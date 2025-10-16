@@ -20,14 +20,27 @@ export type AIResponse = {
   model: AIModel
 }
 
-// Initialize AI clients
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
+// Lazy-initialized AI clients (to avoid build-time initialization)
+let anthropic: Anthropic | null = null
+let openai: OpenAI | null = null
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+function getAnthropicClient(): Anthropic {
+  if (!anthropic) {
+    anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+    })
+  }
+  return anthropic
+}
+
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY!,
+    })
+  }
+  return openai
+}
 
 // Pricing per million tokens (input/output)
 const PRICING = {
@@ -48,7 +61,8 @@ async function generateWithClaude(
     ? `You are an AI writing assistant helping authors write better stories. Here's the context:\n\n${context}`
     : 'You are an AI writing assistant helping authors write better stories.'
 
-  const message = await anthropic.messages.create({
+  const client = getAnthropicClient()
+  const message = await client.messages.create({
     model: 'claude-sonnet-4.5-20250929',
     max_tokens: maxTokens,
     system: systemPrompt,
@@ -92,7 +106,8 @@ async function generateWithGPT5(
     ? `You are an AI writing assistant helping authors write better stories. Here's the context:\n\n${context}`
     : 'You are an AI writing assistant helping authors write better stories.'
 
-  const completion = await openai.chat.completions.create({
+  const client = getOpenAIClient()
+  const completion = await client.chat.completions.create({
     model: 'gpt-5',
     max_tokens: maxTokens,
     messages: [

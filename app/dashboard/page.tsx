@@ -1,42 +1,86 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
-export const dynamic = 'force-dynamic'
+type Project = {
+  id: string
+  name: string
+  type: string
+  created_at: string
+}
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+export default function DashboardPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    projectCount: 0,
+    documentCount: 0,
+    totalWordsGenerated: 0,
+  })
+  const [projects, setProjects] = useState<Project[]>([])
 
-  if (authError || !user) {
-    redirect('/auth/login')
+  useEffect(() => {
+    loadDashboard()
+  }, [])
+
+  const loadDashboard = async () => {
+    try {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        router.push('/auth/login')
+        return
+      }
+
+      // Get user stats
+      const { data: projectsData, count: projectCount } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact' })
+        .eq('user_id', user.id)
+        .limit(5)
+
+      const { data: documentsData, count: documentCount } = await supabase
+        .from('documents')
+        .select('*', { count: 'exact' })
+        .eq('user_id', user.id)
+        .limit(5)
+
+      const { data: aiUsage } = await supabase
+        .from('ai_usage')
+        .select('words_generated')
+        .eq('user_id', user.id)
+
+      const totalWordsGenerated =
+        aiUsage?.reduce((sum, record) => sum + (record.words_generated || 0), 0) || 0
+
+      setStats({
+        projectCount: projectCount || 0,
+        documentCount: documentCount || 0,
+        totalWordsGenerated,
+      })
+      setProjects(projectsData || [])
+    } catch (error) {
+      console.error('Error loading dashboard:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Get user stats with error handling
-  const { data: projects, count: projectCount } = await supabase
-    .from('projects')
-    .select('*', { count: 'exact' })
-    .eq('user_id', user.id)
-    .limit(5)
-
-  const { data: documents, count: documentCount } = await supabase
-    .from('documents')
-    .select('*', { count: 'exact' })
-    .eq('user_id', user.id)
-    .limit(5)
-
-  const { data: aiUsage } = await supabase
-    .from('ai_usage')
-    .select('words_generated')
-    .eq('user_id', user.id)
-
-  const totalWordsGenerated =
-    aiUsage?.reduce((sum, record) => sum + (record.words_generated || 0), 0) || 0
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-muted-foreground">Loading dashboard...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
@@ -52,19 +96,19 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardDescription>Total Projects</CardDescription>
-            <CardTitle className="text-3xl">{projectCount || 0}</CardTitle>
+            <CardTitle className="text-3xl">{stats.projectCount}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
             <CardDescription>Total Documents</CardDescription>
-            <CardTitle className="text-3xl">{documentCount || 0}</CardTitle>
+            <CardTitle className="text-3xl">{stats.documentCount}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
             <CardDescription>AI Words Generated</CardDescription>
-            <CardTitle className="text-3xl">{totalWordsGenerated.toLocaleString()}</CardTitle>
+            <CardTitle className="text-3xl">{stats.totalWordsGenerated.toLocaleString()}</CardTitle>
           </CardHeader>
         </Card>
       </div>

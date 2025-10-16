@@ -276,8 +276,10 @@ export default function ProjectsPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Created {new Date(project.created_at).toLocaleDateString()}
                 </p>
-                <Button variant="outline" className="w-full">
-                  Open Project
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href={`/dashboard/projects/${project.id}`}>
+                    Open Project
+                  </Link>
                 </Button>
               </CardContent>
             </Card>

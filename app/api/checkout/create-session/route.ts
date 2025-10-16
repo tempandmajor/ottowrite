@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { stripe } from '@/lib/stripe/config'
+import { getStripeClient } from '@/lib/stripe/config'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
 
     let customerId = profile?.stripe_customer_id
 
+    const stripe = getStripeClient()
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: user.email!,

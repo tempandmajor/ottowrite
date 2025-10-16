@@ -1,9 +1,20 @@
 import Stripe from 'stripe'
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-09-30.clover',
-  typescript: true,
-})
+// Lazy singleton pattern - only instantiate when actually used at runtime
+let stripeInstance: Stripe | null = null
+
+export function getStripeClient(): Stripe {
+  if (!stripeInstance) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY is not set')
+    }
+    stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-09-30.clover',
+      typescript: true,
+    })
+  }
+  return stripeInstance
+}
 
 // Subscription tier configuration
 export const SUBSCRIPTION_TIERS = {

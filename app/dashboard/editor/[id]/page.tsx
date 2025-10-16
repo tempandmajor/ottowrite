@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { TiptapEditor } from '@/components/editor/tiptap-editor'
+import { ScreenplayEditor } from '@/components/editor/screenplay-editor'
 import { AIAssistant } from '@/components/editor/ai-assistant'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
-import { ArrowLeft, Save, PanelRightClose, PanelRightOpen } from 'lucide-react'
+import { ArrowLeft, Save, PanelRightClose, PanelRightOpen, FileText, Film } from 'lucide-react'
 import Link from 'next/link'
 
 type Document = {
@@ -68,7 +69,13 @@ export default function EditorPage() {
 
       setDocument(data)
       setTitle(data.title)
-      setContent(data.content?.html || '')
+
+      // Load content based on document type
+      if (data.type === 'screenplay' || data.type === 'play') {
+        setContent(JSON.stringify(data.content?.screenplay || []))
+      } else {
+        setContent(data.content?.html || '')
+      }
     } catch (error) {
       console.error('Error loading document:', error)
       toast({
@@ -88,16 +95,26 @@ export default function EditorPage() {
     try {
       const supabase = createClient()
 
-      // Calculate word count from content
-      const text = content.replace(/<[^>]*>/g, ' ')
-      const words = text.trim().split(/\s+/).filter(w => w.length > 0)
-      const wordCount = words.length
+      // Calculate word count and prepare content based on type
+      let contentData: any
+      let wordCount = 0
+
+      if (document.type === 'screenplay' || document.type === 'play') {
+        const screenplay = JSON.parse(content || '[]')
+        const text = screenplay.map((el: any) => el.content).join(' ')
+        wordCount = text.trim().split(/\s+/).filter((w: string) => w.length > 0).length
+        contentData = { screenplay }
+      } else {
+        const text = content.replace(/<[^>]*>/g, ' ')
+        wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length
+        contentData = { html: content }
+      }
 
       const { error } = await supabase
         .from('documents')
         .update({
           title,
-          content: { html: content },
+          content: contentData,
           word_count: wordCount,
           updated_at: new Date().toISOString(),
         })
@@ -108,7 +125,7 @@ export default function EditorPage() {
       setDocument({
         ...document,
         title,
-        content: { html: content },
+        content: contentData,
         word_count: wordCount,
       })
 
@@ -205,11 +222,18 @@ export default function EditorPage() {
       <div className="flex-1 overflow-hidden flex">
         <div className={`flex-1 overflow-auto ${showAI ? 'pr-2' : ''}`}>
           <div className="container mx-auto px-4 py-6 max-w-5xl">
-            <TiptapEditor
-              content={content}
-              onUpdate={setContent}
-              placeholder="Start writing your story..."
-            />
+            {document.type === 'screenplay' || document.type === 'play' ? (
+              <ScreenplayEditor
+                content={JSON.parse(content || '[]')}
+                onUpdate={(newContent) => setContent(JSON.stringify(newContent))}
+              />
+            ) : (
+              <TiptapEditor
+                content={content}
+                onUpdate={setContent}
+                placeholder="Start writing your story..."
+              />
+            )}
           </div>
         </div>
 

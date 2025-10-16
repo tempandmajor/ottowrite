@@ -2,6 +2,12 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  // Skip middleware for RSC (React Server Component) requests
+  // These have _rsc query parameter and should be handled by Next.js directly
+  if (request.nextUrl.searchParams.has('_rsc')) {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })

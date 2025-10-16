@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Trash2, FileText } from 'lucide-react'
+import Link from 'next/link'
 
 type Document = {
   id: string
@@ -334,9 +335,11 @@ export default function DocumentsPage() {
                       {new Date(document.updated_at).toLocaleDateString()}
                     </span>
                   </div>
-                  <Button variant="outline" className="w-full">
-                    Open in Editor
-                  </Button>
+                  <Link href={`/dashboard/editor/${document.id}`}>
+                    <Button variant="outline" className="w-full">
+                      Open in Editor
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>

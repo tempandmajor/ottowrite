@@ -21,9 +21,9 @@ export default async function DashboardLayout({
           return cookieStore.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
+          // Server Components are read-only for cookies after rendering starts
+          // Middleware handles all cookie updates via setAll
+          // This is intentionally empty - DO NOT try to set cookies here
         },
       },
     }

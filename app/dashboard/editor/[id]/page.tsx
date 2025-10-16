@@ -6,10 +6,11 @@ import { createClient } from '@/lib/supabase/client'
 import { TiptapEditor } from '@/components/editor/tiptap-editor'
 import { ScreenplayEditor } from '@/components/editor/screenplay-editor'
 import { AIAssistant } from '@/components/editor/ai-assistant'
+import { ExportModal } from '@/components/editor/export-modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
-import { ArrowLeft, Save, PanelRightClose, PanelRightOpen, FileText, Film } from 'lucide-react'
+import { ArrowLeft, Save, PanelRightClose, PanelRightOpen, FileDown } from 'lucide-react'
 import Link from 'next/link'
 
 type Document = {
@@ -31,6 +32,8 @@ export default function EditorPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showAI, setShowAI] = useState(true)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [userTier, setUserTier] = useState('free')
 
   useEffect(() => {
     loadDocument()
@@ -46,6 +49,17 @@ export default function EditorPage() {
       if (!user) {
         router.push('/auth/login')
         return
+      }
+
+      // Get user profile for tier info
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('subscription_tier')
+        .eq('id', user.id)
+        .single()
+
+      if (profile) {
+        setUserTier(profile.subscription_tier || 'free')
       }
 
       const { data, error } = await supabase
@@ -197,6 +211,14 @@ export default function EditorPage() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setShowExportModal(true)}
+            >
+              <FileDown className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setShowAI(!showAI)}
             >
               {showAI ? (
@@ -249,6 +271,19 @@ export default function EditorPage() {
           </div>
         )}
       </div>
+
+      <ExportModal
+        open={showExportModal}
+        onOpenChange={setShowExportModal}
+        title={title}
+        content={
+          document.type === 'screenplay' || document.type === 'play'
+            ? JSON.parse(content || '[]')
+            : content
+        }
+        isScreenplay={document.type === 'screenplay' || document.type === 'play'}
+        userTier={userTier}
+      />
     </div>
   )
 }

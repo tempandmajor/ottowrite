@@ -45,14 +45,6 @@ type Document = {
   updated_at: string
 }
 
-// Tell Next.js to not statically generate any paths
-export async function generateStaticParams() {
-  return []
-}
-
-export const dynamic = 'force-dynamic'
-export const dynamicParams = true
-
 export default function ProjectDetailPage() {
   const params = useParams()
   const router = useRouter()

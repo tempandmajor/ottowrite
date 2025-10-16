@@ -167,7 +167,7 @@ export async function exportToDOCX(options: ExportOptions): Promise<void> {
       const { type, content: text } = element
 
       let indent = 0
-      let alignment = AlignmentType.LEFT
+      let alignment: typeof AlignmentType[keyof typeof AlignmentType] = AlignmentType.LEFT
       let bold = false
 
       switch (type) {

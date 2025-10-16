@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { TiptapEditor } from '@/components/editor/tiptap-editor'
+import { AIAssistant } from '@/components/editor/ai-assistant'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Save, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import Link from 'next/link'
 
 type Document = {
@@ -28,6 +29,7 @@ export default function EditorPage() {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [showAI, setShowAI] = useState(true)
 
   useEffect(() => {
     loadDocument()
@@ -139,6 +141,11 @@ export default function EditorPage() {
     return () => clearInterval(interval)
   }, [content, title, document])
 
+  const insertAIText = (text: string) => {
+    // Append AI text to current content
+    setContent(content + '\n\n' + text)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -169,21 +176,54 @@ export default function EditorPage() {
               placeholder="Document title..."
             />
           </div>
-          <Button onClick={saveDocument} disabled={saving}>
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAI(!showAI)}
+            >
+              {showAI ? (
+                <>
+                  <PanelRightClose className="h-4 w-4 mr-2" />
+                  Hide AI
+                </>
+              ) : (
+                <>
+                  <PanelRightOpen className="h-4 w-4 mr-2" />
+                  Show AI
+                </>
+              )}
+            </Button>
+            <Button onClick={saveDocument} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <div className="container mx-auto px-4 py-6 max-w-5xl">
-          <TiptapEditor
-            content={content}
-            onUpdate={setContent}
-            placeholder="Start writing your story..."
-          />
+      <div className="flex-1 overflow-hidden flex">
+        <div className={`flex-1 overflow-auto ${showAI ? 'pr-2' : ''}`}>
+          <div className="container mx-auto px-4 py-6 max-w-5xl">
+            <TiptapEditor
+              content={content}
+              onUpdate={setContent}
+              placeholder="Start writing your story..."
+            />
+          </div>
         </div>
+
+        {showAI && (
+          <div className="w-96 border-l overflow-auto">
+            <div className="p-4 h-full">
+              <AIAssistant
+                documentId={document.id}
+                currentContent={content}
+                onInsertText={insertAIText}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

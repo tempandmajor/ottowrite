@@ -12,7 +12,7 @@ const plans = [
     name: 'Free',
     price: '$0',
     period: 'forever',
-    description: 'Perfect for trying out OttoWrite',
+    description: 'Perfect for trying out Ottowrite',
     features: [
       '25,000 AI words/month',
       '5 documents max',
@@ -125,7 +125,7 @@ export default function PricingPage() {
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <Link href="/" className="text-2xl font-bold">
-            OttoWrite
+            Ottowrite
           </Link>
           <div className="flex gap-4">
             <Link href="/auth/login">

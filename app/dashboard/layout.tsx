@@ -31,7 +31,7 @@ export default async function DashboardLayout({
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-8">
             <Link href="/dashboard" className="text-2xl font-bold">
-              OttoWrite
+              Ottowrite
             </Link>
             <nav className="flex gap-6">
               <Link

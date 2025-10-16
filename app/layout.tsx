@@ -6,8 +6,8 @@ import { Toaster } from '@/components/ui/toaster'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'OttoWrite - AI-Powered Writing Assistant',
-  description: 'Write better and faster with OttoWrite. The intelligent writing assistant for novelists, screenwriters, and content creators.',
+  title: 'Ottowrite - AI-Powered Writing Assistant',
+  description: 'Write better and faster with Ottowrite. The intelligent writing assistant for novelists, screenwriters, and content creators.',
 }
 
 export default function RootLayout({

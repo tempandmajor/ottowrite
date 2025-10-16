@@ -1,4 +1,4 @@
-# OttoWrite - AI-Powered Writing Assistant
+# Ottowrite - AI-Powered Writing Assistant
 
 An intelligent writing assistant for novelists, screenwriters, and content creators. Write better and faster with multi-model AI assistance.
 

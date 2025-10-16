@@ -1,31 +1,39 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+
+export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser()
 
-  // Get user stats
+  if (authError || !user) {
+    redirect('/auth/login')
+  }
+
+  // Get user stats with error handling
   const { data: projects, count: projectCount } = await supabase
     .from('projects')
     .select('*', { count: 'exact' })
-    .eq('user_id', user!.id)
+    .eq('user_id', user.id)
     .limit(5)
 
   const { data: documents, count: documentCount } = await supabase
     .from('documents')
     .select('*', { count: 'exact' })
-    .eq('user_id', user!.id)
+    .eq('user_id', user.id)
     .limit(5)
 
   const { data: aiUsage } = await supabase
     .from('ai_usage')
     .select('words_generated')
-    .eq('user_id', user!.id)
+    .eq('user_id', user.id)
 
   const totalWordsGenerated =
     aiUsage?.reduce((sum, record) => sum + (record.words_generated || 0), 0) || 0

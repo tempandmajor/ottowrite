@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -64,6 +65,24 @@ export function TiptapEditor({
       },
     },
   })
+
+  useEffect(() => {
+    if (!editor) return
+
+    const normalize = (value: string) => {
+      if (!value) return ''
+      const trimmed = value.replace(/\s+/g, '')
+      if (trimmed === '<p></p>') return ''
+      return value
+    }
+
+    const incoming = normalize(content)
+    const current = normalize(editor.getHTML())
+
+    if (incoming !== current) {
+      editor.commands.setContent(incoming || '<p></p>', { emitUpdate: false })
+    }
+  }, [editor, content])
 
   if (!editor) {
     return null

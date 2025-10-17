@@ -7,10 +7,11 @@ import { TiptapEditor } from '@/components/editor/tiptap-editor'
 import { ScreenplayEditor } from '@/components/editor/screenplay-editor'
 import { AIAssistant } from '@/components/editor/ai-assistant'
 import { ExportModal } from '@/components/editor/export-modal'
+import { VersionHistory } from '@/components/editor/version-history'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
-import { ArrowLeft, Save, PanelRightClose, PanelRightOpen, FileDown } from 'lucide-react'
+import { ArrowLeft, Save, PanelRightClose, PanelRightOpen, FileDown, History, Search } from 'lucide-react'
 import Link from 'next/link'
 
 type Document = {
@@ -21,6 +22,21 @@ type Document = {
   word_count: number
   project_id: string
 }
+
+const isScriptType = (type?: string) => type === 'screenplay' || type === 'play'
+
+const generateElementId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 
 export default function EditorPage() {
   const params = useParams()
@@ -33,6 +49,7 @@ export default function EditorPage() {
   const [saving, setSaving] = useState(false)
   const [showAI, setShowAI] = useState(true)
   const [showExportModal, setShowExportModal] = useState(false)
+  const [showVersionHistory, setShowVersionHistory] = useState(false)
   const [userTier, setUserTier] = useState('free')
 
   useEffect(() => {
@@ -113,10 +130,24 @@ export default function EditorPage() {
       let contentData: any
       let wordCount = 0
 
-      if (document.type === 'screenplay' || document.type === 'play') {
-        const screenplay = JSON.parse(content || '[]')
-        const text = screenplay.map((el: any) => el.content).join(' ')
-        wordCount = text.trim().split(/\s+/).filter((w: string) => w.length > 0).length
+      if (isScriptType(document.type)) {
+        let screenplay: any[] = []
+        try {
+          screenplay = JSON.parse(content || '[]')
+        } catch (parseError) {
+          console.error('Error parsing screenplay content:', parseError)
+          screenplay = []
+        }
+
+        const text = screenplay
+          .map((el: any) => (el?.content ?? el?.text ?? ''))
+          .join(' ')
+
+        wordCount = text
+          .trim()
+          .split(/\s+/)
+          .filter((w: string) => w.length > 0).length
+
         contentData = { screenplay }
       } else {
         const text = content.replace(/<[^>]*>/g, ' ')
@@ -136,12 +167,16 @@ export default function EditorPage() {
 
       if (error) throw error
 
-      setDocument({
-        ...document,
-        title,
-        content: contentData,
-        word_count: wordCount,
-      })
+      setDocument((prev) =>
+        prev
+          ? {
+              ...prev,
+              title,
+              content: contentData,
+              word_count: wordCount,
+            }
+          : prev
+      )
 
       toast({
         title: 'Success',
@@ -159,22 +194,95 @@ export default function EditorPage() {
     }
   }
 
-  // Auto-save every 30 seconds
+  // Auto-save every 3 seconds
   useEffect(() => {
     if (!document) return
 
     const interval = setInterval(() => {
-      if (content !== (document.content?.html || '') || title !== document.title) {
+      if (!document || saving) {
+        return
+      }
+
+      const originalSignature = isScriptType(document.type)
+        ? JSON.stringify(document.content?.screenplay || [])
+        : document.content?.html || ''
+
+      const currentSignature = isScriptType(document.type)
+        ? (() => {
+            try {
+              return JSON.stringify(JSON.parse(content || '[]'))
+            } catch (error) {
+              console.error('Error parsing screenplay content for autosave:', error)
+              return JSON.stringify([])
+            }
+          })()
+        : content
+
+      if (currentSignature !== originalSignature || title !== document.title) {
         saveDocument()
       }
-    }, 30000)
+    }, 3000)
 
     return () => clearInterval(interval)
-  }, [content, title, document])
+  }, [content, title, document, saving])
 
   const insertAIText = (text: string) => {
-    // Append AI text to current content
-    setContent(content + '\n\n' + text)
+    if (!text.trim()) return
+
+    if (isScriptType(document?.type)) {
+      const segments = text
+        .split(/\n{2,}/)
+        .map((segment) => segment.trim())
+        .filter((segment) => segment.length > 0)
+
+      if (segments.length === 0) return
+
+      setContent((prev) => {
+        let screenplay: any[] = []
+        try {
+          screenplay = JSON.parse(prev || '[]')
+        } catch (error) {
+          console.error('Error parsing screenplay content for AI insert:', error)
+          screenplay = []
+        }
+
+        const additions = segments.map((segment) => ({
+          id: generateElementId(),
+          type: 'action',
+          content: segment.replace(/\s+/g, ' ').trim(),
+        }))
+
+        return JSON.stringify([...screenplay, ...additions])
+      })
+      return
+    }
+
+    const paragraphs = text
+      .split(/\n{2,}/)
+      .map((paragraph) => paragraph.trim())
+      .filter((paragraph) => paragraph.length > 0)
+
+    if (paragraphs.length === 0) return
+
+    const htmlSnippet = paragraphs
+      .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br />')}</p>`)
+      .join('')
+
+    setContent((prev) => {
+      const base = prev || ''
+      return base ? base + htmlSnippet : htmlSnippet
+    })
+  }
+
+  const handleRestoreVersion = (versionContent: any, versionTitle: string) => {
+    setTitle(versionTitle)
+    if (isScriptType(document?.type)) {
+      setContent(JSON.stringify(versionContent?.screenplay || []))
+    } else {
+      setContent(versionContent?.html || '')
+    }
+    // Save immediately after restore
+    setTimeout(() => saveDocument(), 100)
   }
 
   if (loading) {
@@ -208,6 +316,24 @@ export default function EditorPage() {
             />
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+            >
+              <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
+                <Search className="h-4 w-4 mr-2" />
+                Plot Analysis
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowVersionHistory(true)}
+            >
+              <History className="h-4 w-4 mr-2" />
+              History
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -283,6 +409,13 @@ export default function EditorPage() {
         }
         isScreenplay={document.type === 'screenplay' || document.type === 'play'}
         userTier={userTier}
+      />
+
+      <VersionHistory
+        open={showVersionHistory}
+        onOpenChange={setShowVersionHistory}
+        documentId={document.id}
+        onRestoreVersion={handleRestoreVersion}
       />
     </div>
   )

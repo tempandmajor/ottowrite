@@ -108,3 +108,21 @@ export function getMonthlyAIWordLimit(tier: SubscriptionTier): number {
 export function getMaxDocuments(tier: SubscriptionTier): number {
   return SUBSCRIPTION_TIERS[tier].features.maxDocuments
 }
+
+export function getTierByPriceId(priceId?: string | null): SubscriptionTier | null {
+  if (!priceId) return null
+
+  for (const [tierKey, config] of Object.entries(SUBSCRIPTION_TIERS)) {
+    if (config.priceId && config.priceId === priceId) {
+      return tierKey as SubscriptionTier
+    }
+  }
+
+  return null
+}
+
+export function getAllowedPriceIds(): string[] {
+  return Object.values(SUBSCRIPTION_TIERS)
+    .map(({ priceId }) => priceId)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
+}

@@ -1,33 +1,15 @@
 import { redirect } from 'next/navigation'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { SignOutButton } from '@/components/auth/sign-out-button'
+import { createClient } from '@/lib/supabase/server'
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const cookieStore = await cookies()
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          // Server Components are read-only for cookies after rendering starts
-          // Middleware handles all cookie updates via setAll
-          // This is intentionally empty - DO NOT try to set cookies here
-        },
-      },
-    }
-  )
+  const supabase = await createClient()
 
   const {
     data: { user },
@@ -58,6 +40,12 @@ export default async function DashboardLayout({
                 className="text-sm hover:text-foreground transition-colors"
               >
                 Documents
+              </Link>
+              <Link
+                href="/dashboard/settings"
+                className="text-sm hover:text-foreground transition-colors"
+              >
+                Settings
               </Link>
             </nav>
           </div>

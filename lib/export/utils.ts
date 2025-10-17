@@ -1,8 +1,9 @@
 import jsPDF from 'jspdf'
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx'
 import { saveAs } from 'file-saver'
+import JSZip from 'jszip'
 
-export type ExportFormat = 'pdf' | 'docx' | 'markdown' | 'txt' | 'fountain' | 'fdx'
+export type ExportFormat = 'pdf' | 'docx' | 'markdown' | 'txt' | 'epub' | 'fountain' | 'fdx'
 
 export interface ExportOptions {
   format: ExportFormat
@@ -438,6 +439,133 @@ function escapeXml(text: string): string {
 }
 
 /**
+ * Export document as EPUB
+ */
+export async function exportToEPUB(options: ExportOptions): Promise<void> {
+  const { title, content, author } = options
+
+  if (Array.isArray(content)) {
+    throw new Error('EPUB export currently only supports prose format')
+  }
+
+  const zip = new JSZip()
+
+  // Generate UUID for the book
+  const bookId = `urn:uuid:${crypto.randomUUID()}`
+  const plainText = stripHtml(content)
+  const paragraphs = plainText.split('\n\n').filter(p => p.trim())
+
+  // META-INF/container.xml
+  zip.folder('META-INF')?.file('container.xml', `<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`)
+
+  // mimetype
+  zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' })
+
+  // OEBPS/content.opf (Package document)
+  const contentOpf = `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">${bookId}</dc:identifier>
+    <dc:title>${escapeXml(title)}</dc:title>
+    ${author ? `<dc:creator>${escapeXml(author)}</dc:creator>` : ''}
+    <dc:language>en</dc:language>
+    <meta property="dcterms:modified">${new Date().toISOString().split('.')[0]}Z</meta>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="content" href="content.xhtml" media-type="application/xhtml+xml"/>
+    <item id="stylesheet" href="stylesheet.css" media-type="text/css"/>
+  </manifest>
+  <spine>
+    <itemref idref="content"/>
+  </spine>
+</package>`
+
+  zip.folder('OEBPS')?.file('content.opf', contentOpf)
+
+  // OEBPS/nav.xhtml (Navigation document)
+  const navXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+  <title>${escapeXml(title)}</title>
+  <meta charset="UTF-8"/>
+</head>
+<body>
+  <nav epub:type="toc">
+    <h1>Table of Contents</h1>
+    <ol>
+      <li><a href="content.xhtml">${escapeXml(title)}</a></li>
+    </ol>
+  </nav>
+</body>
+</html>`
+
+  zip.folder('OEBPS')?.file('nav.xhtml', navXhtml)
+
+  // OEBPS/content.xhtml (Main content)
+  const contentHtml = paragraphs.map(p => `    <p>${escapeXml(p)}</p>`).join('\n')
+  const contentXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>${escapeXml(title)}</title>
+  <meta charset="UTF-8"/>
+  <link rel="stylesheet" type="text/css" href="stylesheet.css"/>
+</head>
+<body>
+  <section epub:type="chapter">
+    <h1>${escapeXml(title)}</h1>
+    ${author ? `<p class="author">by ${escapeXml(author)}</p>` : ''}
+${contentHtml}
+  </section>
+</body>
+</html>`
+
+  zip.folder('OEBPS')?.file('content.xhtml', contentXhtml)
+
+  // OEBPS/stylesheet.css
+  const stylesheet = `body {
+  font-family: Georgia, serif;
+  line-height: 1.6;
+  margin: 2em;
+}
+
+h1 {
+  font-size: 2em;
+  margin-bottom: 0.5em;
+  text-align: center;
+}
+
+.author {
+  text-align: center;
+  font-style: italic;
+  margin-bottom: 2em;
+}
+
+p {
+  text-indent: 1.5em;
+  margin: 0;
+  text-align: justify;
+}
+
+p:first-of-type {
+  text-indent: 0;
+}`
+
+  zip.folder('OEBPS')?.file('stylesheet.css', stylesheet)
+
+  // Generate and save the EPUB file
+  const blob = await zip.generateAsync({ type: 'blob' })
+  saveAs(blob, `${title}.epub`)
+}
+
+/**
  * Main export function that routes to the appropriate exporter
  */
 export async function exportDocument(options: ExportOptions): Promise<void> {
@@ -450,6 +578,8 @@ export async function exportDocument(options: ExportOptions): Promise<void> {
       return exportToMarkdown(options)
     case 'txt':
       return exportToTXT(options)
+    case 'epub':
+      return exportToEPUB(options)
     case 'fountain':
       return exportToFountain(options)
     case 'fdx':

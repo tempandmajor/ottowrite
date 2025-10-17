@@ -44,22 +44,6 @@ export default function SignupPage() {
       }
 
       if (data.user) {
-        // Create user profile
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .insert([
-            {
-              id: data.user.id,
-              email: data.user.email,
-              full_name: fullName,
-              subscription_tier: 'free',
-            },
-          ])
-
-        if (profileError) {
-          console.error('Error creating profile:', profileError)
-        }
-
         toast({
           title: 'Success',
           description: 'Account created successfully! Please check your email to verify your account.',

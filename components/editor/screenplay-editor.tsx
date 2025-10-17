@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
@@ -23,11 +23,39 @@ export function ScreenplayEditor({
   onUpdate,
   editable = true,
 }: ScreenplayEditorProps) {
-  const [elements, setElements] = useState<ScreenplayElement[]>(
-    content.length > 0 ? content : [{ id: '1', type: 'scene', content: '' }]
-  )
+  const generateElementId = () =>
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : Date.now().toString()
+
+  const createDefaultElement = (): ScreenplayElement => ({
+    id: generateElementId(),
+    type: 'scene',
+    content: '',
+  })
+
+  const normalizeElements = (items: ScreenplayElement[]) => {
+    const base = items.length > 0 ? items : [createDefaultElement()]
+    return base.map((item) => ({
+      ...item,
+      id: item.id || generateElementId(),
+      content: item.content ?? (item as any).text ?? '',
+    }))
+  }
+
+  const [elements, setElements] = useState<ScreenplayElement[]>(normalizeElements(content))
   const [focusedIndex, setFocusedIndex] = useState(0)
   const inputRefs = useRef<(HTMLTextAreaElement | null)[]>([])
+
+  useEffect(() => {
+    const incoming = normalizeElements(content)
+    const incomingString = JSON.stringify(incoming)
+    const currentString = JSON.stringify(elements)
+
+    if (incomingString !== currentString) {
+      setElements(incoming)
+    }
+  }, [content, elements])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>, index: number) => {
     const element = elements[index]
@@ -50,7 +78,7 @@ export function ScreenplayEditor({
       e.preventDefault()
 
       const newElement: ScreenplayElement = {
-        id: Date.now().toString(),
+        id: generateElementId(),
         type: getNextElementType(element.type),
         content: '',
       }

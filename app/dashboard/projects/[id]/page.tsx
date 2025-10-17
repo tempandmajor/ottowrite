@@ -24,8 +24,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { Plus, ArrowLeft, FileText, Trash2, Edit } from 'lucide-react'
+import { Plus, ArrowLeft, FileText, BookOpen, Lightbulb, Users } from 'lucide-react'
 import Link from 'next/link'
+import { DocumentCard } from '@/components/dashboard/document-card'
+import { TemplateDialog } from '@/components/dashboard/template-dialog'
 
 type Project = {
   id: string
@@ -53,6 +55,7 @@ export default function ProjectDetailPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     type: 'novel' as 'novel' | 'screenplay' | 'play' | 'short_story',
@@ -249,13 +252,36 @@ export default function ProjectDetailPage() {
             </p>
           </div>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Document
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href={`/dashboard/projects/${project.id}/characters`}>
+              <Users className="mr-2 h-4 w-4" />
+              Characters
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href={`/dashboard/projects/${project.id}/story-structure`}>
+              <BookOpen className="mr-2 h-4 w-4" />
+              Story Structure
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href={`/dashboard/projects/${project.id}/outlines`}>
+              <Lightbulb className="mr-2 h-4 w-4" />
+              AI Outlines
+            </Link>
+          </Button>
+          <Button variant="outline" onClick={() => setShowTemplateDialog(true)}>
+            <FileText className="mr-2 h-4 w-4" />
+            From Template
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Document
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Document</DialogTitle>
@@ -303,6 +329,7 @@ export default function ProjectDetailPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Documents List */}
@@ -322,42 +349,21 @@ export default function ProjectDetailPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {documents.map((doc) => (
-            <Card key={doc.id} className="relative group">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">{doc.title}</CardTitle>
-                    <CardDescription className="mt-1">
-                      {doc.type.replace('_', ' ')} • {doc.word_count.toLocaleString()} words
-                    </CardDescription>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteDocument(doc.id)}
-                    className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Last edited {new Date(doc.updated_at).toLocaleDateString()}
-                </p>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => router.push(`/dashboard/editor/${doc.id}`)}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Open Editor
-                </Button>
-              </CardContent>
-            </Card>
+            <DocumentCard
+              key={doc.id}
+              document={doc}
+              onDelete={loadDocuments}
+              onDuplicate={loadDocuments}
+            />
           ))}
         </div>
       )}
+
+      <TemplateDialog
+        open={showTemplateDialog}
+        onOpenChange={setShowTemplateDialog}
+        projectId={project.id}
+      />
     </div>
   )
 }

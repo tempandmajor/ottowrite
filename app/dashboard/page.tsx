@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { TemplateDialog } from '@/components/dashboard/template-dialog'
+import { FileText } from 'lucide-react'
 
 type Project = {
   id: string
@@ -17,6 +19,7 @@ type Project = {
 export default function DashboardPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false)
   const [stats, setStats] = useState({
     projectCount: 0,
     documentCount: 0,
@@ -84,11 +87,17 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground mt-2">
-          Welcome back! Here's an overview of your writing projects.
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground mt-2">
+            Welcome back! Here's an overview of your writing projects.
+          </p>
+        </div>
+        <Button onClick={() => setShowTemplateDialog(true)}>
+          <FileText className="h-4 w-4 mr-2" />
+          New from Template
+        </Button>
       </div>
 
       {/* Stats */}
@@ -152,6 +161,11 @@ export default function DashboardPage() {
           </Card>
         )}
       </div>
+
+      <TemplateDialog
+        open={showTemplateDialog}
+        onOpenChange={setShowTemplateDialog}
+      />
     </div>
   )
 }

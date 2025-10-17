@@ -41,13 +41,16 @@ npm install
 
 3. Set up environment variables:
 
-Create a \`.env.local\` file in the root directory:
+Create a `.env.local` file in the root directory:
 
-\`\`\`env
+```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-\`\`\`
-
+# Server-only keys (never expose in the browser)
+SUPABASE_ANON_KEY=your_supabase_anon_key         # optional fallback for SSR
+SUPABASE_URL=your_supabase_url                         # optional fallback for SSR
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
 4. Run the development server:
 \`\`\`bash
 npm run dev
@@ -63,22 +66,23 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 3. Add the following environment variables in Vercel Dashboard → Settings → Environment Variables:
 
-- \`NEXT_PUBLIC_SUPABASE_URL\`
-- \`NEXT_PUBLIC_SUPABASE_ANON_KEY\`
-
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (Server, Encrypted)
+- `SUPABASE_ANON_KEY` (Server, optional fallback)
+- `SUPABASE_URL` (Server, optional fallback)
 4. Deploy!
 
 ## Database Schema
 
 The application uses the following tables in Supabase:
 
-- \`projects\` - Writing projects (novels, screenplays, etc.)
-- \`documents\` - Individual documents within projects
-- \`scenes\` - Chapters/scenes within documents
-- \`ai_usage\` - AI model usage tracking
-- \`user_profiles\` - User subscription tiers and preferences
+- `user_profiles` - User subscription tiers, billing identifiers, and AI usage
+- `projects` - Writing projects (novels, screenplays, etc.)
+- `documents` - Individual documents within projects
+- `ai_usage` - AI model usage tracking
 
-All tables have Row Level Security (RLS) enabled for data protection.
+Row Level Security (RLS) is enforced on every table with policies limiting access to the authenticated user. Background jobs and Stripe webhooks use the Supabase service role key to perform privileged updates.
 
 ## Project Structure
 

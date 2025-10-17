@@ -34,3 +34,8 @@ next-env.d.ts
 # IDE
 .vscode
 .idea
+
+# Claude Code settings (contains sensitive credentials)
+.claude/
+.claude/**
+*.claude

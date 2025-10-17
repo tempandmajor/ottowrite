@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
-import { getStripeClient } from '@/lib/stripe/config'
-import { createClient } from '@/lib/supabase/server'
+import { getStripeClient, getTierByPriceId } from '@/lib/stripe/config'
+import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import Stripe from 'stripe'
 
 export const dynamic = 'force-dynamic'
@@ -29,7 +29,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
-  const supabase = await createClient()
+  const supabase = createServiceRoleClient()
+  const isoFromUnix = (value?: number | null) =>
+    typeof value === 'number' ? new Date(value * 1000).toISOString() : null
+
+  const updateProfile = (
+    update: Record<string, unknown>,
+    identifiers: {
+      userId?: string | null
+      subscriptionId?: string | null
+      customerId?: string | null
+    }
+  ) => {
+    let query = supabase.from('user_profiles').update(update)
+
+    if (identifiers.userId) {
+      query = query.eq('id', identifiers.userId)
+    } else if (identifiers.subscriptionId) {
+      query = query.eq('stripe_subscription_id', identifiers.subscriptionId)
+    } else if (identifiers.customerId) {
+      query = query.eq('stripe_customer_id', identifiers.customerId)
+    } else {
+      throw new Error('No identifier provided for profile update')
+    }
+
+    return query
+  }
 
   try {
     switch (event.type) {
@@ -40,33 +65,58 @@ export async function POST(request: NextRequest) {
           const subscription = await stripe.subscriptions.retrieve(
             session.subscription as string,
             { expand: ['items.data.price'] }
+          ) as Stripe.Subscription
+
+          const priceId = subscription.items.data[0]?.price?.id ?? null
+          const subscriptionTier =
+            getTierByPriceId(priceId) ??
+            ((subscription.metadata?.subscription_tier as string | undefined) ??
+              (session.metadata?.subscription_tier as string | undefined) ??
+              'free')
+          const supabaseUserId =
+            (session.metadata?.supabase_user_id as string | undefined) ??
+            (subscription.metadata?.supabase_user_id as string | undefined)
+          const stripeCustomerId =
+            typeof session.customer === 'string'
+              ? session.customer
+              : session.customer?.id ?? null
+
+          if (!supabaseUserId) {
+            console.warn(
+              'checkout.session.completed missing supabase_user_id metadata',
+              { sessionId: session.id }
+            )
+            break
+          }
+
+          const { error } = await updateProfile(
+            {
+              stripe_customer_id: stripeCustomerId,
+              stripe_subscription_id: subscription.id,
+              stripe_price_id: priceId,
+              subscription_status: subscription.status,
+              subscription_tier: subscriptionTier,
+              subscription_current_period_start: isoFromUnix(
+                (subscription as any).current_period_start
+              ),
+              subscription_current_period_end: isoFromUnix(
+                (subscription as any).current_period_end
+              ),
+              ai_words_used_this_month: 0,
+              ai_words_reset_date: isoFromUnix(
+                (subscription as any).current_period_end
+              ),
+              updated_at: new Date().toISOString(),
+            },
+            {
+              userId: supabaseUserId,
+              subscriptionId: subscription.id,
+              customerId: stripeCustomerId,
+            }
           )
 
-          const priceId = subscription.items.data[0]?.price?.id
-
-          if (priceId) {
-            // Update user profile with subscription details
-            await supabase
-              .from('user_profiles')
-              .update({
-                stripe_customer_id: session.customer as string,
-                stripe_subscription_id: subscription.id,
-                stripe_price_id: priceId,
-                subscription_status: subscription.status,
-                subscription_tier: getPriceIdTier(priceId),
-                subscription_current_period_start: new Date(
-                  (subscription as any).current_period_start * 1000
-                ).toISOString(),
-                subscription_current_period_end: new Date(
-                  (subscription as any).current_period_end * 1000
-                ).toISOString(),
-                ai_words_used_this_month: 0,
-                ai_words_reset_date: new Date(
-                  (subscription as any).current_period_end * 1000
-                ).toISOString(),
-                updated_at: new Date().toISOString(),
-              })
-              .eq('email', session.customer_details?.email)
+          if (error) {
+            throw error
           }
         }
         break
@@ -74,24 +124,41 @@ export async function POST(request: NextRequest) {
 
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription
-        const priceId = subscription.items.data[0]?.price?.id
+        const priceId = subscription.items.data[0]?.price?.id ?? null
+        const subscriptionTier =
+          getTierByPriceId(priceId) ??
+          (subscription.metadata?.subscription_tier as string | undefined) ??
+          'free'
+        const supabaseUserId =
+          (subscription.metadata?.supabase_user_id as string | undefined) ??
+          null
+        const stripeCustomerId =
+          typeof subscription.customer === 'string'
+            ? subscription.customer
+            : subscription.customer?.id ?? null
 
-        if (priceId) {
-          await supabase
-            .from('user_profiles')
-            .update({
-              stripe_price_id: priceId,
-              subscription_status: subscription.status,
-              subscription_tier: getPriceIdTier(priceId),
-              subscription_current_period_start: new Date(
-                (subscription as any).current_period_start * 1000
-              ).toISOString(),
-              subscription_current_period_end: new Date(
-                (subscription as any).current_period_end * 1000
-              ).toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('stripe_subscription_id', subscription.id)
+        const { error } = await updateProfile(
+          {
+            stripe_price_id: priceId,
+            subscription_status: subscription.status,
+            subscription_tier: subscriptionTier,
+            subscription_current_period_start: isoFromUnix(
+              (subscription as any).current_period_start
+            ),
+            subscription_current_period_end: isoFromUnix(
+              (subscription as any).current_period_end
+            ),
+            updated_at: new Date().toISOString(),
+          },
+          {
+            userId: supabaseUserId,
+            subscriptionId: subscription.id,
+            customerId: stripeCustomerId,
+          }
+        )
+
+        if (error) {
+          throw error
         }
         break
       }
@@ -99,48 +166,130 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
 
-        await supabase
-          .from('user_profiles')
-          .update({
+        const supabaseUserId =
+          (subscription.metadata?.supabase_user_id as string | undefined) ??
+          null
+        const stripeCustomerId =
+          typeof subscription.customer === 'string'
+            ? subscription.customer
+            : subscription.customer?.id ?? null
+
+        const { error } = await updateProfile(
+          {
             subscription_status: 'canceled',
             subscription_tier: 'free',
             stripe_subscription_id: null,
             stripe_price_id: null,
             updated_at: new Date().toISOString(),
-          })
-          .eq('stripe_subscription_id', subscription.id)
+          },
+          {
+            userId: supabaseUserId,
+            subscriptionId: subscription.id,
+            customerId: stripeCustomerId,
+          }
+        )
+
+        if (error) {
+          throw error
+        }
         break
       }
 
       case 'invoice.payment_succeeded': {
-        const invoice = event.data.object as any
+        const invoice = event.data.object as Stripe.Invoice
+        const subscriptionId =
+          typeof (invoice as any).subscription === 'string'
+            ? (invoice as any).subscription
+            : (invoice as any).subscription?.id
 
-        if (invoice.subscription && typeof invoice.subscription === 'string') {
-          // Reset monthly usage on successful payment
-          await supabase
-            .from('user_profiles')
-            .update({
+        if (subscriptionId) {
+          let supabaseUserId: string | null = null
+
+          try {
+            const subscription = await stripe.subscriptions.retrieve(
+              subscriptionId,
+              { expand: ['items.data.price'] }
+            )
+            supabaseUserId =
+              (subscription.metadata?.supabase_user_id as string | undefined) ??
+              null
+          } catch (subscriptionError) {
+            console.error(
+              'Failed to retrieve subscription metadata for invoice.payment_succeeded',
+              subscriptionError
+            )
+          }
+
+          const stripeCustomerId =
+            typeof invoice.customer === 'string'
+              ? invoice.customer
+              : invoice.customer?.id ?? null
+
+          const { error } = await updateProfile(
+            {
               ai_words_used_this_month: 0,
               ai_words_reset_date: new Date().toISOString(),
               subscription_status: 'active',
               updated_at: new Date().toISOString(),
-            })
-            .eq('stripe_subscription_id', invoice.subscription)
+            },
+            {
+              userId: supabaseUserId,
+              subscriptionId,
+              customerId: stripeCustomerId,
+            }
+          )
+
+          if (error) {
+            throw error
+          }
         }
         break
       }
 
       case 'invoice.payment_failed': {
-        const invoice = event.data.object as any
+        const invoice = event.data.object as Stripe.Invoice
+        const subscriptionId =
+          typeof (invoice as any).subscription === 'string'
+            ? (invoice as any).subscription
+            : (invoice as any).subscription?.id
 
-        if (invoice.subscription && typeof invoice.subscription === 'string') {
-          await supabase
-            .from('user_profiles')
-            .update({
+        if (subscriptionId) {
+          let supabaseUserId: string | null = null
+
+          try {
+            const subscription = await stripe.subscriptions.retrieve(
+              subscriptionId
+            )
+            supabaseUserId =
+              (subscription.metadata?.supabase_user_id as string | undefined) ??
+              null
+          } catch (subscriptionError) {
+            console.error(
+              'Failed to retrieve subscription metadata for invoice.payment_failed',
+              subscriptionError
+            )
+          }
+
+          const stripeCustomerId =
+            typeof invoice.customer === 'string'
+              ? invoice.customer
+              : invoice.customer?.id ?? null
+
+          const { error } = await updateProfile(
+            {
               subscription_status: 'past_due',
               updated_at: new Date().toISOString(),
-            })
-            .eq('stripe_subscription_id', invoice.subscription)
+            },
+            {
+              userId: supabaseUserId,
+              subscriptionId,
+              customerId: stripeCustomerId,
+            }
+          )
+
+          if (error) {
+            throw error
+          }
         }
         break
       }
@@ -157,14 +306,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-// Helper function to map price IDs to subscription tiers
-function getPriceIdTier(priceId: string): string {
-  const priceMap: Record<string, string> = {
-    [process.env.STRIPE_PRICE_HOBBYIST!]: 'hobbyist',
-    [process.env.STRIPE_PRICE_PROFESSIONAL!]: 'professional',
-    [process.env.STRIPE_PRICE_STUDIO!]: 'studio',
-  }
-  return priceMap[priceId] || 'free'
 }

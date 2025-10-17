@@ -41,6 +41,13 @@ const exportFormats = [
     tiers: ['hobbyist', 'professional', 'studio'],
   },
   {
+    id: 'epub' as ExportFormat,
+    label: 'EPUB',
+    description: 'Electronic publication format for e-readers',
+    icon: FileText,
+    tiers: ['hobbyist', 'professional', 'studio'],
+  },
+  {
     id: 'markdown' as ExportFormat,
     label: 'Markdown',
     description: 'Markdown format (.md)',
@@ -160,7 +167,7 @@ export function ExportModal({
             <div className="p-3 bg-muted rounded-lg text-sm">
               <p className="font-medium mb-1">Want more export formats?</p>
               <p className="text-muted-foreground">
-                Upgrade to Hobbyist for DOCX, or Professional for screenplay formats (Fountain, Final Draft).
+                Upgrade to Hobbyist for DOCX and EPUB, or Professional for screenplay formats (Fountain, Final Draft).
               </p>
             </div>
           )}

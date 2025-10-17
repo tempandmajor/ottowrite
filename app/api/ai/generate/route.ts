@@ -3,6 +3,15 @@ import { createClient } from '@/lib/supabase/server'
 import { generateWithAI, AIModel } from '@/lib/ai/service'
 import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
 
+const MAX_PROMPT_LENGTH = 5000
+const MAX_COMPLETION_TOKENS = 3000
+const DEFAULT_MAX_TOKENS = 2000
+const ALLOWED_MODELS: AIModel[] = [
+  'claude-sonnet-4.5',
+  'gpt-5',
+  'deepseek-v3',
+]
+
 // Force dynamic rendering - don't try to statically analyze this route
 export const dynamic = 'force-dynamic'
 
@@ -47,19 +56,63 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { model, prompt, context, maxTokens, documentId } = body
 
-    if (!model || !prompt) {
+    if (typeof prompt !== 'string' || prompt.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Model and prompt are required' },
+        { error: 'Prompt is required' },
         { status: 400 }
       )
     }
 
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: `Prompt exceeds ${MAX_PROMPT_LENGTH} characters` },
+        { status: 400 }
+      )
+    }
+
+    if (context && typeof context !== 'string') {
+      return NextResponse.json(
+        { error: 'Context must be a string' },
+        { status: 400 }
+      )
+    }
+
+    if (typeof context === 'string' && context.length > MAX_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: `Context exceeds ${MAX_PROMPT_LENGTH} characters` },
+        { status: 400 }
+      )
+    }
+
+    if (typeof model !== 'string' || !ALLOWED_MODELS.includes(model as AIModel)) {
+      return NextResponse.json(
+        { error: 'Unsupported model requested' },
+        { status: 400 }
+      )
+    }
+
+    const sanitizedPrompt = prompt.trim()
+    const sanitizedContext =
+      typeof context === 'string' ? context : undefined
+    const requestedTokens =
+      typeof maxTokens === 'number' && Number.isFinite(maxTokens)
+        ? Math.floor(maxTokens)
+        : DEFAULT_MAX_TOKENS
+    const safeMaxTokens = Math.max(
+      1,
+      Math.min(requestedTokens, MAX_COMPLETION_TOKENS)
+    )
+    const documentIdValue =
+      typeof documentId === 'string' && documentId.length > 0
+        ? documentId
+        : null
+
     // Generate AI response
     const response = await generateWithAI({
       model: model as AIModel,
-      prompt,
-      context,
-      maxTokens,
+      prompt: sanitizedPrompt,
+      context: sanitizedContext,
+      maxTokens: safeMaxTokens,
     })
 
     // Calculate word count from generated content
@@ -69,13 +122,13 @@ export async function POST(request: NextRequest) {
     await supabase.from('ai_usage').insert([
       {
         user_id: user.id,
-        document_id: documentId || null,
+        document_id: documentIdValue,
         model: response.model,
         words_generated: wordsGenerated,
         prompt_tokens: response.usage.inputTokens,
         completion_tokens: response.usage.outputTokens,
         total_cost: response.usage.totalCost,
-        prompt_preview: prompt.substring(0, 200),
+        prompt_preview: sanitizedPrompt.substring(0, 200),
       },
     ])
 

@@ -23,6 +23,7 @@ export type AIResponse = {
 // Lazy-initialized AI clients (to avoid build-time initialization)
 let anthropic: Anthropic | null = null
 let openai: OpenAI | null = null
+let deepseek: OpenAI | null = null
 
 function getAnthropicClient(): Anthropic {
   if (!anthropic) {
@@ -40,6 +41,16 @@ function getOpenAIClient(): OpenAI {
     })
   }
   return openai
+}
+
+function getDeepSeekClient(): OpenAI {
+  if (!deepseek) {
+    deepseek = new OpenAI({
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      baseURL: 'https://api.deepseek.com/v1',
+    })
+  }
+  return deepseek
 }
 
 // Pricing per million tokens (input/output)
@@ -152,13 +163,9 @@ async function generateWithDeepSeek(
     ? `You are an AI writing assistant helping authors write better stories. Here's the context:\n\n${context}`
     : 'You are an AI writing assistant helping authors write better stories.'
 
-  // DeepSeek uses OpenAI-compatible API
-  const deepseek = new OpenAI({
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    baseURL: 'https://api.deepseek.com/v1',
-  })
+  const client = getDeepSeekClient()
 
-  const completion = await deepseek.chat.completions.create({
+  const completion = await client.chat.completions.create({
     model: 'deepseek-chat',
     max_tokens: maxTokens,
     messages: [

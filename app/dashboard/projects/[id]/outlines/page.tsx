@@ -1,15 +1,34 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
-import { Plus, ArrowLeft, FileText, Loader2 } from 'lucide-react'
+import {
+  Plus,
+  ArrowLeft,
+  FileText,
+  Loader2,
+  Filter,
+  RefreshCw,
+  Search,
+  SortDesc,
+} from 'lucide-react'
 import Link from 'next/link'
 import { OutlineGeneratorDialog } from '@/components/outlines/outline-generator-dialog'
 import { OutlineCard } from '@/components/outlines/outline-card'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type Project = {
   id: string
@@ -35,8 +54,12 @@ export default function OutlinesPage() {
   const { toast } = useToast()
   const [project, setProject] = useState<Project | null>(null)
   const [outlines, setOutlines] = useState<Outline[]>([])
-  const [loading, setLoading] = useState(true)
+  const [projectLoading, setProjectLoading] = useState(true)
+  const [outlinesLoading, setOutlinesLoading] = useState(true)
   const [showGenerator, setShowGenerator] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [formatFilter, setFormatFilter] = useState<string>('all')
+  const [sortOrder, setSortOrder] = useState<'recent' | 'az'>('recent')
 
   useEffect(() => {
     loadProject()
@@ -45,6 +68,7 @@ export default function OutlinesPage() {
 
   const loadProject = async () => {
     try {
+      setProjectLoading(true)
       const supabase = createClient()
       const {
         data: { user },
@@ -72,12 +96,13 @@ export default function OutlinesPage() {
         variant: 'destructive',
       })
     } finally {
-      setLoading(false)
+      setProjectLoading(false)
     }
   }
 
   const loadOutlines = async () => {
     try {
+      setOutlinesLoading(true)
       const response = await fetch(`/api/outlines?project_id=${params.id}`)
       if (!response.ok) throw new Error('Failed to fetch outlines')
 
@@ -90,6 +115,8 @@ export default function OutlinesPage() {
         description: 'Failed to load outlines',
         variant: 'destructive',
       })
+    } finally {
+      setOutlinesLoading(false)
     }
   }
 
@@ -119,7 +146,36 @@ export default function OutlinesPage() {
     }
   }
 
-  if (loading) {
+  const formatOptions = useMemo(() => {
+    const values = new Set(outlines.map((outline) => outline.format))
+    return Array.from(values).sort()
+  }, [outlines])
+
+  const filteredOutlines = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    const sorted = [...outlines].sort((a, b) => {
+      if (sortOrder === 'az') {
+        return a.title.localeCompare(b.title)
+      }
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    })
+
+    return sorted.filter((outline) => {
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        outline.title.toLowerCase().includes(normalizedSearch) ||
+        (outline.premise || '').toLowerCase().includes(normalizedSearch)
+
+      const matchesFormat =
+        formatFilter === 'all' || outline.format.toLowerCase() === formatFilter
+
+      return matchesSearch && matchesFormat
+    })
+  }, [formatFilter, outlines, searchTerm, sortOrder])
+
+  const activeFilters = formatFilter !== 'all' || searchTerm.trim().length > 0
+
+  if (projectLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -152,6 +208,96 @@ export default function OutlinesPage() {
           Generate Outline
         </Button>
       </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            Filter & organize
+          </CardTitle>
+          <CardDescription>
+            Search through generated outlines and refine by format or sort order.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex-1 flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search outlines by title or premise…"
+                  className="pl-9"
+                />
+              </div>
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchTerm('')}
+                  className="shrink-0"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-3 lg:w-[360px]">
+              <Select value={formatFilter} onValueChange={setFormatFilter}>
+                <SelectTrigger className="w-[170px]">
+                  <SelectValue placeholder="All formats" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All formats</SelectItem>
+                  {formatOptions.map((format) => (
+                    <SelectItem key={format} value={format.toLowerCase()}>
+                      {format.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={sortOrder}
+                onValueChange={(value) => setSortOrder(value as 'recent' | 'az')}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Sort order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent">Recently updated</SelectItem>
+                  <SelectItem value="az">Title A → Z</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">
+              <SortDesc className="mr-1 h-3 w-3" />
+              {sortOrder === 'recent' ? 'Recently updated' : 'Alphabetical'}
+            </Badge>
+            <Badge variant={formatFilter === 'all' ? 'outline' : 'default'}>
+              {formatFilter === 'all' ? 'All formats' : formatFilter.replace(/_/g, ' ')}
+            </Badge>
+            {activeFilters && (
+              <Button
+                variant="link"
+                size="sm"
+                className="gap-1 px-0"
+                onClick={() => {
+                  setFormatFilter('all')
+                  setSortOrder('recent')
+                  setSearchTerm('')
+                }}
+              >
+                <RefreshCw className="h-3 w-3" />
+                Reset filters
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Info Card */}
       <Card className="border-blue-200 bg-blue-50/50">
@@ -199,27 +345,64 @@ export default function OutlinesPage() {
       </Card>
 
       {/* Outlines List */}
-      {outlines.length === 0 ? (
+      {outlinesLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index}>
+              <CardHeader>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-full" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-10 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : filteredOutlines.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground" />
               <div>
-                <p className="font-semibold">No outlines yet</p>
+                <p className="font-semibold">
+                  {activeFilters ? 'No outlines match your filters' : 'No outlines yet'}
+                </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Generate your first AI-powered outline to start planning your story
+                  {activeFilters
+                    ? 'Try adjusting your search or reset filters to see every outline.'
+                    : 'Generate your first AI-powered outline to start planning your story.'}
                 </p>
               </div>
-              <Button onClick={() => setShowGenerator(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Generate Your First Outline
-              </Button>
+              <div className="flex justify-center gap-2">
+                {activeFilters && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setFormatFilter('all')
+                      setSortOrder('recent')
+                      setSearchTerm('')
+                    }}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Reset Filters
+                  </Button>
+                )}
+                <Button onClick={() => setShowGenerator(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Generate Outline
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {outlines.map((outline) => (
+          {filteredOutlines.map((outline) => (
             <OutlineCard
               key={outline.id}
               outline={outline}

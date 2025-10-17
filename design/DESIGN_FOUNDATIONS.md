@@ -1,7 +1,8 @@
-# Ottowrite Design Foundations (Phase 1 Input)
+# Ottowrite Style Guide v1.0 (Phase 5 Release)
 
-Last updated: 2025-10-17  
-Maintainer: Codex (ChatGPT)
+Last updated: 2025-10-18  
+Maintainer: Codex (ChatGPT)  
+Release scope: Phases 0‑5 (dashboard shell → advanced tools)
 
 ## 1. Brand & Layout Principles
 - **Voice**: Confident, collaborative, inspiring; pair bold headlines with supportive body copy.
@@ -99,5 +100,34 @@ Typeface: Inter (default). Set `font-semibold` for headers, `font-medium` for bu
 - **Phase 2**: Update data lists/tables with filter pills & empty states.
 - **Phase 3**: Refactor editors with two-column layouts & sticky section nav.
 - **Phase 4**: Extend with visualization palette & interactive components.
+- **Phase 5**: Final QA, documentation, component parity in Storybook-equivalent.
+
+## 6. Pattern Library (Phase 3–5 Additions)
+
+### 6.1 Outline Workspace
+- **Filter Card**: Primary filters live inside a `Card` with `Filter` icon heading, search input with leading icon, select pairs for format + sort. Keep reset action aligned right using `variant="link"`.
+- **Active State Badges**: Surface current sort + format via `Badge` components directly under filters; destructive color reserved for unsaved notes indicators.
+- **Card Grid**: `md:grid-cols-2 lg:grid-cols-3`. Use `OutlineCard` component — ensure metadata badges follow `format → count → timestamps`.
+- **Empty States**: Differentiate dataset vs filter-empty with tailored copy and a dedicated reset button.
+
+### 6.2 Outline Detail
+- **Sticky Aside**: `lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]` with `aside` using `lg:sticky lg:top-24`. Keep summary metrics concise (format, sections, target totals).
+- **Notes Editor**: Enforce `NOTE_MAX_LENGTH = 2000`. Dirty badge displayed via `Badge variant="destructive"` with sticky note icon. Button disabled while saving or over limit.
+- **Metadata Chips**: Genres, characters, locations rendered with `Badge variant="outline"`; keep consistent casing (`capitalize` when derived from enums).
+
+### 6.3 Plot Analysis
+- **Run Controls**: Analysis select + run button share a responsive grid. Disable run button if word count < 100 or request inflight.
+- **Summary vs History Tabs**: Use `Tabs` with lucide icons (`ListChecks`, `History`) for clarity. Summary displays metric cards using bordered flex containers; history cards highlight active selection with `border-primary/50`.
+- **Pending Runs**: Provide spinner card until Supabase job completes; ensure toast copy indicates expected wait.
+
+### 6.4 Shared Patterns
+- **Skeletons**: Prefer `Skeleton` components for grid placeholders while fetching.
+- **Badges**: Use `Badge` variants consistently: `secondary` for neutral context, `outline` for informational tags, `destructive` reserved for error/dirty states.
+- **Accessibility**: All additions must preserve focus states (`focus-visible:ring-2 focus-visible:ring-primary/60`) and include icon labels where needed.
+
+## 7. Handoff Checklist
+- [x] Style guide updated (this document).
+- [x] Regression guide (`docs/UI_QA_REPORT.md`) captured with burn-down.
+- [ ] Storybook stories (see `docs/STORYBOOK_COVERAGE.md`) — implement for next sprint.
 
 Keep this document updated as tokens/components evolve. All new UI work should reference these foundations before adding custom styles.

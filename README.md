@@ -8,6 +8,7 @@ An intelligent writing assistant for novelists, screenwriters, and content creat
 - 📊 **Dashboard** - Track your projects, documents, and AI usage
 - 📝 **Projects** - Organize novels, screenplays, and writing projects
 - 🤖 **Multi-Model AI** - Claude Sonnet 4.5, GPT-5, DeepSeek V3 integration
+- 🗺️ **World Building** - Catalogue locations and timeline events
 - ⚫⚪ **Black & White Theme** - Clean, distraction-free interface
 
 ## Tech Stack
@@ -72,6 +73,16 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - `SUPABASE_ANON_KEY` (Server, optional fallback)
 - `SUPABASE_URL` (Server, optional fallback)
 4. Deploy!
+
+### Apply database migrations
+
+Run the Supabase migrations before starting the app (locally and in your deployment pipeline):
+
+```bash
+npx supabase db push
+```
+
+This ensures the world-building tables (`locations`, `location_events`) from migration `20251017000010_world_building.sql` are available.
 
 ## Database Schema
 

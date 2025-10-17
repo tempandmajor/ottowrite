@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -13,8 +13,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
-import { ArrowLeft, Loader2, AlertTriangle, CheckCircle2, Sparkles, Play } from 'lucide-react'
+import {
+  ArrowLeft,
+  Loader2,
+  AlertTriangle,
+  CheckCircle2,
+  Sparkles,
+  Play,
+  History,
+  ListChecks,
+} from 'lucide-react'
 import Link from 'next/link'
 import { PlotIssueList } from '@/components/plot-analysis/plot-issue-list'
 import type { AnalysisType, IssueSeverity } from '@/lib/ai/plot-analyzer'
@@ -54,6 +64,20 @@ export default function PlotAnalysisPage() {
     resolved: 0,
   })
   const [issuesLoading, setIssuesLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<'summary' | 'history'>('summary')
+
+  const sortedAnalyses = useMemo(
+    () =>
+      [...analyses].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      ),
+    [analyses]
+  )
+
+  const completedAnalyses = useMemo(
+    () => sortedAnalyses.filter((analysis) => analysis.status === 'completed'),
+    [sortedAnalyses]
+  )
 
   useEffect(() => {
     loadDocument()
@@ -140,13 +164,29 @@ export default function PlotAnalysisPage() {
   }
 
   useEffect(() => {
-    if (selectedAnalysis) {
+    if (selectedAnalysis?.status === 'completed') {
       loadIssueSummary(selectedAnalysis.id)
     } else {
       setIssueStats({ total: 0, unresolved: 0, critical: 0, major: 0, resolved: 0 })
       setIssuesLoading(false)
     }
-  }, [selectedAnalysis?.id])
+  }, [selectedAnalysis?.id, selectedAnalysis?.status])
+
+  useEffect(() => {
+    if (!selectedAnalysis && completedAnalyses.length > 0) {
+      setSelectedAnalysis(completedAnalyses[0])
+      return
+    }
+
+    if (selectedAnalysis) {
+      const matching = analyses.find((analysis) => analysis.id === selectedAnalysis.id)
+      if (!matching && completedAnalyses.length > 0) {
+        setSelectedAnalysis(completedAnalyses[0])
+      } else if (matching && matching !== selectedAnalysis) {
+        setSelectedAnalysis(matching)
+      }
+    }
+  }, [analyses, completedAnalyses, selectedAnalysis])
 
   const runAnalysis = async () => {
     if (!document) return
@@ -178,7 +218,12 @@ export default function PlotAnalysisPage() {
       })
 
       setSelectedAnalysis(newAnalysis)
-      loadIssueSummary(newAnalysis.id)
+      setActiveTab('summary')
+      if (newAnalysis.status === 'completed') {
+        loadIssueSummary(newAnalysis.id)
+      } else {
+        setIssueStats({ total: 0, unresolved: 0, critical: 0, major: 0, resolved: 0 })
+      }
       loadAnalyses()
     } catch (error) {
       console.error('Error running analysis:', error)
@@ -204,15 +249,20 @@ export default function PlotAnalysisPage() {
     return null
   }
 
+  const isDocumentTooShort = (document.word_count || 0) < 100
   const issueCount = issueStats.unresolved
   const criticalCount = issueStats.critical
   const majorCount = issueStats.major
   const resolvedCount = issueStats.resolved
+  const documentTypeLabel = document.type ? document.type.replace('_', ' ') : 'Document'
+  const activeAnalysisTimestamp = selectedAnalysis
+    ? new Date(selectedAnalysis.created_at).toLocaleString()
+    : null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 lg:space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-4">
           <Link href={`/dashboard/editor/${document.id}`}>
             <Button variant="ghost" size="sm">
@@ -224,6 +274,20 @@ export default function PlotAnalysisPage() {
             <h1 className="text-3xl font-bold">Plot Analysis</h1>
             <p className="text-muted-foreground mt-1">{document.title}</p>
           </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="capitalize">
+            {documentTypeLabel}
+          </Badge>
+          <Badge variant="secondary">{document.word_count.toLocaleString()} words</Badge>
+          {selectedAnalysis && (
+            <Badge
+              variant={selectedAnalysis.status === 'completed' ? 'secondary' : 'outline'}
+              className="uppercase tracking-wide"
+            >
+              Latest run • {selectedAnalysis.status}
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -239,12 +303,12 @@ export default function PlotAnalysisPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-end gap-4">
-            <div className="flex-1 space-y-2">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] md:items-end">
+            <div className="space-y-2">
               <label className="text-sm font-medium">Analysis Type</label>
               <Select value={analysisType} onValueChange={(v) => setAnalysisType(v as AnalysisType)}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select analysis focus" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="full">Full Analysis (recommended)</SelectItem>
@@ -255,7 +319,7 @@ export default function PlotAnalysisPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={runAnalysis} disabled={analyzing} size="lg">
+            <Button onClick={runAnalysis} disabled={analyzing || isDocumentTooShort} size="lg">
               {analyzing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -270,124 +334,260 @@ export default function PlotAnalysisPage() {
             </Button>
           </div>
 
-          {document.word_count < 100 && (
-            <p className="text-sm text-muted-foreground">
-              ⚠️ Document should have at least 100 words for meaningful analysis
-            </p>
-          )}
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            {isDocumentTooShort ? (
+              <>
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <span>
+                  Add at least 100 words to the document to unlock richer analysis results.
+                </span>
+              </>
+            ) : (
+              <span>
+                Run new analyses after major revisions so the issue tracker reflects the latest
+                draft.
+              </span>
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Results */}
-      {selectedAnalysis && (
-        <>
-          {/* Summary Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Analysis Summary</CardTitle>
-              <CardDescription>
-                {new Date(selectedAnalysis.created_at).toLocaleString()} •{' '}
-                {selectedAnalysis.word_count.toLocaleString()} words analyzed
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {selectedAnalysis.summary && (
-                <p className="text-sm">{selectedAnalysis.summary}</p>
-              )}
-
-              <div className="flex gap-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-lg">
-                    {issueCount}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">Open Issues</span>
-                </div>
-                {issueStats.total > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-lg">
-                      {issueStats.total}
-                    </Badge>
-                    <span className="text-sm text-muted-foreground">Total Recorded</span>
-                  </div>
-                )}
-                {resolvedCount > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-green-100 text-green-800 text-lg">
-                      {resolvedCount}
-                    </Badge>
-                    <span className="text-sm text-muted-foreground">Resolved</span>
-                  </div>
-                )}
-                {issuesLoading && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Updating…
-                  </div>
-                )}
-                {criticalCount > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-red-100 text-red-800 text-lg">
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                      {criticalCount}
-                    </Badge>
-                    <span className="text-sm text-muted-foreground">Critical</span>
-                  </div>
-                )}
-                {majorCount > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-orange-100 text-orange-800 text-lg">
-                      {majorCount}
-                    </Badge>
-                    <span className="text-sm text-muted-foreground">Major</span>
-                  </div>
-                )}
-              </div>
-
-              {issueStats.total === 0 && !issuesLoading && (
-                <div className="flex items-center gap-2 text-green-700 bg-green-50 p-4 rounded-lg">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span className="font-medium">No plot issues detected yet.</span>
-                </div>
-              )}
-
-              {issueStats.total > 0 && issueCount === 0 && !issuesLoading && (
-                <div className="flex items-center gap-2 text-green-700 bg-green-50 p-4 rounded-lg">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span className="font-medium">All tracked issues are resolved. Great work!</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Issues List */}
-          {issueStats.total > 0 && (
-            <PlotIssueList
-              analysisId={selectedAnalysis.id}
-              onUpdate={() => {
-                loadIssueSummary(selectedAnalysis.id)
-                loadAnalyses()
-              }}
-            />
-          )}
-        </>
-      )}
-
-      {/* Empty State */}
-      {!selectedAnalysis && analyses.length === 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <Sparkles className="h-12 w-12 mx-auto text-muted-foreground" />
-              <div>
-                <p className="font-semibold">No analyses yet</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Run your first plot analysis to check for continuity issues
-                </p>
-              </div>
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as 'summary' | 'history')}
+        className="space-y-4"
+      >
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <TabsList className="grid grid-cols-2 md:w-auto">
+            <TabsTrigger value="summary" className="flex items-center gap-2">
+              <ListChecks className="h-4 w-4" />
+              Summary
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              History
+            </TabsTrigger>
+          </TabsList>
+          {selectedAnalysis && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {activeAnalysisTimestamp}
+              <Badge variant={selectedAnalysis.status === 'completed' ? 'secondary' : 'outline'}>
+                {selectedAnalysis.status}
+              </Badge>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </div>
+
+        <TabsContent value="summary" className="space-y-4">
+          {selectedAnalysis ? (
+            selectedAnalysis.status === 'completed' ? (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Analysis Summary</CardTitle>
+                    <CardDescription>
+                      {activeAnalysisTimestamp} • {selectedAnalysis.word_count.toLocaleString()} words
+                      analyzed
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {selectedAnalysis.summary && (
+                      <p className="text-sm leading-relaxed">{selectedAnalysis.summary}</p>
+                    )}
+
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2">
+                        <Badge variant="secondary" className="text-base">
+                          {issueCount}
+                        </Badge>
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Open issues
+                          </p>
+                          <p className="text-sm font-medium">{issueCount}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2">
+                        <Badge variant="outline" className="text-base">
+                          {issueStats.total}
+                        </Badge>
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Total recorded
+                          </p>
+                          <p className="text-sm font-medium">{issueStats.total}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2">
+                        <Badge
+                          className="bg-green-100 text-green-800 text-base"
+                          variant="secondary"
+                        >
+                          {resolvedCount}
+                        </Badge>
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Resolved
+                          </p>
+                          <p className="text-sm font-medium">{resolvedCount}</p>
+                        </div>
+                      </div>
+                      {criticalCount > 0 && (
+                        <div className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2">
+                          <Badge className="bg-red-100 text-red-800 text-base">
+                            <AlertTriangle className="mr-1 h-3 w-3" />
+                            {criticalCount}
+                          </Badge>
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Critical
+                            </p>
+                            <p className="text-sm font-medium">{criticalCount}</p>
+                          </div>
+                        </div>
+                      )}
+                      {majorCount > 0 && (
+                        <div className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2">
+                          <Badge className="bg-orange-100 text-orange-800 text-base">
+                            {majorCount}
+                          </Badge>
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Major
+                            </p>
+                            <p className="text-sm font-medium">{majorCount}</p>
+                          </div>
+                        </div>
+                      )}
+                      {issuesLoading && (
+                        <div className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                              Fetching
+                            </p>
+                            <p className="text-sm font-medium">Refreshing issue stats…</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {issueStats.total === 0 && !issuesLoading && (
+                      <div className="flex items-center gap-2 text-green-700 bg-green-50 p-4 rounded-lg">
+                        <CheckCircle2 className="h-5 w-5" />
+                        <span className="font-medium">No plot issues detected yet.</span>
+                      </div>
+                    )}
+
+                    {issueStats.total > 0 && issueCount === 0 && !issuesLoading && (
+                      <div className="flex items-center gap-2 text-green-700 bg-green-50 p-4 rounded-lg">
+                        <CheckCircle2 className="h-5 w-5" />
+                        <span className="font-medium">
+                          All tracked issues are resolved. Great work!
+                        </span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {issueStats.total > 0 && (
+                  <PlotIssueList
+                    analysisId={selectedAnalysis.id}
+                    onUpdate={() => {
+                      loadIssueSummary(selectedAnalysis.id)
+                      loadAnalyses()
+                    }}
+                  />
+                )}
+              </>
+            ) : (
+              <Card>
+                <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Analysis is still running</p>
+                    <p className="text-sm text-muted-foreground">
+                      Keep this tab open — we’ll pull in issues as soon as the AI finishes.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          ) : analyses.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center space-y-4">
+                  <Sparkles className="h-12 w-12 mx-auto text-muted-foreground" />
+                  <div>
+                    <p className="font-semibold">No analyses yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Run your first plot analysis to check for continuity issues.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-6 text-center text-sm text-muted-foreground">
+                Select an analysis from the history tab to review findings.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="history" className="space-y-3">
+          {sortedAnalyses.length > 0 ? (
+            sortedAnalyses.map((analysis) => {
+              const isActive = selectedAnalysis?.id === analysis.id
+              return (
+                <Card
+                  key={analysis.id}
+                  className={isActive ? 'border-primary/50 shadow-sm' : undefined}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <CardTitle className="text-base capitalize">
+                          {analysis.analysis_type.replace(/_/g, ' ')}
+                        </CardTitle>
+                        <CardDescription>
+                          {new Date(analysis.created_at).toLocaleString()} •{' '}
+                          {analysis.word_count.toLocaleString()} words analyzed
+                        </CardDescription>
+                      </div>
+                      <Badge variant={analysis.status === 'completed' ? 'secondary' : 'outline'}>
+                        {analysis.status}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {analysis.summary || 'No summary generated yet.'}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant={isActive ? 'secondary' : 'outline'}
+                      onClick={() => {
+                        setSelectedAnalysis(analysis)
+                        setActiveTab('summary')
+                      }}
+                    >
+                      {isActive ? 'Viewing' : 'View Summary'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )
+            })
+          ) : (
+            <Card>
+              <CardContent className="py-6 text-center text-sm text-muted-foreground">
+                Analyses will appear here after you run them.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

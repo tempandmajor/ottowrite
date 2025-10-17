@@ -39,7 +39,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Plus, Trash2, Edit, Network, Filter, Scale, Heart, Timeline } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Edit, Network, Filter, Scale, Heart, GitBranch } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { RelationshipWithCharacters } from '@/types/relationships'
 
@@ -52,19 +52,6 @@ type Character = {
   id: string
   name: string
   role: string
-}
-
-type Relationship = {
-  id: string
-  character_a_id: string
-  character_b_id: string
-  relationship_type: string
-  description?: string
-  strength: number
-  is_positive: boolean
-  status: string
-  character_a?: { id: string; name: string; role: string }
-  character_b?: { id: string; name: string; role: string }
 }
 
 type Project = {
@@ -110,7 +97,7 @@ export default function CharacterRelationshipsPage() {
   const [relationships, setRelationships] = useState<RelationshipWithCharacters[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingRelationship, setEditingRelationship] = useState<Relationship | null>(null)
+  const [editingRelationship, setEditingRelationship] = useState<RelationshipWithCharacters | null>(null)
   const [filterType, setFilterType] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [polarityFilter, setPolarityFilter] = useState<'all' | 'positive' | 'negative'>('all')
@@ -124,6 +111,9 @@ export default function CharacterRelationshipsPage() {
     strength: 5,
     is_positive: true,
     status: 'current' as string,
+    starts_at: '',
+    ends_at: '',
+    key_moments: '',
   })
 
   useEffect(() => {
@@ -179,11 +169,14 @@ export default function CharacterRelationshipsPage() {
       strength: 5,
       is_positive: true,
       status: 'current',
+      starts_at: '',
+      ends_at: '',
+      key_moments: '',
     })
     setDialogOpen(true)
   }
 
-  function openEditDialog(relationship: Relationship) {
+  function openEditDialog(relationship: RelationshipWithCharacters) {
     setEditingRelationship(relationship)
     setFormData({
       character_a_id: relationship.character_a_id,
@@ -193,6 +186,11 @@ export default function CharacterRelationshipsPage() {
       strength: relationship.strength,
       is_positive: relationship.is_positive,
       status: relationship.status,
+      starts_at: relationship.starts_at || '',
+      ends_at: relationship.ends_at || '',
+      key_moments: Array.isArray(relationship.key_moments)
+        ? relationship.key_moments.join(', ')
+        : '',
     })
     setDialogOpen(true)
   }
@@ -216,10 +214,28 @@ export default function CharacterRelationshipsPage() {
       return
     }
 
+    const payload = {
+      character_a_id: formData.character_a_id,
+      character_b_id: formData.character_b_id,
+      relationship_type: formData.relationship_type,
+      description: formData.description,
+      strength: formData.strength,
+      is_positive: formData.is_positive,
+      status: formData.status,
+      starts_at: formData.starts_at || null,
+      ends_at: formData.ends_at || null,
+      key_moments: formData.key_moments
+        ? formData.key_moments
+            .split(',')
+            .map((item) => item.trim())
+            .filter((item) => item.length > 0)
+        : null,
+    }
+
     const method = editingRelationship ? 'PATCH' : 'POST'
     const body = editingRelationship
-      ? { id: editingRelationship.id, ...formData }
-      : { project_id: projectId, ...formData }
+      ? { id: editingRelationship.id, ...payload }
+      : { project_id: projectId, ...payload }
 
     const response = await fetch('/api/characters/relationships', {
       method,
@@ -270,6 +286,43 @@ export default function CharacterRelationshipsPage() {
       return matchesType && matchesStatus && matchesPolarity
     })
   }, [relationships, filterType, statusFilter, polarityFilter])
+
+  const timelineEntries = useMemo(() => {
+    return filteredRelationships.flatMap((relationship) => {
+      const entries: Array<{ id: string; title: string; description: string }> = []
+      if (relationship.starts_at) {
+        entries.push({
+          id: `${relationship.id}-start`,
+          title: `Begins (${relationship.starts_at})`,
+          description: `${relationship.character_a?.name} • ${relationship.relationship_type.replace('_', ' ')} • ${relationship.character_b?.name}`,
+        })
+      }
+      if (Array.isArray(relationship.key_moments)) {
+        relationship.key_moments.forEach((moment, index) => {
+          entries.push({
+            id: `${relationship.id}-moment-${index}`,
+            title: moment,
+            description: `${relationship.character_a?.name} ↔ ${relationship.character_b?.name}`,
+          })
+        })
+      }
+      if (relationship.ends_at) {
+        entries.push({
+          id: `${relationship.id}-end`,
+          title: `Shifts (${relationship.ends_at})`,
+          description: `${relationship.status.replace('_', ' ')}`,
+        })
+      }
+      if (entries.length === 0) {
+        entries.push({
+          id: `${relationship.id}-fallback`,
+          title: `${relationship.status.replace('_', ' ')} relationship`,
+          description: `${relationship.character_a?.name} ↔ ${relationship.character_b?.name}`,
+        })
+      }
+      return entries
+    })
+  }, [filteredRelationships])
 
   const totalPositive = relationships.filter((rel) => rel.is_positive).length
   const totalNegative = relationships.length - totalPositive
@@ -367,6 +420,7 @@ export default function CharacterRelationshipsPage() {
         <TabsList>
           <TabsTrigger value="list">List view</TabsTrigger>
           <TabsTrigger value="network">Network graph</TabsTrigger>
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
         </TabsList>
 
         <TabsContent value="list">
@@ -451,10 +505,34 @@ export default function CharacterRelationshipsPage() {
             </div>
           ) : (
             <EmptyState
-              icon={Timeline}
+              icon={GitBranch}
               title="Not enough data"
               description="Add at least two relationships to visualise the network graph."
               action={{ label: 'Create relationship', onClick: openCreateDialog }}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="timeline">
+          {timelineEntries.length > 0 ? (
+            <div className="relative space-y-6 rounded-3xl border bg-card/80 p-6 shadow-card">
+              <div className="absolute left-4 top-10 bottom-10 hidden w-px bg-border lg:block" aria-hidden />
+              {timelineEntries.map((entry, index) => (
+                <div key={entry.id} className="relative flex gap-4 lg:pl-10">
+                  <div className="mt-1 hidden h-3 w-3 rounded-full border-2 border-primary bg-background lg:block" />
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">{entry.title}</h4>
+                    <p className="text-xs text-muted-foreground">{entry.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={GitBranch}
+              title="No timeline data yet"
+              description="Add key moments, start/end markers, or update relationship details to build a chronology."
+              action={{ label: 'Update relationships', onClick: openCreateDialog }}
             />
           )}
         </TabsContent>
@@ -577,6 +655,38 @@ export default function CharacterRelationshipsPage() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Describe the relationship between these characters"
                 rows={3}
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="relationship-start">Start timeline</Label>
+                <Input
+                  id="relationship-start"
+                  value={formData.starts_at}
+                  onChange={(e) => setFormData({ ...formData, starts_at: e.target.value })}
+                  placeholder="e.g. Act I, Episode 2"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="relationship-end">End timeline</Label>
+                <Input
+                  id="relationship-end"
+                  value={formData.ends_at}
+                  onChange={(e) => setFormData({ ...formData, ends_at: e.target.value })}
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="relationship-moments">Key moments (comma separated)</Label>
+              <Textarea
+                id="relationship-moments"
+                value={formData.key_moments}
+                onChange={(e) => setFormData({ ...formData, key_moments: e.target.value })}
+                placeholder="First mission together, Betrayal at the docks, Reconciliation"
+                rows={2}
               />
             </div>
           </div>

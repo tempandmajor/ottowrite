@@ -4,6 +4,18 @@ import { useEffect, useMemo } from 'react'
 import * as d3 from 'd3'
 import { RelationshipWithCharacters } from '@/types/relationships'
 
+type NodeDatum = d3.SimulationNodeDatum & {
+  id: string
+  name: string
+  role: string
+}
+
+type LinkDatum = d3.SimulationLinkDatum<NodeDatum> & {
+  strength: number
+  type: string
+  is_positive: boolean
+}
+
 export function RelationshipNetwork({
   relationships,
   characters,
@@ -11,17 +23,19 @@ export function RelationshipNetwork({
   relationships: RelationshipWithCharacters[]
   characters: { id: string; name: string; role: string }[]
 }) {
-  const nodes = useMemo(
+  const nodes: NodeDatum[] = useMemo(
     () =>
       characters.map((char) => ({
         id: char.id,
         name: char.name,
         role: char.role,
+        x: undefined,
+        y: undefined,
       })),
     [characters]
   )
 
-  const links = useMemo(
+  const links: LinkDatum[] = useMemo(
     () =>
       relationships.map((rel) => ({
         source: rel.character_a_id,
@@ -43,11 +57,11 @@ export function RelationshipNetwork({
     svg.attr('viewBox', `0 0 ${width} ${height}`)
 
     const simulation = d3
-      .forceSimulation(nodes)
+      .forceSimulation<NodeDatum>(nodes)
       .force(
         'link',
         d3
-          .forceLink(links)
+          .forceLink<NodeDatum, LinkDatum>(links)
           .id((d: any) => d.id)
           .distance(120)
       )
@@ -63,11 +77,28 @@ export function RelationshipNetwork({
       .join('line')
       .attr('stroke-width', (d) => Math.max(2, d.strength / 2))
 
+    const dragBehaviour = d3
+      .drag<SVGCircleElement, NodeDatum>()
+      .on('start', (event, d) => {
+        if (!event.active) simulation.alphaTarget(0.3).restart()
+        d.fx = d.x
+        d.fy = d.y
+      })
+      .on('drag', (event, d) => {
+        d.fx = event.x
+        d.fy = event.y
+      })
+      .on('end', (event, d) => {
+        if (!event.active) simulation.alphaTarget(0)
+        d.fx = null
+        d.fy = null
+      })
+
     const node = svg
       .append('g')
       .attr('stroke', '#fff')
       .attr('stroke-width', 1.5)
-      .selectAll('circle')
+      .selectAll<SVGCircleElement, NodeDatum>('circle')
       .data(nodes)
       .join('circle')
       .attr('r', 18)
@@ -83,28 +114,11 @@ export function RelationshipNetwork({
             return '#64748B'
         }
       })
-      .call(
-        d3
-          .drag<any, any>()
-          .on('start', (event, d) => {
-            if (!event.active) simulation.alphaTarget(0.3).restart()
-            d.fx = d.x
-            d.fy = d.y
-          })
-          .on('drag', (event, d) => {
-            d.fx = event.x
-            d.fy = event.y
-          })
-          .on('end', (event, d) => {
-            if (!event.active) simulation.alphaTarget(0)
-            d.fx = null
-            d.fy = null
-          })
-      )
+      .call(dragBehaviour)
 
     const labels = svg
       .append('g')
-      .selectAll('text')
+      .selectAll<SVGTextElement, NodeDatum>('text')
       .data(nodes)
       .join('text')
       .attr('text-anchor', 'middle')
@@ -115,13 +129,13 @@ export function RelationshipNetwork({
 
     simulation.on('tick', () => {
       link
-        .attr('x1', (d) => (d.source as any).x)
-        .attr('y1', (d) => (d.source as any).y)
-        .attr('x2', (d) => (d.target as any).x)
-        .attr('y2', (d) => (d.target as any).y)
+        .attr('x1', (d) => ((d.source as NodeDatum).x ?? 0))
+        .attr('y1', (d) => ((d.source as NodeDatum).y ?? 0))
+        .attr('x2', (d) => ((d.target as NodeDatum).x ?? 0))
+        .attr('y2', (d) => ((d.target as NodeDatum).y ?? 0))
 
-      node.attr('cx', (d) => d.x!).attr('cy', (d) => d.y!)
-      labels.attr('x', (d) => d.x!).attr('y', (d) => d.y! + 28)
+      node.attr('cx', (d) => d.x ?? 0).attr('cy', (d) => d.y ?? 0)
+      labels.attr('x', (d) => d.x ?? 0).attr('y', (d) => (d.y ?? 0) + 28)
     })
 
     return () => {

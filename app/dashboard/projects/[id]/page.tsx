@@ -46,6 +46,7 @@ import {
   Lightbulb,
   Plus,
   Users,
+  Trash2,
 } from 'lucide-react'
 
 interface Project {

@@ -8,6 +8,9 @@ export type RelationshipWithCharacters = {
   strength: number
   is_positive: boolean
   status: string
+  starts_at?: string | null
+  ends_at?: string | null
+  key_moments?: string[] | null
   character_a?: { id: string; name: string; role: string }
   character_b?: { id: string; name: string; role: string }
 }

@@ -81,8 +81,8 @@ export function DashboardNav() {
                     {label}
                   </Link>
                 </li>
-              )}
-            })
+              )
+            })}
           </ul>
         </div>
       </nav>

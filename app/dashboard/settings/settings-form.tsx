@@ -3,24 +3,14 @@
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Loader2, Sparkles } from 'lucide-react'
 
 type ProfileSettings = {
   id: string
@@ -32,9 +22,9 @@ type ProfileSettings = {
 }
 
 const WRITING_FOCUS_OPTIONS = [
-  { value: 'prose', label: 'Primarily Prose' },
-  { value: 'screenplay', label: 'Primarily Screenplays' },
-  { value: 'both', label: 'Both Prose & Screenplays' },
+  { value: 'prose', label: 'Primarily prose' },
+  { value: 'screenplay', label: 'Primarily screenplays' },
+  { value: 'both', label: 'Both prose & screenplays' },
 ]
 
 type SettingsFormProps = {
@@ -47,29 +37,21 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
   const { toast } = useToast()
 
   const [fullName, setFullName] = useState(profile.fullName)
-  const [writingFocus, setWritingFocus] = useState(
-    profile.writingFocus || 'prose'
-  )
-  const [genresInput, setGenresInput] = useState(
-    profile.preferredGenres.join(', ')
-  )
-  const [writingGoals, setWritingGoals] = useState(
-    profile.writingPreferences?.goals ?? ''
-  )
-  const [voiceNotes, setVoiceNotes] = useState(
-    profile.writingPreferences?.voice ?? ''
-  )
+  const [writingFocus, setWritingFocus] = useState(profile.writingFocus || 'prose')
+  const [genresInput, setGenresInput] = useState(profile.preferredGenres.join(', '))
+  const [writingGoals, setWritingGoals] = useState(profile.writingPreferences?.goals ?? '')
+  const [voiceNotes, setVoiceNotes] = useState(profile.writingPreferences?.voice ?? '')
   const [timezone, setTimezone] = useState(profile.timezone ?? '')
   const [saving, setSaving] = useState(false)
+
+  const preferredGenres = genresInput
+    .split(',')
+    .map((genre) => genre.trim())
+    .filter((genre) => genre.length > 0)
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
     setSaving(true)
-
-    const preferredGenres = genresInput
-      .split(',')
-      .map((genre) => genre.trim())
-      .filter((genre) => genre.length > 0)
 
     const writingPreferences = {
       goals: writingGoals,
@@ -79,7 +61,7 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
     const { error } = await supabase
       .from('user_profiles')
       .update({
-        full_name: fullName,
+        full_name: fullName || null,
         preferred_genres: preferredGenres,
         writing_focus: writingFocus,
         writing_preferences: writingPreferences,
@@ -100,8 +82,8 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
     }
 
     toast({
-      title: 'Profile updated',
-      description: 'Your writing preferences have been saved.',
+      title: 'Preferences updated',
+      description: 'Your writing workspace is now tailored to your goals.',
     })
   }
 
@@ -117,20 +99,41 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>
-            Update the name and preferences associated with your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-6" onSubmit={handleSave}>
+    <div className="mx-auto max-w-4xl space-y-10">
+      <section className="rounded-3xl border bg-card/80 p-6 shadow-card">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              Personalization
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold text-foreground">Workspace settings</h1>
+              <p className="text-sm text-muted-foreground">
+                Fine-tune how Ottowrite collaborates with you—from tone guidance to scheduling.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Account</p>
+            <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
+              {email}
+            </Badge>
+          </div>
+        </div>
+      </section>
+
+      <form className="space-y-8" onSubmit={handleSave}>
+        <Card className="border-none bg-card/80 shadow-card">
+          <CardHeader>
+            <CardTitle>Profile details</CardTitle>
+            <CardDescription>Who should Ottowrite address and reference in documents.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" value={email} disabled />
+                <Input id="email" value={email} disabled className="bg-muted/60" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full name</Label>
@@ -145,10 +148,7 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
 
             <div className="space-y-2">
               <Label>Primary writing focus</Label>
-              <Select
-                value={writingFocus}
-                onValueChange={(value) => setWritingFocus(value)}
-              >
+              <Select value={writingFocus} onValueChange={(value) => setWritingFocus(value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select your focus" />
                 </SelectTrigger>
@@ -161,19 +161,28 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
                 </SelectContent>
               </Select>
             </div>
+          </CardContent>
+        </Card>
 
+        <Card className="border-none bg-card/80 shadow-card">
+          <CardHeader>
+            <CardTitle>Creative preferences</CardTitle>
+            <CardDescription>
+              Share your genre interests, goals, and voice guidance to shape AI suggestions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="genres">Preferred genres</Label>
               <Textarea
                 id="genres"
-                placeholder="e.g. Fantasy, Thriller, Literary Fiction"
+                placeholder="Fantasy, Thriller, Literary Fiction"
                 value={genresInput}
                 onChange={(event) => setGenresInput(event.target.value)}
                 rows={3}
               />
               <p className="text-xs text-muted-foreground">
-                Separate multiple genres with commas to help tailor AI
-                suggestions.
+                Separate with commas. Ottowrite uses this to recommend tailored beat sheets and prompts.
               </p>
             </div>
 
@@ -182,7 +191,7 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
                 <Label htmlFor="goals">Writing goals</Label>
                 <Textarea
                   id="goals"
-                  placeholder="Share your writing goals to guide AI feedback."
+                  placeholder="Share the milestones you want Ottowrite to keep you accountable for."
                   value={writingGoals}
                   onChange={(event) => setWritingGoals(event.target.value)}
                   rows={4}
@@ -192,44 +201,55 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
                 <Label htmlFor="voice">Voice & tone guidance</Label>
                 <Textarea
                   id="voice"
-                  placeholder="Describe the tone, style, or voices you want the AI to maintain."
+                  placeholder="Describe style, pacing, or voice cues Ottowrite should honor."
                   value={voiceNotes}
                   onChange={(event) => setVoiceNotes(event.target.value)}
                   rows={4}
                 />
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="timezone">Timezone</Label>
-              <div className="flex gap-2">
+        <Card className="border-none bg-card/80 shadow-card">
+          <CardHeader>
+            <CardTitle>Scheduling</CardTitle>
+            <CardDescription>Choose the timezone for reminders, analytics, and collaboration.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="timezone">Timezone</Label>
                 <Input
                   id="timezone"
                   value={timezone}
                   onChange={(event) => setTimezone(event.target.value)}
                   placeholder="e.g. America/New_York"
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleUseLocalTimezone}
-                >
-                  Use my timezone
-                </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Used for scheduling features and aligning usage reports.
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <Button type="submit" disabled={saving}>
-                {saving ? 'Saving...' : 'Save changes'}
+              <Button type="button" variant="outline" onClick={handleUseLocalTimezone}>
+                Use my timezone
               </Button>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+            <p className="text-xs text-muted-foreground">
+              We use your timezone to schedule AI-assisted writing sessions and align progress reports.
+            </p>
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-end">
+          <Button type="submit" disabled={saving} className="px-6">
+            {saving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving
+              </>
+            ) : (
+              'Save changes'
+            )}
+          </Button>
+        </div>
+      </form>
     </div>
   )
 }

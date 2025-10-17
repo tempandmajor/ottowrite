@@ -9,12 +9,15 @@ const config: Config = {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+  			sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+  		},
   		colors: {
-  			background: 'hsl(var(--background))',
-  			foreground: 'hsl(var(--foreground))',
-  			card: {
-  				DEFAULT: 'hsl(var(--card))',
-  				foreground: 'hsl(var(--card-foreground))'
+ 			background: 'hsl(var(--background))',
+ 			foreground: 'hsl(var(--foreground))',
+ 			card: {
+ 				DEFAULT: 'hsl(var(--card))',
+ 				foreground: 'hsl(var(--card-foreground))'
   			},
   			popover: {
   				DEFAULT: 'hsl(var(--popover))',
@@ -42,20 +45,24 @@ const config: Config = {
   			},
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
-  			ring: 'hsl(var(--ring))',
-  			chart: {
-  				'1': 'hsl(var(--chart-1))',
-  				'2': 'hsl(var(--chart-2))',
-  				'3': 'hsl(var(--chart-3))',
-  				'4': 'hsl(var(--chart-4))',
-  				'5': 'hsl(var(--chart-5))'
-  			}
-  		},
-  		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
-  		}
+ 			ring: 'hsl(var(--ring))',
+ 			chart: {
+ 				'1': 'hsl(var(--chart-1))',
+ 				'2': 'hsl(var(--chart-2))',
+ 				'3': 'hsl(var(--chart-3))',
+ 				'4': 'hsl(var(--chart-4))',
+ 				'5': 'hsl(var(--chart-5))'
+ 			}
+ 		},
+ 		borderRadius: {
+ 			lg: 'var(--radius)',
+ 			md: 'calc(var(--radius) - 2px)',
+			sm: 'calc(var(--radius) - 4px)'
+		},
+		boxShadow: {
+			glow: '0 22px 45px -20px rgba(79, 70, 229, 0.45)',
+			card: '0 18px 36px -28px rgba(15, 23, 42, 0.25)'
+		}
   	}
   },
   plugins: [require("tailwindcss-animate")],

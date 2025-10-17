@@ -41,6 +41,7 @@ import { TemplateDialog } from '@/components/dashboard/template-dialog'
 import { useToast } from '@/hooks/use-toast'
 import {
   ArrowLeft,
+  Building2,
   BookOpen,
   FileText,
   Lightbulb,
@@ -330,6 +331,12 @@ export default function ProjectDetailPage() {
               <Link href={`/dashboard/projects/${project.id}/outlines`}>
                 AI outlines
                 <Lightbulb className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button variant="ghost" className="w-full justify-between" asChild>
+              <Link href={`/dashboard/projects/${project.id}/world-building`}>
+                World building
+                <Building2 className="h-4 w-4" />
               </Link>
             </Button>
           </div>

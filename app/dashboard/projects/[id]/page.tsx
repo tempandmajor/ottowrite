@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -88,6 +89,14 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null)
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
   const [characters, setCharacters] = useState<CharacterSummary[]>([])
+  const [characterStats, setCharacterStats] = useState<{
+    total_characters: number
+    protagonists: number
+    antagonists: number
+    supporting: number
+    total_relationships: number
+    avg_importance: number
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
@@ -142,6 +151,24 @@ export default function ProjectDetailPage() {
       setProject(projectRes.data)
       setDocuments(documentsRes.data || [])
       setCharacters(charactersRes.data || [])
+
+      const { data: statsData } = await supabase.rpc('get_character_stats', {
+        p_project_id: projectId,
+      })
+
+      if (statsData && statsData.length > 0) {
+        const stats = statsData[0]
+        setCharacterStats({
+          total_characters: Number(stats.total_characters || 0),
+          protagonists: Number(stats.protagonists || 0),
+          antagonists: Number(stats.antagonists || 0),
+          supporting: Number(stats.supporting || 0),
+          total_relationships: Number(stats.total_relationships || 0),
+          avg_importance: Number(stats.avg_importance || 0),
+        })
+      } else {
+        setCharacterStats(null)
+      }
     } catch (error) {
       console.error('Error loading project:', error)
       toast({
@@ -209,6 +236,8 @@ export default function ProjectDetailPage() {
     () => documents.reduce((sum, doc) => sum + (doc.word_count || 0), 0),
     [documents]
   )
+
+  const topCharacters = useMemo(() => characters.slice(0, 3), [characters])
 
   if (loading) {
     return (
@@ -413,28 +442,92 @@ export default function ProjectDetailPage() {
 
           <TabsContent value="insights">
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border bg-card/70 p-6 shadow-sm">
-                <h3 className="text-base font-semibold text-foreground">Outline readiness</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Generate or refine your plot structure with Ottowrite’s AI suggestions tailored to this project.
-                </p>
-                <Button className="mt-4" asChild>
-                  <Link href={`/dashboard/projects/${project.id}/outlines`}>
-                    Launch outline assistant
-                  </Link>
-                </Button>
-              </div>
-              <div className="rounded-2xl border bg-card/70 p-6 shadow-sm">
-                <h3 className="text-base font-semibold text-foreground">Relationship map</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Visualize character dynamics and track evolving arcs across your narrative.
-                </p>
-                <Button variant="outline" className="mt-4" asChild>
-                  <Link href={`/dashboard/projects/${project.id}/characters/relationships`}>
-                    Open relationship view
-                  </Link>
-                </Button>
-              </div>
+              <Card className="border-none bg-card/80 shadow-card">
+                <CardHeader>
+                  <CardTitle>Character composition</CardTitle>
+                  <CardDescription>Snapshot of the cast powering this story.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4 text-sm">
+                    <Badge variant="muted">Total</Badge>
+                    <span className="text-lg font-semibold text-foreground">
+                      {characterStats?.total_characters ?? characters.length}
+                    </span>
+                    <span className="text-xs text-muted-foreground">characters</span>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl border bg-muted/40 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Protagonists</p>
+                      <p className="text-base font-semibold text-foreground">
+                        {characterStats?.protagonists ?? characters.filter((c) => c.role === 'protagonist').length}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border bg-muted/40 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Antagonists</p>
+                      <p className="text-base font-semibold text-foreground">
+                        {characterStats?.antagonists ?? characters.filter((c) => c.role === 'antagonist').length}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border bg-muted/40 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Supporting</p>
+                      <p className="text-base font-semibold text-foreground">
+                        {characterStats?.supporting ?? characters.filter((c) => c.role === 'supporting').length}
+                      </p>
+                    </div>
+                  </div>
+                  {topCharacters.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Top importance</p>
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        {topCharacters.map((character) => (
+                          <li key={character.id} className="flex items-center justify-between">
+                            <span>{character.name}</span>
+                            <span className="text-xs">{character.importance}/10</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-none bg-card/80 shadow-card">
+                <CardHeader>
+                  <CardTitle>Relationship & pacing</CardTitle>
+                  <CardDescription>Monitor dynamics and narrative momentum.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4 text-sm">
+                    <Badge variant="muted">Relationships</Badge>
+                    <span className="text-lg font-semibold text-foreground">
+                      {characterStats?.total_relationships ?? 0}
+                    </span>
+                  </div>
+                  <div className="rounded-2xl border bg-muted/40 p-3 text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">
+                      {characterStats?.avg_importance ? characterStats.avg_importance.toFixed(1) : '—'}
+                    </span>{' '}
+                    average importance across cast
+                  </div>
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <p>
+                      Use the relationship manager to visualise your network graph and ensure every character has meaningful stakes.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild size="sm">
+                        <Link href={`/dashboard/projects/${project.id}/characters/relationships`}>
+                          Open relationship map
+                        </Link>
+                      </Button>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/dashboard/projects/${project.id}/outlines`}>
+                          Outline assistant
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>

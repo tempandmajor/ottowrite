@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,6 +16,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -24,9 +36,17 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Plus, Trash2, Edit, Network } from 'lucide-react'
-import Link from 'next/link'
+import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/dashboard/empty-state'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ArrowLeft, Plus, Trash2, Edit, Network, Filter, Scale, Heart, Timeline } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { RelationshipWithCharacters } from '@/types/relationships'
+
+const RelationshipNetwork = dynamic(
+  () => import('@/components/dashboard/relationship-network').then((mod) => mod.RelationshipNetwork),
+  { ssr: false }
+)
 
 type Character = {
   id: string
@@ -65,6 +85,8 @@ const relationshipTypes = [
   'other',
 ]
 
+const relationshipStatuses = ['current', 'past', 'developing', 'ending', 'complicated']
+
 const relationshipColors: Record<string, string> = {
   family: 'bg-blue-500',
   romantic: 'bg-pink-500',
@@ -85,11 +107,14 @@ export default function CharacterRelationshipsPage() {
 
   const [project, setProject] = useState<Project | null>(null)
   const [characters, setCharacters] = useState<Character[]>([])
-  const [relationships, setRelationships] = useState<Relationship[]>([])
+  const [relationships, setRelationships] = useState<RelationshipWithCharacters[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRelationship, setEditingRelationship] = useState<Relationship | null>(null)
-  const [filterType, setFilterType] = useState<string | null>(null)
+  const [filterType, setFilterType] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [polarityFilter, setPolarityFilter] = useState<'all' | 'positive' | 'negative'>('all')
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     character_a_id: '',
@@ -108,7 +133,6 @@ export default function CharacterRelationshipsPage() {
   async function loadData() {
     const supabase = createClient()
 
-    // Load project
     const { data: projectData } = await supabase
       .from('projects')
       .select('id, title')
@@ -119,7 +143,6 @@ export default function CharacterRelationshipsPage() {
       setProject(projectData)
     }
 
-    // Load characters
     const { data: charactersData } = await supabase
       .from('characters')
       .select('id, name, role')
@@ -130,7 +153,6 @@ export default function CharacterRelationshipsPage() {
       setCharacters(charactersData)
     }
 
-    // Load relationships
     const { data: relationshipsData } = await supabase
       .from('character_relationships')
       .select(`
@@ -141,7 +163,7 @@ export default function CharacterRelationshipsPage() {
       .eq('project_id', projectId)
 
     if (relationshipsData) {
-      setRelationships(relationshipsData)
+      setRelationships(relationshipsData as RelationshipWithCharacters[])
     }
 
     setLoading(false)
@@ -188,22 +210,18 @@ export default function CharacterRelationshipsPage() {
     if (formData.character_a_id === formData.character_b_id) {
       toast({
         title: 'Error',
-        description: 'Cannot create relationship between same character',
+        description: 'Cannot create relationship between the same character',
         variant: 'destructive',
       })
       return
     }
 
-    const url = editingRelationship
-      ? '/api/characters/relationships'
-      : '/api/characters/relationships'
     const method = editingRelationship ? 'PATCH' : 'POST'
-
     const body = editingRelationship
       ? { id: editingRelationship.id, ...formData }
       : { project_id: projectId, ...formData }
 
-    const response = await fetch(url, {
+    const response = await fetch('/api/characters/relationships', {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -226,208 +244,227 @@ export default function CharacterRelationshipsPage() {
     }
   }
 
-  async function deleteRelationship(id: string) {
-    if (!confirm('Are you sure you want to delete this relationship?')) {
-      return
-    }
+  function requestDelete(id: string) {
+    setDeleteId(id)
+  }
 
-    const response = await fetch(`/api/characters/relationships?id=${id}`, {
+  async function confirmDelete() {
+    if (!deleteId) return
+    const response = await fetch(`/api/characters/relationships?id=${deleteId}`, {
       method: 'DELETE',
     })
-
     if (response.ok) {
-      toast({
-        title: 'Success',
-        description: 'Relationship deleted successfully',
-      })
+      toast({ title: 'Relationship deleted', description: 'Connection removed successfully.' })
+      setDeleteId(null)
       loadData()
     }
   }
 
-  const filteredRelationships = filterType
-    ? relationships.filter((relationship) => relationship.relationship_type === filterType)
-    : relationships
+  const filteredRelationships = useMemo(() => {
+    return relationships.filter((relationship) => {
+      const matchesType = filterType === 'all' || relationship.relationship_type === filterType
+      const matchesStatus = statusFilter === 'all' || relationship.status === statusFilter
+      const matchesPolarity =
+        polarityFilter === 'all' ||
+        (polarityFilter === 'positive' ? relationship.is_positive : !relationship.is_positive)
+      return matchesType && matchesStatus && matchesPolarity
+    })
+  }, [relationships, filterType, statusFilter, polarityFilter])
 
-  const handleTypeFilter = (type: string) => {
-    setFilterType((current) => (current === type ? null : type))
-  }
+  const totalPositive = relationships.filter((rel) => rel.is_positive).length
+  const totalNegative = relationships.length - totalPositive
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-60" />
+        <Skeleton className="h-32 rounded-3xl" />
+        <div className="grid gap-4 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-40 rounded-2xl" />
+          ))}
         </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/dashboard/projects/${projectId}/characters`}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Characters
-            </Link>
-          </Button>
-        </div>
-        <div className="flex items-center justify-between">
+    <div className="space-y-10">
+      <section className="flex flex-col gap-6 rounded-3xl border bg-card/80 p-6 shadow-card md:flex-row md:items-center md:justify-between">
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+            <Network className="h-3.5 w-3.5" />
+            Character relationships
+          </div>
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Network className="h-8 w-8" />
-              Character Relationships
-            </h1>
-            <p className="text-muted-foreground">
-              {project?.title} • {relationships.length} relationship
-              {relationships.length !== 1 ? 's' : ''}
-              {filterType && (
-                <span className="ml-2 text-sm text-muted-foreground">
-                  • Filtering by {filterType.replace('_', ' ')}
-                </span>
-              )}
+            <h1 className="text-3xl font-semibold tracking-tight">Connection map</h1>
+            <p className="text-sm text-muted-foreground">
+              Explore how your cast intersects, track emotional dynamics, and keep development arcs aligned.
             </p>
           </div>
-          <div className="flex gap-2">
-            {filterType && (
-              <Button variant="outline" onClick={() => setFilterType(null)}>
-                Clear Filter
-              </Button>
-            )}
-            <Button onClick={openCreateDialog}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Relationship
-            </Button>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span>{relationships.length} relationships total</span>
+            <span className="h-4 w-px bg-border" />
+            <span>{totalPositive} positive • {totalNegative} negative</span>
           </div>
         </div>
-      </div>
+        <Button size="lg" onClick={openCreateDialog}>
+          <Plus className="mr-2 h-4 w-4" />
+          New relationship
+        </Button>
+      </section>
 
-      {/* Statistics */}
-      <div className="grid gap-4 md:grid-cols-5 lg:grid-cols-6 mb-8">
-        {relationshipTypes.map((type) => {
-          const count = relationships.filter((r) => r.relationship_type === type).length
-          const isActive = filterType === type
-          return (
-            <Card
+      <section className="flex flex-col gap-4 rounded-2xl border bg-card/60 p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant={filterType === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilterType('all')}
+            className="flex items-center gap-2"
+          >
+            <Filter className="h-4 w-4" />
+            All types
+          </Button>
+          {relationshipTypes.map((type) => (
+            <Badge
               key={type}
-              className={`cursor-pointer transition-all ${isActive ? 'ring-2 ring-primary' : ''}`}
-              onClick={() => handleTypeFilter(type)}
+              variant={filterType === type ? 'default' : 'outline'}
+              className="cursor-pointer capitalize"
+              onClick={() => setFilterType((prev) => (prev === type ? 'all' : type))}
             >
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <div className={`h-3 w-3 rounded-full ${relationshipColors[type]}`}></div>
-                  <span className="text-2xl font-bold">{count}</span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground capitalize">
-                  {type.replace('_', ' ')}
-                </p>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
-
-      {/* Relationships List */}
-      {filteredRelationships.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <Network className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No relationships yet</h3>
-            <p className="text-muted-foreground mb-4">
-              {filterType
-                ? `No ${filterType.replace('_', ' ')} relationships found. Try another filter.`
-                : 'Define connections between your characters to bring their interactions to life.'}
-            </p>
-            {!filterType && (
-              <Button onClick={openCreateDialog}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Relationship
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {filteredRelationships.map((relationship) => (
-            <Card key={relationship.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <span>{relationship.character_a?.name}</span>
-                      <span className="text-muted-foreground">↔</span>
-                      <span>{relationship.character_b?.name}</span>
-                    </CardTitle>
-                    <CardDescription className="mt-1">
-                      <Badge
-                        className={`${relationshipColors[relationship.relationship_type]} text-white`}
-                      >
-                        {relationship.relationship_type.replace('_', ' ')}
-                      </Badge>
-                      <Badge variant="outline" className="ml-2">
-                        ★ {relationship.strength}/10
-                      </Badge>
-                      <Badge
-                        variant={relationship.is_positive ? 'default' : 'destructive'}
-                        className="ml-2"
-                      >
-                        {relationship.is_positive ? 'Positive' : 'Negative'}
-                      </Badge>
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <p className="text-sm">
-                    <strong>Status:</strong>{' '}
-                    <span className="capitalize">{relationship.status}</span>
-                  </p>
-                  {relationship.description && (
-                    <p className="text-sm text-muted-foreground">
-                      {relationship.description}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => openEditDialog(relationship)}
-                  >
-                    <Edit className="h-3 w-3 mr-1" />
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => deleteRelationship(relationship.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              {type.replace('_', ' ')}
+            </Badge>
           ))}
         </div>
-      )}
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="sm:w-44">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {relationshipStatuses.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {status.replace('_', ' ')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={polarityFilter} onValueChange={(value) => setPolarityFilter(value as typeof polarityFilter)}>
+            <SelectTrigger className="sm:w-44">
+              <SelectValue placeholder="Polarity" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All dynamics</SelectItem>
+              <SelectItem value="positive">Positive</SelectItem>
+              <SelectItem value="negative">Negative</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </section>
 
-      {/* Create/Edit Dialog */}
+      <Tabs defaultValue="list" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="list">List view</TabsTrigger>
+          <TabsTrigger value="network">Network graph</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="list">
+          {filteredRelationships.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {filteredRelationships.map((relationship) => (
+                <Card key={relationship.id} className="flex h-full flex-col justify-between rounded-2xl border bg-card/80 p-6 shadow-card transition hover:shadow-lg">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-lg font-semibold text-foreground">
+                          {relationship.character_a?.name}
+                          <span className="mx-2 text-muted-foreground">↔</span>
+                          {relationship.character_b?.name}
+                        </CardTitle>
+                        <CardDescription className="mt-1 flex flex-wrap items-center gap-2">
+                          <Badge className={`${relationshipColors[relationship.relationship_type]} text-white capitalize`}>
+                            {relationship.relationship_type.replace('_', ' ')}
+                          </Badge>
+                          <Badge variant="outline">Strength {relationship.strength}/10</Badge>
+                          <Badge variant={relationship.is_positive ? 'outline' : 'destructive'} className="flex items-center gap-1">
+                            {relationship.is_positive ? (
+                              <Heart className="h-3 w-3" />
+                            ) : (
+                              <Scale className="h-3 w-3" />
+                            )}
+                            {relationship.is_positive ? 'Positive' : 'Negative'}
+                          </Badge>
+                          <Badge variant="outline" className="capitalize">
+                            {relationship.status}
+                          </Badge>
+                        </CardDescription>
+                      </div>
+                    </div>
+                    {relationship.description && (
+                      <p className="text-sm text-muted-foreground">{relationship.description}</p>
+                    )}
+                  </div>
+                  <div className="mt-6 flex items-center justify-between">
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => openEditDialog(relationship)}>
+                      <Edit className="mr-2 h-3 w-3" />
+                      Edit relationship
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="ml-2"
+                      onClick={() => requestDelete(relationship.id)}
+                      aria-label="Delete relationship"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={Network}
+              title="No relationships match your filters"
+              description="Adjust the filters or create a new connection to visualize your character web."
+              action={{ label: 'Create relationship', onClick: openCreateDialog }}
+              secondaryAction={{
+                label: 'Reset filters',
+                onClick: () => {
+                  setFilterType('all')
+                  setStatusFilter('all')
+                  setPolarityFilter('all')
+                },
+              }}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="network">
+          {filteredRelationships.length > 1 ? (
+            <div className="rounded-3xl border bg-card/70 p-6 shadow-card">
+              <RelationshipNetwork
+                relationships={filteredRelationships}
+                characters={characters}
+              />
+            </div>
+          ) : (
+            <EmptyState
+              icon={Timeline}
+              title="Not enough data"
+              description="Add at least two relationships to visualise the network graph."
+              action={{ label: 'Create relationship', onClick: openCreateDialog }}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>
-              {editingRelationship ? 'Edit Relationship' : 'New Relationship'}
-            </DialogTitle>
-            <DialogDescription>
-              Define the connection between two characters
-            </DialogDescription>
+            <DialogTitle>{editingRelationship ? 'Edit relationship' : 'New relationship'}</DialogTitle>
+            <DialogDescription>Define the connection between two characters in this project.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid gap-4 md:grid-cols-2">
@@ -435,9 +472,7 @@ export default function CharacterRelationshipsPage() {
                 <Label>Character A</Label>
                 <Select
                   value={formData.character_a_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, character_a_id: value })
-                  }
+                  onValueChange={(value) => setFormData({ ...formData, character_a_id: value })}
                   disabled={!!editingRelationship}
                 >
                   <SelectTrigger>
@@ -456,9 +491,7 @@ export default function CharacterRelationshipsPage() {
                 <Label>Character B</Label>
                 <Select
                   value={formData.character_b_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, character_b_id: value })
-                  }
+                  onValueChange={(value) => setFormData({ ...formData, character_b_id: value })}
                   disabled={!!editingRelationship}
                 >
                   <SelectTrigger>
@@ -476,12 +509,10 @@ export default function CharacterRelationshipsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Relationship Type</Label>
+              <Label>Relationship type</Label>
               <Select
                 value={formData.relationship_type}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, relationship_type: value })
-                }
+                onValueChange={(value) => setFormData({ ...formData, relationship_type: value })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -504,18 +535,14 @@ export default function CharacterRelationshipsPage() {
                   min="1"
                   max="10"
                   value={formData.strength}
-                  onChange={(e) =>
-                    setFormData({ ...formData, strength: parseInt(e.target.value) || 5 })
-                  }
+                  onChange={(e) => setFormData({ ...formData, strength: parseInt(e.target.value) || 5 })}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Nature</Label>
                 <Select
                   value={formData.is_positive ? 'positive' : 'negative'}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, is_positive: value === 'positive' })
-                  }
+                  onValueChange={(value) => setFormData({ ...formData, is_positive: value === 'positive' })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -528,19 +555,16 @@ export default function CharacterRelationshipsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) => setFormData({ ...formData, status: value })}
-                >
+                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="current">Current</SelectItem>
-                    <SelectItem value="past">Past</SelectItem>
-                    <SelectItem value="developing">Developing</SelectItem>
-                    <SelectItem value="ending">Ending</SelectItem>
-                    <SelectItem value="complicated">Complicated</SelectItem>
+                    {relationshipStatuses.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status.replace('_', ' ')}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -561,11 +585,28 @@ export default function CharacterRelationshipsPage() {
               Cancel
             </Button>
             <Button onClick={saveRelationship}>
-              {editingRelationship ? 'Update' : 'Create'} Relationship
+              {editingRelationship ? 'Update' : 'Create'} relationship
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={Boolean(deleteId)} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete relationship?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the link between these characters. You can always recreate it later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={confirmDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

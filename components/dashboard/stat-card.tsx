@@ -21,7 +21,7 @@ export function StatCard({
     <div
       className={cn(
         'relative overflow-hidden rounded-2xl border bg-card/80 p-6 shadow-card transition hover:shadow-lg',
-        tone === 'accent' && 'bg-gradient-to-br from-primary/10 via-primary/5 to-card'
+        tone === 'accent' && 'bg-gradient-to-br from-muted via-card to-card'
       )}
     >
       <div className="flex items-start justify-between gap-4">
@@ -32,14 +32,14 @@ export function StatCard({
           <p className="text-3xl font-semibold tracking-tight text-foreground">{value}</p>
           {helper && <p className="text-sm text-muted-foreground/80">{helper}</p>}
         </div>
-        {icon && <div className="rounded-full bg-primary/10 p-3 text-primary">{icon}</div>}
+        {icon && <div className="rounded-full bg-secondary p-3 text-secondary-foreground">{icon}</div>}
       </div>
       {delta && (
         <Badge
           variant="outline"
           className={cn(
-            'mt-4 border-primary/50 bg-primary/10 text-primary',
-            delta.positive === false && 'border-destructive/40 bg-destructive/10 text-destructive'
+            'mt-4 border-border bg-secondary/60 text-foreground',
+            delta.positive === false && 'border-destructive/40 bg-destructive/15 text-destructive'
           )}
         >
           {delta.positive === false ? '▼' : '▲'} {delta.value}

@@ -139,7 +139,7 @@ export default function Home() {
           <div className="grid gap-6 md:grid-cols-3">
             {featureHighlights.map(({ icon: Icon, title, description }) => (
               <div key={title} className="rounded-2xl border bg-card/70 p-6 shadow-sm transition hover:shadow-md">
-                <div className="inline-flex rounded-full bg-primary/10 p-3 text-primary">
+                <div className="inline-flex rounded-full bg-secondary p-3 text-secondary-foreground">
                   <Icon className="h-5 w-5" />
                 </div>
                 <h3 className="mt-4 text-xl font-semibold">{title}</h3>

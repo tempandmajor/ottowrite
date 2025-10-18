@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { TiptapEditor } from '@/components/editor/tiptap-editor'
@@ -8,6 +8,7 @@ import { ScreenplayEditor } from '@/components/editor/screenplay-editor'
 import { AIAssistant } from '@/components/editor/ai-assistant'
 import { ExportModal } from '@/components/editor/export-modal'
 import { VersionHistory } from '@/components/editor/version-history'
+import { ChapterSidebar, Chapter } from '@/components/editor/chapter-sidebar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,20 +26,38 @@ import {
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 
-type Document = {
+type DocumentContent = {
+  html?: string
+  screenplay?: any
+  structure?: Chapter[]
+}
+
+type DocumentRecord = {
   id: string
   title: string
-  content: any
+  content?: DocumentContent
   type: string
   word_count: number
   project_id: string
+  updated_at?: string
 }
+
+const cloneStructure = (chapters: Chapter[]): Chapter[] =>
+  chapters.map((chapter) => ({
+    ...chapter,
+    scenes: (chapter.scenes ?? []).map((scene) => ({
+      ...scene,
+      metadata: scene.metadata ? { ...scene.metadata } : undefined,
+    })),
+  }))
 
 const isScriptType = (type?: string) => type === 'screenplay' || type === 'play'
 
-const generateElementId = () =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
+const generateClientId = () =>
+  typeof globalThis !== 'undefined' &&
+  globalThis.crypto &&
+  typeof globalThis.crypto.randomUUID === 'function'
+    ? globalThis.crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`
 
 const escapeHtml = (value: string) =>
@@ -49,13 +68,46 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 
+const anchorSpanRegex = /<span[^>]*data-scene-anchor=["']true["'][^>]*data-scene-id=["']([^"']+)["'][^>]*>/gi
+
+function extractSceneAnchors(html?: string): string[] {
+  if (!html) return []
+  const ids = new Set<string>()
+  let match: RegExpExecArray | null
+  while ((match = anchorSpanRegex.exec(html)) !== null) {
+    if (match[1]) ids.add(match[1])
+  }
+  return Array.from(ids)
+}
+
+async function computeClientContentHash(payload: {
+  html?: string
+  structure?: unknown
+  anchorIds?: string[]
+}): Promise<string> {
+  const normalized = {
+    html: payload.html ?? '',
+    structure: Array.isArray(payload.structure) ? payload.structure : [],
+    anchors: Array.from(new Set((payload.anchorIds ?? []).filter((id) => typeof id === 'string'))).sort(),
+  }
+
+  const encoder = new TextEncoder()
+  const data = encoder.encode(JSON.stringify(normalized))
+  const digest = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+}
+
 export default function EditorPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
-  const [document, setDocument] = useState<Document | null>(null)
+  const [document, setDocument] = useState<DocumentRecord | null>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const [structure, setStructure] = useState<Chapter[]>([])
+  const [activeSceneId, setActiveSceneId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showAI, setShowAI] = useState(true)
@@ -65,6 +117,47 @@ export default function EditorPage() {
   const [projectTitle, setProjectTitle] = useState<string | null>(null)
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [isDirty, setIsDirty] = useState(false)
+  const [sceneAnchors, setSceneAnchors] = useState<Set<string>>(new Set())
+  const [autosaveStatus, setAutosaveStatus] = useState<
+    'idle' | 'pending' | 'saving' | 'saved' | 'offline' | 'error' | 'conflict'
+  >('idle')
+  const [baseHash, setBaseHash] = useState<string | null>(null)
+  const [serverContent, setServerContent] = useState<{
+    html: string
+    structure?: Chapter[] | null
+    wordCount?: number
+  } | null>(null)
+  const lastSceneFocusMissRef = useRef<string | null>(null)
+  const autosaveTimerRef = useRef<number | null>(null)
+  const autosaveControllerRef = useRef<AbortController | null>(null)
+  const lastAutosaveSignatureRef = useRef<string | null>(null)
+
+  const activeSceneInfo = useMemo(() => {
+    if (!activeSceneId) return null
+    for (const chapter of structure) {
+      const scene = chapter.scenes?.find((item) => item.id === activeSceneId)
+      if (scene) {
+        return {
+          id: scene.id,
+          title: scene.title ?? '',
+          chapterTitle: chapter.title ?? '',
+        }
+      }
+    }
+    return null
+  }, [activeSceneId, structure])
+
+  const missingAnchors = useMemo(() => {
+    const missing = new Set<string>()
+    structure.forEach((chapter) => {
+      chapter.scenes?.forEach((scene) => {
+        if (scene.id && !sceneAnchors.has(scene.id)) {
+          missing.add(scene.id)
+        }
+      })
+    })
+    return missing
+  }, [structure, sceneAnchors])
 
   const loadDocument = useCallback(async () => {
     try {
@@ -108,30 +201,52 @@ export default function EditorPage() {
         return
       }
 
-      setDocument(data)
-      setTitle(data.title)
-      setLastSavedAt(data.updated_at ? new Date(data.updated_at) : new Date())
+      const typedData = data as DocumentRecord
+      setDocument(typedData)
+      setTitle(typedData.title)
+      setLastSavedAt(typedData.updated_at ? new Date(typedData.updated_at) : new Date())
 
-      // Load content based on document type
-      if (data.type === 'screenplay' || data.type === 'play') {
-        setContent(JSON.stringify(data.content?.screenplay || []))
+      if (isScriptType(typedData.type)) {
+        setContent(JSON.stringify(typedData.content?.screenplay || []))
+        setStructure([])
+        setActiveSceneId(null)
+        setSceneAnchors(new Set())
+        setBaseHash(null)
+        setAutosaveStatus('idle')
       } else {
-        setContent(data.content?.html || '')
+        const initialHtml = typedData.content?.html || ''
+        const initialStructure = Array.isArray(typedData.content?.structure)
+          ? (typedData.content?.structure as Chapter[])
+          : []
+        const initialAnchors = extractSceneAnchors(initialHtml)
+
+        setContent(initialHtml)
+        setStructure(cloneStructure(initialStructure))
+        setActiveSceneId(null)
+        setSceneAnchors(new Set(initialAnchors))
+
+        const initialHash = await computeClientContentHash({
+          html: initialHtml,
+          structure: initialStructure,
+          anchorIds: initialAnchors,
+        })
+        setBaseHash(initialHash)
+        setAutosaveStatus('idle')
       }
 
-      if (data.project_id) {
+      let resolvedProjectTitle: string | null = null
+      if (typedData.project_id) {
         const { data: projectData } = await supabase
           .from('projects')
           .select('title')
-          .eq('id', data.project_id)
+          .eq('id', typedData.project_id)
           .single()
 
-        if (projectData) {
-          setProjectTitle(projectData.title)
+        if (projectData?.title) {
+          resolvedProjectTitle = projectData.title
         }
-      } else {
-        setProjectTitle(null)
       }
+      setProjectTitle(resolvedProjectTitle)
     } catch (error) {
       console.error('Error loading document:', error)
       toast({
@@ -147,6 +262,18 @@ export default function EditorPage() {
   useEffect(() => {
     loadDocument()
   }, [loadDocument])
+
+  useEffect(() => {
+    if (!activeSceneId) return
+
+    const exists = structure.some((chapter) =>
+      chapter.scenes.some((scene) => scene.id === activeSceneId)
+    )
+
+    if (!exists) {
+      setActiveSceneId(null)
+    }
+  }, [activeSceneId, structure])
 
   const saveDocument = useCallback(async () => {
     if (!document) return
@@ -181,7 +308,7 @@ export default function EditorPage() {
       } else {
         const text = content.replace(/<[^>]*>/g, ' ')
         wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length
-        contentData = { html: content }
+        contentData = { html: content, structure: cloneStructure(structure) }
       }
 
       const { error } = await supabase
@@ -196,18 +323,34 @@ export default function EditorPage() {
 
       if (error) throw error
 
-      setDocument((prev) =>
-        prev
-          ? {
-              ...prev,
-              title,
-              content: contentData,
-              word_count: wordCount,
+      setDocument((prev) => {
+        if (!prev) return prev
+        const nextContent = isScriptType(document.type)
+          ? contentData
+          : {
+              ...(prev.content ?? {}),
+              ...contentData,
             }
-          : prev
-      )
+
+        return {
+          ...prev,
+          title,
+          content: nextContent,
+          word_count: wordCount,
+        }
+      })
       setLastSavedAt(new Date())
       setIsDirty(false)
+
+      if (!isScriptType(document.type)) {
+        const newHash = await computeClientContentHash({
+          html: content,
+          structure,
+          anchorIds: Array.from(sceneAnchors),
+        })
+        setBaseHash(newHash)
+        setAutosaveStatus('saved')
+      }
 
       toast({
         title: 'Success',
@@ -223,39 +366,57 @@ export default function EditorPage() {
     } finally {
       setSaving(false)
     }
-  }, [content, document, title, toast])
+  }, [content, document, title, toast, structure, sceneAnchors])
 
-  // Auto-save every 3 seconds
-  useEffect(() => {
-    if (!document) return
+  const handleStructureChange = useCallback((nextChapters: Chapter[]) => {
+    setStructure(nextChapters)
+  }, [])
 
-    const interval = setInterval(() => {
-      if (!document || saving) {
+  const handleSceneSelect = useCallback((sceneId: string | null) => {
+    setActiveSceneId(sceneId)
+  }, [])
+
+  const handleSceneCreated = useCallback((_chapterId: string, sceneId: string) => {
+    setActiveSceneId(sceneId)
+  }, [])
+
+  const handleInsertAnchor = useCallback(
+    (sceneId: string) => {
+      if (!sceneId || isScriptType(document?.type)) {
         return
       }
 
-      const originalSignature = isScriptType(document.type)
-        ? JSON.stringify(document.content?.screenplay || [])
-        : document.content?.html || ''
+      setActiveSceneId(sceneId)
 
-      const currentSignature = isScriptType(document.type)
-        ? (() => {
-            try {
-              return JSON.stringify(JSON.parse(content || '[]'))
-            } catch (error) {
-              console.error('Error parsing screenplay content for autosave:', error)
-              return JSON.stringify([])
-            }
-          })()
-        : content
+      window.dispatchEvent(
+        new CustomEvent('editor-insert-scene-anchor', {
+          detail: { sceneId },
+        })
+      )
+    },
+    [document]
+  )
 
-      if (currentSignature !== originalSignature || title !== document.title) {
-        saveDocument()
+  const handleAnchorsChange = useCallback((anchors: Set<string>) => {
+    setSceneAnchors(new Set(anchors))
+  }, [])
+
+  const handleSceneFocusResult = useCallback(
+    ({ id, found }: { id: string; found: boolean }) => {
+      if (!found) {
+        if (lastSceneFocusMissRef.current === id) return
+        lastSceneFocusMissRef.current = id
+        toast({
+          title: 'Scene location not found',
+          description:
+            'Insert an anchor for this scene or add a heading/paragraph with the scene title so navigation can jump to it.',
+        })
+      } else {
+        lastSceneFocusMissRef.current = null
       }
-    }, 3000)
-
-    return () => clearInterval(interval)
-  }, [content, title, document, saving, saveDocument])
+    },
+    [toast]
+  )
 
   const insertAIText = (text: string) => {
     if (!text.trim()) return
@@ -278,7 +439,7 @@ export default function EditorPage() {
         }
 
         const additions = segments.map((segment) => ({
-          id: generateElementId(),
+          id: generateClientId(),
           type: 'action',
           content: segment.replace(/\s+/g, ' ').trim(),
         }))
@@ -311,6 +472,10 @@ export default function EditorPage() {
       setContent(JSON.stringify(versionContent?.screenplay || []))
     } else {
       setContent(versionContent?.html || '')
+      const restoredStructure = Array.isArray(versionContent?.structure)
+        ? (versionContent.structure as Chapter[])
+        : []
+      setStructure(cloneStructure(restoredStructure))
     }
     // Save immediately after restore
     setTimeout(() => saveDocument(), 100)
@@ -322,12 +487,17 @@ export default function EditorPage() {
     const originalTitle = document.title || ''
     const originalSignature = isScriptType(document.type)
       ? JSON.stringify(document.content?.screenplay || [])
-      : document.content?.html || ''
+      : JSON.stringify({
+          html: document.content?.html || '',
+          structure: document.content?.structure || [],
+        })
 
-    const currentSignature = isScriptType(document.type) ? content : content
+    const currentSignature = isScriptType(document.type)
+      ? content
+      : JSON.stringify({ html: content, structure })
 
     setIsDirty(currentSignature !== originalSignature || title !== originalTitle)
-  }, [content, title, document])
+  }, [content, title, document, structure])
 
   const wordCount = useMemo(() => {
     if (!document) return 0
@@ -352,6 +522,207 @@ export default function EditorPage() {
       .filter((w) => w.length > 0).length
   }, [document, content])
 
+  const autosaveLabelData = useMemo(() => {
+    switch (autosaveStatus) {
+      case 'saving':
+        return { label: 'Autosaving…', className: 'text-muted-foreground' }
+      case 'saved':
+        return { label: 'All changes saved', className: 'text-muted-foreground' }
+      case 'pending':
+        return { label: 'Autosave pending…', className: 'text-muted-foreground' }
+      case 'offline':
+        return { label: 'Offline – retrying…', className: 'text-amber-600' }
+      case 'error':
+        return { label: 'Autosave failed', className: 'text-destructive' }
+      case 'conflict':
+        return { label: 'Autosave conflict', className: 'text-amber-600' }
+      default:
+        return { label: 'Autosave idle', className: 'text-muted-foreground' }
+    }
+  }, [autosaveStatus])
+
+const autosaveLabel = autosaveLabelData.label
+const autosaveClassName = autosaveLabelData.className
+
+  const performAutosave = useCallback(async () => {
+    if (!document || isScriptType(document.type)) return
+
+    try {
+      const anchorIds = Array.from(sceneAnchors)
+      const payloadHash = await computeClientContentHash({
+        html: content,
+        structure,
+        anchorIds,
+      })
+
+      if (payloadHash === baseHash) {
+        setAutosaveStatus((prev) => (prev === 'conflict' ? prev : 'saved'))
+        return
+      }
+
+      if (autosaveControllerRef.current) {
+        autosaveControllerRef.current.abort()
+      }
+
+      const controller = new AbortController()
+      autosaveControllerRef.current = controller
+      setAutosaveStatus('saving')
+
+      const response = await fetch(`/api/documents/${document.id}/autosave`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          html: content,
+          structure,
+          anchorIds,
+          wordCount,
+          baseHash,
+          snapshotOnly: false,
+        }),
+        signal: controller.signal,
+      })
+
+      if (response.status === 409) {
+        setAutosaveStatus('conflict')
+        const data = await response.json()
+        toast({
+          title: 'Autosave conflict',
+          description: 'Another session updated this document. Review changes before continuing.',
+          variant: 'destructive',
+        })
+        if (data?.hash) {
+          setBaseHash(data.hash)
+        }
+        const conflictStructure = Array.isArray(data?.document?.structure)
+          ? (data.document.structure as Chapter[])
+          : null
+        if (data?.document?.html) {
+          setServerContent({
+            html: data.document.html as string,
+            structure: conflictStructure,
+            wordCount: typeof data?.document?.wordCount === 'number' ? data.document.wordCount : undefined,
+          })
+        }
+        autosaveControllerRef.current = null
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(`Autosave failed with status ${response.status}`)
+      }
+
+      const data = await response.json()
+      setBaseHash(data?.hash ?? payloadHash)
+      setAutosaveStatus('saved')
+      setLastSavedAt(new Date())
+      setDocument((prev) =>
+        prev
+          ? {
+              ...prev,
+              content: {
+                ...(prev.content ?? {}),
+                html: content,
+                structure,
+              },
+              word_count: wordCount,
+            }
+          : prev
+      )
+      setIsDirty(false)
+      autosaveControllerRef.current = null
+    } catch (error) {
+      if ((error as any)?.name === 'AbortError') {
+        return
+      }
+
+      if (!navigator.onLine) {
+        setAutosaveStatus('offline')
+      } else {
+        setAutosaveStatus('error')
+      }
+      console.error('Autosave error:', error)
+      autosaveControllerRef.current = null
+    }
+  }, [document, sceneAnchors, content, structure, baseHash, wordCount, toast])
+
+  useEffect(() => {
+    if (!document || isScriptType(document.type)) {
+      lastAutosaveSignatureRef.current = null
+      return
+    }
+
+    const signature = JSON.stringify({
+      html: content,
+      structure,
+      anchors: Array.from(sceneAnchors).sort(),
+    })
+
+    if (signature === lastAutosaveSignatureRef.current) {
+      return
+    }
+
+    lastAutosaveSignatureRef.current = signature
+
+    if (!['saving', 'conflict', 'offline'].includes(autosaveStatus)) {
+      setAutosaveStatus('pending')
+    }
+
+    if (autosaveTimerRef.current) {
+      window.clearTimeout(autosaveTimerRef.current)
+    }
+
+    autosaveTimerRef.current = window.setTimeout(() => {
+      void performAutosave()
+    }, 1000)
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current)
+        autosaveTimerRef.current = null
+      }
+    }
+  }, [document, content, structure, sceneAnchors, performAutosave, autosaveStatus])
+
+  useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current)
+      }
+      if (autosaveControllerRef.current) {
+        autosaveControllerRef.current.abort()
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!document || isScriptType(document.type)) {
+      return
+    }
+
+    if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+      setAutosaveStatus((prev) => (prev === 'conflict' ? prev : 'offline'))
+    }
+
+    const handleOffline = () => {
+      setAutosaveStatus((prev) => (prev === 'conflict' ? prev : 'offline'))
+    }
+
+    const handleOnline = () => {
+      setAutosaveStatus((prev) => (prev === 'offline' || prev === 'error' ? 'pending' : prev))
+      void performAutosave()
+    }
+
+    window.addEventListener('offline', handleOffline)
+    window.addEventListener('online', handleOnline)
+
+    return () => {
+      window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [document, performAutosave])
+
   const savedMessage = isDirty
     ? 'Unsaved changes'
     : lastSavedAt
@@ -369,6 +740,8 @@ export default function EditorPage() {
   if (!document) {
     return null
   }
+
+  const showStructureSidebar = !isScriptType(document.type)
 
   return (
     <div className="min-h-screen bg-background">
@@ -403,6 +776,12 @@ export default function EditorPage() {
                 <span>{wordCount.toLocaleString()} words</span>
                 <span className="h-3 w-px bg-border" aria-hidden />
                 <span className={isDirty ? 'text-amber-600' : 'text-muted-foreground'}>{savedMessage}</span>
+                {!isScriptType(document.type) && (
+                  <>
+                    <span className="h-3 w-px bg-border" aria-hidden />
+                    <span className={autosaveClassName}>{autosaveLabel}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -442,7 +821,26 @@ export default function EditorPage() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <main
+        className={`mx-auto grid max-w-6xl gap-6 px-6 py-6 ${
+          showStructureSidebar
+            ? 'lg:grid-cols-[280px_minmax(0,1fr)_320px]'
+            : 'lg:grid-cols-[minmax(0,1fr)_320px]'
+        }`}
+      >
+        {showStructureSidebar && (
+          <div className="space-y-4">
+            <ChapterSidebar
+              chapters={structure}
+              onChange={handleStructureChange}
+              activeSceneId={activeSceneId}
+              onSelectScene={handleSceneSelect}
+              onCreateScene={handleSceneCreated}
+              onInsertAnchor={handleInsertAnchor}
+              missingAnchors={missingAnchors}
+            />
+          </div>
+        )}
         <div className="space-y-6">
           <Card className="border-none bg-card/80 shadow-card">
             <CardHeader>
@@ -481,6 +879,50 @@ export default function EditorPage() {
                   content={content}
                   onUpdate={setContent}
                   placeholder="Start writing your story..."
+                  focusScene={activeSceneInfo}
+                  onAnchorsChange={handleAnchorsChange}
+                  onSceneFocusResult={handleSceneFocusResult}
+                  remoteContent={serverContent}
+                  conflictVisible={autosaveStatus === 'conflict'}
+                  onReplaceWithServer={async () => {
+                    if (!serverContent) return
+                    const nextStructure = Array.isArray(serverContent.structure)
+                      ? cloneStructure(serverContent.structure)
+                      : cloneStructure(structure)
+                    setContent(serverContent.html)
+                    setStructure(nextStructure)
+                    setAutosaveStatus('pending')
+                    const anchorIds = extractSceneAnchors(serverContent.html)
+                    setSceneAnchors(new Set(anchorIds))
+                    const newHash = await computeClientContentHash({
+                      html: serverContent.html,
+                      structure: nextStructure,
+                      anchorIds,
+                    })
+                    setBaseHash(newHash)
+                    setAutosaveStatus('saved')
+                    setLastSavedAt(new Date())
+                    setDocument((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            content: {
+                              ...(prev.content ?? {}),
+                              html: serverContent.html,
+                              structure: nextStructure,
+                            },
+                            word_count: serverContent.wordCount ?? prev.word_count,
+                          }
+                        : prev
+                    )
+                    setIsDirty(false)
+                    setServerContent(null)
+                  }}
+                  onCloseConflict={() => {
+                    setServerContent(null)
+                    setAutosaveStatus('pending')
+                    void performAutosave()
+                  }}
                 />
               )}
             </div>

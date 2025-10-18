@@ -34,7 +34,7 @@ export function QuickActions() {
           className="group relative flex h-full flex-col justify-between gap-4 rounded-2xl border bg-card/70 p-6 shadow-card transition hover:shadow-glow"
         >
           <div className="space-y-3">
-            <span className="inline-flex rounded-full bg-primary/10 p-2 text-primary">
+            <span className="inline-flex rounded-full bg-secondary p-2 text-secondary-foreground">
               <action.icon className="h-5 w-5" />
             </span>
             <div className="space-y-1">
@@ -43,7 +43,7 @@ export function QuickActions() {
             </div>
           </div>
           <Button variant="link" className="px-0" asChild>
-            <Link href={action.href} className="flex items-center gap-1 text-primary">
+            <Link href={action.href} className="flex items-center gap-1 text-foreground">
               Open
               <ArrowUpRight className="h-4 w-4 transition group-hover:translate-x-1 group-hover:-translate-y-1" />
             </Link>

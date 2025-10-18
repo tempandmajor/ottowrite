@@ -63,10 +63,10 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
       <div className="mx-auto grid min-h-screen max-w-6xl gap-12 px-6 py-12 lg:grid-cols-[1.2fr_1fr] lg:items-center">
         <div className="space-y-8">
-          <Badge variant="outline" className="rounded-full border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+          <Badge variant="outline" className="rounded-full border-border bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
             Ottowrite for storytellers
           </Badge>
           <div className="space-y-4">

@@ -2,8 +2,8 @@
 
 /* eslint-disable import/no-named-as-default */
 
-import { useEffect } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEffect, useRef, useCallback } from 'react'
+import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
@@ -11,6 +11,7 @@ import Color from '@tiptap/extension-color'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import {
   Bold,
   Italic,
@@ -26,18 +27,54 @@ import {
   Highlighter
 } from 'lucide-react'
 
+import { SceneAnchor } from '@/components/editor/extensions/scene-anchor'
+
+const collectAnchorsFromEditor = (editor: Editor): Set<string> => {
+  const anchors = new Set<string>()
+  const sceneAnchorType = editor.state.schema.nodes.sceneAnchor
+
+  editor.state.doc.descendants((node) => {
+    if (node.type === sceneAnchorType && node.attrs.sceneId) {
+      anchors.add(String(node.attrs.sceneId))
+    }
+    return true
+  })
+
+  return anchors
+}
+
 interface TiptapEditorProps {
   content: string
   onUpdate: (content: string) => void
   editable?: boolean
   placeholder?: string
+  focusScene?: {
+    id: string
+    title: string
+    chapterTitle?: string
+  } | null
+  onSceneFocusResult?: (payload: { id: string; found: boolean }) => void
+  onAnchorsChange?: (anchors: Set<string>) => void
+  remoteContent?: {
+    html: string
+  } | null
+  conflictVisible?: boolean
+  onReplaceWithServer?: () => void
+  onCloseConflict?: () => void
 }
 
 export function TiptapEditor({
   content,
   onUpdate,
   editable = true,
-  placeholder = 'Start writing...'
+  placeholder = 'Start writing...',
+  focusScene = null,
+  onSceneFocusResult,
+  onAnchorsChange,
+  remoteContent = null,
+  conflictVisible = false,
+  onReplaceWithServer,
+  onCloseConflict,
 }: TiptapEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -55,11 +92,15 @@ export function TiptapEditor({
       Highlight.configure({
         multicolor: true,
       }),
+      SceneAnchor,
     ],
     content,
     editable,
     onUpdate: ({ editor }) => {
       onUpdate(editor.getHTML())
+      if (onAnchorsChange) {
+        onAnchorsChange(collectAnchorsFromEditor(editor))
+      }
     },
     editorProps: {
       attributes: {
@@ -67,6 +108,11 @@ export function TiptapEditor({
       },
     },
   })
+
+  const emitAnchors = useCallback(() => {
+    if (!editor || !onAnchorsChange) return
+    onAnchorsChange(collectAnchorsFromEditor(editor))
+  }, [editor, onAnchorsChange])
 
   useEffect(() => {
     if (!editor) return
@@ -83,8 +129,123 @@ export function TiptapEditor({
 
     if (incoming !== current) {
       editor.commands.setContent(incoming || '<p></p>', { emitUpdate: false })
+      emitAnchors()
     }
-  }, [editor, content])
+  }, [editor, content, emitAnchors])
+
+  const lastHighlightedRef = useRef<HTMLElement | null>(null)
+  const highlightTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      const el = lastHighlightedRef.current
+      if (el) {
+        el.style.outline = el.dataset.sceneHighlightPrevOutline ?? ''
+        el.style.outlineOffset = el.dataset.sceneHighlightPrevOutlineOffset ?? ''
+        delete el.dataset.sceneHighlightPrevOutline
+        delete el.dataset.sceneHighlightPrevOutlineOffset
+        lastHighlightedRef.current = null
+      }
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current)
+        highlightTimeoutRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!editor) return
+
+    const handleInsert: (event: Event) => void = (event) => {
+      const detail = (event as CustomEvent<{ sceneId?: string }>).detail
+      const sceneId = detail?.sceneId
+      if (!sceneId) return
+
+      editor.chain().focus().ensureSceneAnchor(sceneId).run()
+      emitAnchors()
+      onSceneFocusResult?.({ id: sceneId, found: true })
+    }
+
+    window.addEventListener('editor-insert-scene-anchor', handleInsert)
+    return () => {
+      window.removeEventListener('editor-insert-scene-anchor', handleInsert)
+    }
+  }, [editor, emitAnchors, onSceneFocusResult])
+
+  useEffect(() => {
+    if (!editor) return
+
+    const clearHighlight = () => {
+      const previous = lastHighlightedRef.current
+      if (previous) {
+        previous.style.outline = previous.dataset.sceneHighlightPrevOutline ?? ''
+        previous.style.outlineOffset = previous.dataset.sceneHighlightPrevOutlineOffset ?? ''
+        delete previous.dataset.sceneHighlightPrevOutline
+        delete previous.dataset.sceneHighlightPrevOutlineOffset
+        lastHighlightedRef.current = null
+      }
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current)
+        highlightTimeoutRef.current = null
+      }
+    }
+
+    clearHighlight()
+
+    if (!focusScene) {
+      return
+    }
+
+    const searchTerms = [focusScene.title, focusScene.chapterTitle]
+      .map((term) => term?.trim())
+      .filter((term): term is string => Boolean(term?.length))
+
+    let target: HTMLElement | null =
+      editor.view.dom.querySelector(`[data-scene-anchor="true"][data-scene-id="${focusScene.id}"]`) || null
+
+    if (target && target.dataset.sceneAnchor === 'true') {
+      const parentBlock = target.closest('h1, h2, h3, h4, h5, h6, p, li, blockquote')
+      if (parentBlock instanceof HTMLElement) {
+        target = parentBlock
+      }
+    }
+
+    if (!target && searchTerms.length > 0) {
+      const candidates = editor.view.dom.querySelectorAll<HTMLElement>(
+        'h1, h2, h3, h4, h5, h6, p, li, blockquote'
+      )
+      const loweredTerms = searchTerms.map((term) => term.toLowerCase())
+      target = Array.from(candidates).find((element) => {
+        const text = element.textContent?.toLowerCase() ?? ''
+        return loweredTerms.some((term) => text.includes(term))
+      }) as HTMLElement | null
+    }
+
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      target.dataset.sceneHighlightPrevOutline = target.style.outline
+      target.dataset.sceneHighlightPrevOutlineOffset = target.style.outlineOffset
+      target.style.outline = '2px solid hsl(var(--primary))'
+      target.style.outlineOffset = '4px'
+      lastHighlightedRef.current = target
+      highlightTimeoutRef.current = window.setTimeout(() => {
+        if (lastHighlightedRef.current === target) {
+          target.style.outline = target.dataset.sceneHighlightPrevOutline ?? ''
+          target.style.outlineOffset = target.dataset.sceneHighlightPrevOutlineOffset ?? ''
+          delete target.dataset.sceneHighlightPrevOutline
+          delete target.dataset.sceneHighlightPrevOutlineOffset
+          lastHighlightedRef.current = null
+        }
+      }, 2000)
+      onSceneFocusResult?.({ id: focusScene.id, found: true })
+    } else {
+      onSceneFocusResult?.({ id: focusScene.id, found: false })
+    }
+  }, [editor, focusScene, onSceneFocusResult])
+
+  useEffect(() => {
+    emitAnchors()
+  }, [emitAnchors])
 
   if (!editor) {
     return null
@@ -225,6 +386,32 @@ export function TiptapEditor({
             {editor.storage.characterCount.words()} words
           </div>
         </div>
+      )}
+
+      {remoteContent && conflictVisible && (
+        <Dialog open={conflictVisible} onOpenChange={(open) => !open && onCloseConflict?.()}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Changes detected elsewhere</DialogTitle>
+              <DialogDescription>
+                This document was modified in another session. Choose whether to keep your local edits or replace them with the latest saved version.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[300px] overflow-auto rounded-md border bg-muted/40 p-3 text-sm font-mono">
+              <div className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Latest saved version</div>
+              <div
+                className="prose prose-sm max-w-none text-foreground"
+                dangerouslySetInnerHTML={{ __html: remoteContent.html }}
+              />
+            </div>
+            <DialogFooter className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={onCloseConflict}>
+                Keep my changes
+              </Button>
+              <Button onClick={onReplaceWithServer}>Replace with saved version</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )

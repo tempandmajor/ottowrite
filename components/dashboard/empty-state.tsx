@@ -23,7 +23,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border bg-card/70 px-6 py-10 text-center shadow-card">
-      <span className="rounded-full bg-primary/10 p-3 text-primary">
+      <span className="rounded-full bg-secondary p-3 text-secondary-foreground">
         <Icon className="h-6 w-6" />
       </span>
       <h3 className="text-lg font-semibold text-foreground">{title}</h3>

@@ -273,7 +273,7 @@ export default function ProjectDetailPage() {
                 {project.genre && project.genre.length > 0 && ` • ${project.genre.join(', ')}`}
               </p>
             </div>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
               Active
             </span>
           </div>

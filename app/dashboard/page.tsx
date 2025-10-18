@@ -85,9 +85,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-12">
-      <section className="flex flex-col gap-6 rounded-3xl bg-gradient-to-r from-primary/10 via-background to-primary/10 p-8 shadow-card md:flex-row md:items-center md:justify-between">
+      <section className="flex flex-col gap-6 rounded-3xl bg-gradient-to-r from-muted via-background to-muted p-8 shadow-card md:flex-row md:items-center md:justify-between">
         <div className="space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+          <div className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-wide text-secondary-foreground">
             <Sparkles className="h-3.5 w-3.5" />
             Workspace Overview
           </div>

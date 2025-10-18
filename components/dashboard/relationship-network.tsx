@@ -48,6 +48,22 @@ export function RelationshipNetwork({
   )
 
   useEffect(() => {
+    const isDarkMode =
+      typeof document !== 'undefined' &&
+      document.documentElement.classList.contains('dark')
+
+    const palette = {
+      border: isDarkMode ? '#2f2f2f' : '#d4d4d4',
+      node: {
+        protagonist: isDarkMode ? '#f5f5f5' : '#111111',
+        antagonist: isDarkMode ? '#d4d4d4' : '#3f3f3f',
+        supporting: isDarkMode ? '#bfbfbf' : '#6f6f6f',
+        default: isDarkMode ? '#9b9b9b' : '#8f8f8f',
+      },
+      label: isDarkMode ? '#f5f5f5' : '#111111',
+      nodeStroke: isDarkMode ? '#0a0a0a' : '#f5f5f5',
+    }
+
     const svg = d3.select('#relationship-network')
     svg.selectAll('*').remove()
 
@@ -70,7 +86,7 @@ export function RelationshipNetwork({
 
     const link = svg
       .append('g')
-      .attr('stroke', '#CBD5F5')
+      .attr('stroke', palette.border)
       .attr('stroke-opacity', 0.6)
       .selectAll('line')
       .data(links)
@@ -96,7 +112,7 @@ export function RelationshipNetwork({
 
     const node = svg
       .append('g')
-      .attr('stroke', '#fff')
+      .attr('stroke', palette.nodeStroke)
       .attr('stroke-width', 1.5)
       .selectAll<SVGCircleElement, NodeDatum>('circle')
       .data(nodes)
@@ -105,13 +121,13 @@ export function RelationshipNetwork({
       .attr('fill', (d) => {
         switch (d.role) {
           case 'protagonist':
-            return '#4F46E5'
+            return palette.node.protagonist
           case 'antagonist':
-            return '#DC2626'
+            return palette.node.antagonist
           case 'supporting':
-            return '#16A34A'
+            return palette.node.supporting
           default:
-            return '#64748B'
+            return palette.node.default
         }
       })
       .call(dragBehaviour)
@@ -123,7 +139,7 @@ export function RelationshipNetwork({
       .join('text')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
-      .attr('fill', '#0F172A')
+      .attr('fill', palette.label)
       .attr('font-size', 10)
       .text((d) => d.name)
 

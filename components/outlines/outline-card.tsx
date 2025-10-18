@@ -29,7 +29,6 @@ type OutlineCardProps = {
   outline: Outline
   projectId: string
   onDelete: () => void
-  onUpdate: () => void
 }
 
 const formatLabels: Record<string, { label: string; color: string }> = {
@@ -40,7 +39,7 @@ const formatLabels: Record<string, { label: string; color: string }> = {
   custom: { label: 'Custom', color: 'bg-gray-100 text-gray-800' },
 }
 
-export function OutlineCard({ outline, projectId, onDelete, onUpdate }: OutlineCardProps) {
+export function OutlineCard({ outline, projectId, onDelete }: OutlineCardProps) {
   const [expanded, setExpanded] = useState(false)
 
   const formatInfo = formatLabels[outline.format] || formatLabels.custom

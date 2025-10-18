@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -79,12 +80,7 @@ export default function PlotAnalysisPage() {
     [sortedAnalyses]
   )
 
-  useEffect(() => {
-    loadDocument()
-    loadAnalyses()
-  }, [params.id])
-
-  const loadDocument = async () => {
+  const loadDocument = useCallback(async () => {
     try {
       const supabase = createClient()
       const {
@@ -115,9 +111,9 @@ export default function PlotAnalysisPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, router, toast])
 
-  const loadAnalyses = async () => {
+  const loadAnalyses = useCallback(async () => {
     try {
       const response = await fetch(`/api/plot-analysis?document_id=${params.id}`)
       if (!response.ok) throw new Error('Failed to fetch analyses')
@@ -127,15 +123,21 @@ export default function PlotAnalysisPage() {
 
       // Auto-select most recent completed analysis
       const completed = data.filter((a: PlotAnalysis) => a.status === 'completed')
-      if (completed.length > 0 && !selectedAnalysis) {
-        setSelectedAnalysis(completed[0])
+      if (completed.length > 0) {
+        setSelectedAnalysis((current) => {
+          if (!current) {
+            return completed[0]
+          }
+          const stillExists = completed.find((item: PlotAnalysis) => item.id === current.id)
+          return stillExists ?? completed[0]
+        })
       }
     } catch (error) {
       console.error('Error loading analyses:', error)
     }
-  }
+  }, [params.id])
 
-  const loadIssueSummary = async (analysisId: string) => {
+  const loadIssueSummary = useCallback(async (analysisId: string) => {
     setIssuesLoading(true)
     try {
       const response = await fetch(`/api/plot-analysis/issues?analysis_id=${analysisId}`)
@@ -161,7 +163,12 @@ export default function PlotAnalysisPage() {
     } finally {
       setIssuesLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadDocument()
+    loadAnalyses()
+  }, [loadDocument, loadAnalyses])
 
   useEffect(() => {
     if (selectedAnalysis?.status === 'completed') {
@@ -170,7 +177,7 @@ export default function PlotAnalysisPage() {
       setIssueStats({ total: 0, unresolved: 0, critical: 0, major: 0, resolved: 0 })
       setIssuesLoading(false)
     }
-  }, [selectedAnalysis?.id, selectedAnalysis?.status])
+  }, [selectedAnalysis?.id, selectedAnalysis?.status, loadIssueSummary])
 
   useEffect(() => {
     if (!selectedAnalysis && completedAnalyses.length > 0) {
@@ -305,9 +312,11 @@ export default function PlotAnalysisPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] md:items-end">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Analysis Type</label>
+              <Label htmlFor="analysis-type" className="text-sm font-medium">
+                Analysis Type
+              </Label>
               <Select value={analysisType} onValueChange={(v) => setAnalysisType(v as AnalysisType)}>
-                <SelectTrigger>
+                <SelectTrigger id="analysis-type">
                   <SelectValue placeholder="Select analysis focus" />
                 </SelectTrigger>
                 <SelectContent>

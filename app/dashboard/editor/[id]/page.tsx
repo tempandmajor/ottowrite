@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { TiptapEditor } from '@/components/editor/tiptap-editor'
@@ -9,7 +9,6 @@ import { AIAssistant } from '@/components/editor/ai-assistant'
 import { ExportModal } from '@/components/editor/export-modal'
 import { VersionHistory } from '@/components/editor/version-history'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
@@ -67,11 +66,7 @@ export default function EditorPage() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [isDirty, setIsDirty] = useState(false)
 
-  useEffect(() => {
-    loadDocument()
-  }, [params.id])
-
-  const loadDocument = async () => {
+  const loadDocument = useCallback(async () => {
     try {
       const supabase = createClient()
       const {
@@ -147,9 +142,13 @@ export default function EditorPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, router, toast])
 
-  const saveDocument = async () => {
+  useEffect(() => {
+    loadDocument()
+  }, [loadDocument])
+
+  const saveDocument = useCallback(async () => {
     if (!document) return
 
     setSaving(true)
@@ -224,7 +223,7 @@ export default function EditorPage() {
     } finally {
       setSaving(false)
     }
-  }
+  }, [content, document, title, toast])
 
   // Auto-save every 3 seconds
   useEffect(() => {
@@ -256,7 +255,7 @@ export default function EditorPage() {
     }, 3000)
 
     return () => clearInterval(interval)
-  }, [content, title, document, saving])
+  }, [content, title, document, saving, saveDocument])
 
   const insertAIText = (text: string) => {
     if (!text.trim()) return
@@ -342,7 +341,7 @@ export default function EditorPage() {
           .trim()
           .split(/\s+/)
           .filter((w) => w.length > 0).length
-      } catch (error) {
+      } catch {
         return 0
       }
     }

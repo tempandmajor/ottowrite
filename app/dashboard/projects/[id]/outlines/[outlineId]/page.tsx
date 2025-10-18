@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -60,11 +60,7 @@ export default function OutlineDetailPage() {
   const [editingNotes, setEditingNotes] = useState<Record<number, string>>({})
   const [dirtySections, setDirtySections] = useState<number[]>([])
 
-  useEffect(() => {
-    loadOutline()
-  }, [params.outlineId])
-
-  const loadOutline = async () => {
+  const loadOutline = useCallback(async () => {
     try {
       const supabase = createClient()
       const {
@@ -95,7 +91,11 @@ export default function OutlineDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.outlineId, router, toast])
+
+  useEffect(() => {
+    loadOutline()
+  }, [loadOutline])
 
   const updateSectionNotes = async (index: number, notes: string) => {
     if (!outline) return
@@ -475,7 +475,7 @@ export default function OutlineDetailPage() {
                   <div className="space-y-1">
                     <span className="text-muted-foreground">Genres</span>
                     <div className="flex flex-wrap gap-1">
-                      {projectGenres.split(',').map((genre) => (
+                    {projectGenres.split(',').map((genre: string) => (
                         <Badge key={genre.trim()} variant="outline">
                           {genre.trim()}
                         </Badge>
@@ -489,8 +489,9 @@ export default function OutlineDetailPage() {
                     <span className="text-xs uppercase tracking-wide">{generatorModel}</span>
                   </div>
                 )}
-              </div>
-              )}
+              </CardContent>
+            </Card>
+          )}
           <Card className="bg-muted/40">
             <CardHeader>
               <CardTitle className="text-base">Editor tips</CardTitle>

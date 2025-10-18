@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { Check, Loader2, Sparkles, PenTool, BookOpen, Users } from 'lucide-react'
+import { Check, Loader2, Sparkles, PenTool, Users } from 'lucide-react'
 
 const benefits = [
   'AI-assisted outlining and beat sheets',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { BookOpen, Film, Theater, ScrollText } from 'lucide-react'
@@ -39,13 +38,7 @@ export function BeatTemplateSelector({
   const [templates, setTemplates] = useState<BeatTemplate[]>([])
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (open) {
-      loadTemplates()
-    }
-  }, [open, projectType])
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     setLoading(true)
     try {
       const response = await fetch(`/api/story-beats/templates?suitable_for=${projectType}`)
@@ -58,7 +51,13 @@ export function BeatTemplateSelector({
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectType])
+
+  useEffect(() => {
+    if (open) {
+      loadTemplates()
+    }
+  }, [open, loadTemplates])
 
   const getIcon = (templateName: string) => {
     if (templateName.includes('screenplay') || templateName === 'save_the_cat') {
@@ -100,9 +99,17 @@ export function BeatTemplateSelector({
                   return (
                     <Card
                       key={template.id}
-                      className="cursor-pointer hover:border-primary transition-colors"
+                      className="cursor-pointer hover:border-primary transition-colors focus-within:ring-2 focus-within:ring-primary"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => {
                         onTemplateSelect(template.name)
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          onTemplateSelect(template.name)
+                        }
                       }}
                     >
                       <CardHeader>

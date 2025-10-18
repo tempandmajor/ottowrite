@@ -61,6 +61,7 @@ export function DocumentCard({ document, onDelete, onDuplicate }: DocumentCardPr
 
       onDelete?.()
     } catch (error) {
+      console.error('Failed to delete document:', error)
       toast({
         title: 'Error',
         description: 'Failed to delete document. Please try again.',
@@ -92,6 +93,7 @@ export function DocumentCard({ document, onDelete, onDuplicate }: DocumentCardPr
       onDuplicate?.()
       router.push(`/dashboard/editor/${duplicate.id}`)
     } catch (error) {
+      console.error('Failed to duplicate document:', error)
       toast({
         title: 'Error',
         description: 'Failed to duplicate document. Please try again.',

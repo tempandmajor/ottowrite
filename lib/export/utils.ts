@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf'
+import JsPDF from 'jspdf'
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx'
 import { saveAs } from 'file-saver'
 import JSZip from 'jszip'
@@ -35,7 +35,7 @@ function stripHtml(html: string): string {
 export async function exportToPDF(options: ExportOptions): Promise<void> {
   const { title, content, author, isScreenplay } = options
 
-  const doc = new jsPDF({
+  const doc = new JsPDF({
     orientation: 'portrait',
     unit: 'pt',
     format: 'letter',

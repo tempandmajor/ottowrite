@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import { ArrowUpRight, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { cn } from '@/lib/utils'
 import { SignOutButton } from '@/components/auth/sign-out-button'
 
 const quickLinks = [

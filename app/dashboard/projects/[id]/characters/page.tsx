@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,7 +13,6 @@ import {
   ArrowLeft,
   Trash2,
   Edit,
-  Heart,
   Swords,
   Handshake,
   UserCircle2,
@@ -59,7 +58,6 @@ const roleIcons: Record<string, any> = {
 
 export default function CharactersPage() {
   const params = useParams()
-  const router = useRouter()
   const projectId = params.id as string
 
   const [project, setProject] = useState<Project | null>(null)
@@ -68,23 +66,10 @@ export default function CharactersPage() {
   const [loading, setLoading] = useState(true)
   const [filterRole, setFilterRole] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [projectId])
-
-  useEffect(() => {
-    if (filterRole) {
-      setCharacters(allCharacters.filter((c) => c.role === filterRole))
-    } else {
-      setCharacters(allCharacters)
-    }
-  }, [filterRole, allCharacters])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     const supabase = createClient()
     setLoading(true)
 
-    // Load project
     const { data: projectData } = await supabase
       .from('projects')
       .select('id, title, type')
@@ -95,26 +80,30 @@ export default function CharactersPage() {
       setProject(projectData)
     }
 
-    // Load characters
-    let query = supabase
+    const { data: charactersData } = await supabase
       .from('characters')
       .select('*')
       .eq('project_id', projectId)
       .order('importance', { ascending: false })
       .order('created_at', { ascending: false })
 
-    const { data: charactersData } = await query
-
-    if (charactersData) {
-      setAllCharacters(charactersData)
-      setCharacters(filterRole ? charactersData.filter((c) => c.role === filterRole) : charactersData)
-    } else {
-      setAllCharacters([])
-      setCharacters([])
-    }
-
+    const fallback: Character[] = charactersData ?? []
+    setAllCharacters(fallback)
+    setCharacters(fallback)
     setLoading(false)
-  }
+  }, [projectId])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  useEffect(() => {
+    if (filterRole) {
+      setCharacters(allCharacters.filter((c) => c.role === filterRole))
+    } else {
+      setCharacters(allCharacters)
+    }
+  }, [filterRole, allCharacters])
 
   async function deleteCharacter(id: string) {
     if (!confirm('Are you sure you want to delete this character?')) {

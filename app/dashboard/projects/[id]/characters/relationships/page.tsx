@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -39,7 +38,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Plus, Trash2, Edit, Network, Filter, Scale, Heart, GitBranch } from 'lucide-react'
+import { Plus, Trash2, Edit, Network, Filter, Scale, Heart, GitBranch } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { RelationshipWithCharacters } from '@/types/relationships'
 
@@ -116,11 +115,7 @@ export default function CharacterRelationshipsPage() {
     key_moments: '',
   })
 
-  useEffect(() => {
-    loadData()
-  }, [projectId])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     const supabase = createClient()
 
     const { data: projectData } = await supabase
@@ -157,7 +152,11 @@ export default function CharacterRelationshipsPage() {
     }
 
     setLoading(false)
-  }
+  }, [projectId])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   function openCreateDialog() {
     setEditingRelationship(null)
@@ -354,6 +353,11 @@ export default function CharacterRelationshipsPage() {
             <p className="text-sm text-muted-foreground">
               Explore how your cast intersects, track emotional dynamics, and keep development arcs aligned.
             </p>
+            {project?.title && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Project: {project.title}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span>{relationships.length} relationships total</span>
@@ -517,7 +521,7 @@ export default function CharacterRelationshipsPage() {
           {timelineEntries.length > 0 ? (
             <div className="relative space-y-6 rounded-3xl border bg-card/80 p-6 shadow-card">
               <div className="absolute left-4 top-10 bottom-10 hidden w-px bg-border lg:block" aria-hidden />
-              {timelineEntries.map((entry, index) => (
+              {timelineEntries.map((entry) => (
                 <div key={entry.id} className="relative flex gap-4 lg:pl-10">
                   <div className="mt-1 hidden h-3 w-3 rounded-full border-2 border-primary bg-background lg:block" />
                   <div>

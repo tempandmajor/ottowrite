@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -35,7 +35,6 @@ import { EmptyState } from '@/components/dashboard/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { cn } from '@/lib/utils'
 import { BookOpen, Filter, FileText, Plus, Search, Trash2 } from 'lucide-react'
 
 interface Document {
@@ -81,11 +80,7 @@ export default function DocumentsPage() {
   })
   const { toast } = useToast()
 
-  useEffect(() => {
-    loadInitialData()
-  }, [])
-
-  async function loadInitialData() {
+  const loadInitialData = useCallback(async () => {
     try {
       const supabase = createClient()
       const {
@@ -115,9 +110,12 @@ export default function DocumentsPage() {
 
       setDocuments(documentsResponse.data || [])
       setProjects(projectsResponse.data || [])
-      const firstProject = projectsResponse.data?.[0]
-      if (firstProject && !formData.project_id) {
-        setFormData((prev) => ({ ...prev, project_id: firstProject.id }))
+      const firstProjectId = projectsResponse.data?.[0]?.id ?? ''
+
+      if (firstProjectId) {
+        setFormData((prev) =>
+          prev.project_id ? prev : { ...prev, project_id: firstProjectId }
+        )
       }
     } catch (error) {
       console.error('Error loading documents:', error)
@@ -125,7 +123,11 @@ export default function DocumentsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    loadInitialData()
+  }, [loadInitialData])
 
   async function createDocument() {
     try {

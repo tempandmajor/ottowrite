@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, KeyboardEvent } from 'react'
-import { Button } from '@/components/ui/button'
+import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 
 type ElementType = 'scene' | 'action' | 'character' | 'dialogue' | 'parenthetical' | 'transition'
@@ -23,28 +22,36 @@ export function ScreenplayEditor({
   onUpdate,
   editable = true,
 }: ScreenplayEditorProps) {
-  const generateElementId = () =>
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : Date.now().toString()
+  const generateElementId = useCallback(
+    () =>
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : Date.now().toString(),
+    []
+  )
 
-  const createDefaultElement = (): ScreenplayElement => ({
-    id: generateElementId(),
-    type: 'scene',
-    content: '',
-  })
+  const createDefaultElement = useCallback(
+    (): ScreenplayElement => ({
+      id: generateElementId(),
+      type: 'scene',
+      content: '',
+    }),
+    [generateElementId]
+  )
 
-  const normalizeElements = (items: ScreenplayElement[]) => {
-    const base = items.length > 0 ? items : [createDefaultElement()]
-    return base.map((item) => ({
-      ...item,
-      id: item.id || generateElementId(),
-      content: item.content ?? (item as any).text ?? '',
-    }))
-  }
+  const normalizeElements = useCallback(
+    (items: ScreenplayElement[]) => {
+      const base = items.length > 0 ? items : [createDefaultElement()]
+      return base.map((item) => ({
+        ...item,
+        id: item.id || generateElementId(),
+        content: item.content ?? (item as any).text ?? '',
+      }))
+    },
+    [createDefaultElement, generateElementId]
+  )
 
   const [elements, setElements] = useState<ScreenplayElement[]>(normalizeElements(content))
-  const [focusedIndex, setFocusedIndex] = useState(0)
   const inputRefs = useRef<(HTMLTextAreaElement | null)[]>([])
 
   useEffect(() => {
@@ -55,7 +62,7 @@ export function ScreenplayEditor({
     if (incomingString !== currentString) {
       setElements(incoming)
     }
-  }, [content, elements])
+  }, [content, elements, normalizeElements])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>, index: number) => {
     const element = elements[index]
@@ -216,7 +223,6 @@ export function ScreenplayEditor({
                 value={element.content}
                 onChange={(e) => handleChange(index, formatContent(e.target.value, element.type))}
                 onKeyDown={(e) => handleKeyDown(e, index)}
-                onFocus={() => setFocusedIndex(index)}
                 placeholder={getPlaceholder(element.type)}
                 disabled={!editable}
                 className="w-full bg-transparent border-none outline-none resize-none overflow-hidden placeholder-gray-400 focus:bg-gray-50 min-h-[1.5rem]"

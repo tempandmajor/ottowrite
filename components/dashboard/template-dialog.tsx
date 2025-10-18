@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Dialog,
@@ -9,7 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -23,6 +22,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { FileText, Film, BookOpen, FileSignature } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
 
 interface Template {
   id: string
@@ -58,20 +58,8 @@ export function TemplateDialog({ open, onOpenChange, projectId }: TemplateDialog
   const { toast } = useToast()
   const router = useRouter()
 
-  useEffect(() => {
-    if (open) {
-      loadTemplates()
-      if (!projectId) {
-        loadProjects()
-      }
-    } else {
-      setSelectedTemplate(null)
-      setDocumentTitle('')
-      setSelectedProjectId('')
-    }
-  }, [open, projectId])
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
+    setLoading(true)
     try {
       const response = await fetch('/api/templates')
       if (response.ok) {
@@ -88,9 +76,9 @@ export function TemplateDialog({ open, onOpenChange, projectId }: TemplateDialog
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     setProjectLoading(true)
     try {
       const supabase = createClient()
@@ -123,7 +111,20 @@ export function TemplateDialog({ open, onOpenChange, projectId }: TemplateDialog
     } finally {
       setProjectLoading(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    if (open) {
+      loadTemplates()
+      if (!projectId) {
+        loadProjects()
+      }
+    } else {
+      setSelectedTemplate(null)
+      setDocumentTitle('')
+      setSelectedProjectId('')
+    }
+  }, [open, projectId, loadProjects, loadTemplates])
 
   const handleUseTemplate = async () => {
     if (!selectedTemplate) return
@@ -165,6 +166,7 @@ export function TemplateDialog({ open, onOpenChange, projectId }: TemplateDialog
       onOpenChange(false)
       router.push(`/dashboard/editor/${document.id}`)
     } catch (error) {
+      console.error('Failed to create document from template:', error)
       toast({
         title: 'Error',
         description: 'Failed to create document. Please try again.',
@@ -216,9 +218,11 @@ export function TemplateDialog({ open, onOpenChange, projectId }: TemplateDialog
                     const Icon = getIcon(template.type)
                     const templateTitle = template.title || template.name || 'Untitled Document'
                     return (
-                      <div
+                      <button
                         key={template.id}
-                        className="border rounded-lg p-4 cursor-pointer hover:border-primary transition-colors"
+                        type="button"
+                        className="border rounded-lg p-4 text-left hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        aria-label={`Use template ${templateTitle}`}
                         onClick={() => {
                           setSelectedTemplate(template)
                           setDocumentTitle(templateTitle)
@@ -241,7 +245,7 @@ export function TemplateDialog({ open, onOpenChange, projectId }: TemplateDialog
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     )
                   })
                 )}

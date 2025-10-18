@@ -1,8 +1,7 @@
 import * as React from 'react'
 import { DashboardNav } from './dashboard-nav'
-import { cn } from '@/lib/utils'
 
-export function DashboardShell({ children, email }: { children: React.ReactNode; email: string }) {
+export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.08),_transparent_55%)]">
       <a

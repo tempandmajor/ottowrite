@@ -1,5 +1,7 @@
 'use client'
 
+/* eslint-disable import/no-named-as-default */
+
 import { useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'

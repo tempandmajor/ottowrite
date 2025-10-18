@@ -4,7 +4,6 @@ import {
   PenTool,
   Sparkles,
   Compass,
-  Clock,
   Quote,
   ArrowRight,
 } from 'lucide-react'

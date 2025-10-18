@@ -239,7 +239,7 @@ function getTargetInfo(projectType: string, format: OutlineFormat): string {
 }
 
 // Helper function to convert outline to document sections
-export function outlineToDocumentSections(outline: GeneratedOutline, projectType: string) {
+export function outlineToDocumentSections(outline: GeneratedOutline) {
   return outline.sections.map((section) => ({
     title: section.title,
     description: section.description,

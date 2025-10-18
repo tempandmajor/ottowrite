@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -108,12 +108,8 @@ export default function ProjectDetailPage() {
     type: 'novel' as DocumentSummary['type'],
   })
 
-  useEffect(() => {
+  const loadProjectBundle = useCallback(async () => {
     if (!params.id) return
-    loadProjectBundle()
-  }, [params.id])
-
-  async function loadProjectBundle() {
     setLoading(true)
     try {
       const supabase = createClient()
@@ -182,7 +178,11 @@ export default function ProjectDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, router, toast])
+
+  useEffect(() => {
+    loadProjectBundle()
+  }, [loadProjectBundle])
 
   async function createDocument() {
     if (!project) return

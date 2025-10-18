@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -43,13 +43,7 @@ export function VersionHistory({
   const [previewOpen, setPreviewOpen] = useState(false)
   const { toast } = useToast()
 
-  useEffect(() => {
-    if (open) {
-      loadVersions()
-    }
-  }, [open, documentId])
-
-  const loadVersions = async () => {
+  const loadVersions = useCallback(async () => {
     setLoading(true)
     try {
       const supabase = createClient()
@@ -73,7 +67,13 @@ export function VersionHistory({
     } finally {
       setLoading(false)
     }
-  }
+  }, [documentId, toast])
+
+  useEffect(() => {
+    if (open) {
+      loadVersions()
+    }
+  }, [open, loadVersions])
 
   const handleRestore = (version: Version) => {
     onRestoreVersion(version.content, version.title)

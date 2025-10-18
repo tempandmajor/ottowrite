@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { BeatBoard } from '@/components/story/beat-board'
 import { BeatTemplateSelector } from '@/components/story/beat-template-selector'
 import { useToast } from '@/hooks/use-toast'
@@ -42,12 +42,7 @@ export default function StoryStructurePage() {
   const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const [selectedBeatType, setSelectedBeatType] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadProject()
-    loadBeats()
-  }, [params.id])
-
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     try {
       const supabase = createClient()
       const {
@@ -89,9 +84,9 @@ export default function StoryStructurePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, router, toast])
 
-  const loadBeats = async () => {
+  const loadBeats = useCallback(async () => {
     try {
       const response = await fetch(`/api/story-beats?project_id=${params.id}`)
       if (response.ok) {
@@ -106,7 +101,12 @@ export default function StoryStructurePage() {
     } catch (error) {
       console.error('Error loading beats:', error)
     }
-  }
+  }, [params.id])
+
+  useEffect(() => {
+    loadProject()
+    loadBeats()
+  }, [loadProject, loadBeats])
 
   const handleTemplateSelected = async (templateName: string) => {
     try {
@@ -132,6 +132,7 @@ export default function StoryStructurePage() {
       setShowTemplateSelector(false)
       loadBeats()
     } catch (error) {
+      console.error('Failed to initialize story beats:', error)
       toast({
         title: 'Error',
         description: 'Failed to initialize story beats',
@@ -159,6 +160,7 @@ export default function StoryStructurePage() {
 
       loadBeats()
     } catch (error) {
+      console.error('Failed to update beat:', error)
       toast({
         title: 'Error',
         description: 'Failed to update beat',

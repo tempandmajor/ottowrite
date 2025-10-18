@@ -19,7 +19,7 @@ import { AIModel } from '@/lib/ai/service'
 interface AIAssistantProps {
   documentId: string
   currentContent: string
-  onInsertText: (text: string) => void
+  onInsertText: (content: string) => void
 }
 
 export function AIAssistant({ documentId, currentContent, onInsertText }: AIAssistantProps) {

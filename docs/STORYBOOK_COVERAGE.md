@@ -34,7 +34,7 @@ Provide a Storybook-equivalent reference for new dashboard/editor components int
 4. Share Storybook static build link with design/QA ahead of release sign-off.
 
 ## 5. Sign-off Checklist
-- [ ] Storybook command available (`npm run storybook`, `npm run build-storybook`).
+- [x] Storybook command available (`npm run storybook`, `npm run build-storybook`).
 - [ ] All components in matrix documented with knobs/controls.
 - [ ] Accessibility addon passes for each story.
 - [ ] Linked from `README.md` (Design System section) once live.

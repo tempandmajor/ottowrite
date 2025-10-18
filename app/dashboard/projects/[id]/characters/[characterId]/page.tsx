@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -102,20 +102,7 @@ export default function CharacterEditorPage() {
     setNewDesire('')
   }
 
-  useEffect(() => {
-    if (isNew) {
-      setCharacter(createInitialCharacter(projectId))
-      resetListInputs()
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-    resetListInputs()
-    loadCharacter()
-  }, [characterId, projectId])
-
-  async function loadCharacter() {
+  const loadCharacter = useCallback(async () => {
     const supabase = createClient()
     try {
       const { data, error } = await supabase
@@ -148,7 +135,20 @@ export default function CharacterEditorPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [characterId, projectId, toast])
+
+  useEffect(() => {
+    if (isNew) {
+      setCharacter(createInitialCharacter(projectId))
+      resetListInputs()
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    resetListInputs()
+    loadCharacter()
+  }, [isNew, projectId, loadCharacter])
 
   async function saveCharacter() {
     if (!character.name || !character.role) {

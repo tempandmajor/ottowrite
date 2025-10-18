@@ -26,6 +26,8 @@ yarn-error.log*
 # Local env files
 .env*.local
 .env
+.env.production
+VERCEL_ENV_VARS.md
 
 # TypeScript
 *.tsbuildinfo
@@ -39,3 +41,6 @@ next-env.d.ts
 .claude/
 .claude/**
 *.claude
+
+*storybook.log
+storybook-static

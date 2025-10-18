@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -137,11 +137,7 @@ export default function WorldBuildingPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    loadData()
-  }, [projectId])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const supabase = createClient()
@@ -209,7 +205,11 @@ export default function WorldBuildingPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId, toast])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   function openCreateLocation() {
     setEditingLocation(null)
@@ -451,6 +451,9 @@ export default function WorldBuildingPage() {
             <p className="text-sm text-muted-foreground">
               Craft the places that anchor your story world, track their history, and map their evolution.
             </p>
+            {project?.title && (
+              <p className="text-xs text-muted-foreground mt-1">Project: {project.title}</p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span>{locations.length} total locations</span>

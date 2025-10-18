@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { getSeverityColor, getCategoryLabel } from '@/lib/ai/plot-analyzer'
 import type { IssueSeverity, IssueCategory } from '@/lib/ai/plot-analyzer'
+import { cn } from '@/lib/utils'
 
 type PlotIssue = {
   id: string
@@ -57,11 +58,7 @@ export function PlotIssueList({ analysisId, onUpdate }: PlotIssueListProps) {
   const [filterSeverity, setFilterSeverity] = useState<string>('all')
   const [filterResolved, setFilterResolved] = useState<string>('unresolved')
 
-  useEffect(() => {
-    loadIssues()
-  }, [analysisId, filterSeverity, filterResolved])
-
-  const loadIssues = async () => {
+  const loadIssues = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({ analysis_id: analysisId })
@@ -83,7 +80,11 @@ export function PlotIssueList({ analysisId, onUpdate }: PlotIssueListProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [analysisId, filterResolved, filterSeverity, toast])
+
+  useEffect(() => {
+    loadIssues()
+  }, [loadIssues])
 
   const toggleResolve = async (issueId: string, isResolved: boolean) => {
     try {
@@ -132,6 +133,10 @@ export function PlotIssueList({ analysisId, onUpdate }: PlotIssueListProps) {
   }
 
   const filteredIssues = issues
+
+  const toggleExpanded = (issueId: string) => {
+    setExpandedIssue((prev) => (prev === issueId ? null : issueId))
+  }
 
   if (loading) {
     return (
@@ -188,12 +193,24 @@ export function PlotIssueList({ analysisId, onUpdate }: PlotIssueListProps) {
             return (
               <Card
                 key={issue.id}
-                className={`cursor-pointer transition-colors ${
+                className={cn(
+                  'transition-colors focus-within:ring-2 focus-within:ring-primary',
                   issue.is_resolved ? 'opacity-60 bg-muted/50' : ''
-                }`}
-                onClick={() => setExpandedIssue(isExpanded ? null : issue.id)}
+                )}
               >
-                <CardContent className="pt-4">
+                <CardContent
+                  className="pt-4"
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  onClick={() => toggleExpanded(issue.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      toggleExpanded(issue.id)
+                    }
+                  }}
+                >
                   <div className="space-y-3">
                     {/* Header */}
                     <div className="flex items-start justify-between gap-4">
@@ -217,14 +234,25 @@ export function PlotIssueList({ analysisId, onUpdate }: PlotIssueListProps) {
                           </div>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          toggleExpanded(issue.id)
+                        }}
+                        aria-label={isExpanded ? 'Collapse issue details' : 'Expand issue details'}
+                      >
                         {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </Button>
                     </div>
 
                     {/* Expanded Details */}
                     {isExpanded && (
-                      <div className="space-y-4 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+                      <div
+                        className="space-y-4 pt-3 border-t"
+                        onPointerDown={(event) => event.stopPropagation()}
+                      >
                         {/* Description */}
                         <div>
                           <h5 className="text-sm font-semibold mb-2">Issue Description</h5>
@@ -236,7 +264,7 @@ export function PlotIssueList({ analysisId, onUpdate }: PlotIssueListProps) {
                           <div>
                             <h5 className="text-sm font-semibold mb-2">Reference</h5>
                             <p className="text-sm text-muted-foreground italic">
-                              "{issue.line_reference}"
+                              “{issue.line_reference}”
                             </p>
                           </div>
                         )}

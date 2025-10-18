@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -61,12 +61,7 @@ export default function OutlinesPage() {
   const [formatFilter, setFormatFilter] = useState<string>('all')
   const [sortOrder, setSortOrder] = useState<'recent' | 'az'>('recent')
 
-  useEffect(() => {
-    loadProject()
-    loadOutlines()
-  }, [params.id])
-
-  const loadProject = async () => {
+  const loadProject = useCallback(async () => {
     try {
       setProjectLoading(true)
       const supabase = createClient()
@@ -98,9 +93,9 @@ export default function OutlinesPage() {
     } finally {
       setProjectLoading(false)
     }
-  }
+  }, [params.id, router, toast])
 
-  const loadOutlines = async () => {
+  const loadOutlines = useCallback(async () => {
     try {
       setOutlinesLoading(true)
       const response = await fetch(`/api/outlines?project_id=${params.id}`)
@@ -118,7 +113,12 @@ export default function OutlinesPage() {
     } finally {
       setOutlinesLoading(false)
     }
-  }
+  }, [params.id, toast])
+
+  useEffect(() => {
+    loadProject()
+    loadOutlines()
+  }, [loadProject, loadOutlines])
 
   const deleteOutline = async (id: string) => {
     if (!confirm('Are you sure you want to delete this outline?')) return
@@ -408,7 +408,6 @@ export default function OutlinesPage() {
               outline={outline}
               projectId={project.id}
               onDelete={() => deleteOutline(outline.id)}
-              onUpdate={loadOutlines}
             />
           ))}
         </div>

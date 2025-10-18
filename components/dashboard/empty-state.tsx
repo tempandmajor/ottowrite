@@ -1,7 +1,6 @@
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { LucideIcon } from 'lucide-react'
+import type { ComponentType } from 'react'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
 type Action = {
   label: string
@@ -16,7 +15,7 @@ export function EmptyState({
   action,
   secondaryAction,
 }: {
-  icon: LucideIcon
+  icon: ComponentType<{ className?: string }>
   title: string
   description: string
   action?: Action

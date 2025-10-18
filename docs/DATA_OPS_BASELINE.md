@@ -69,7 +69,7 @@ This document captures the current Supabase schema and operational posture ahead
 
 ## 4. Next Steps (Phase 0 Exit Criteria)
 
-1. Publish ERD artifacts (Mermaid source at `docs/erd/phase0-schema.mmd`; export PNG/SVG for decks as needed).
+1. Share ERD artifacts (`docs/erd/phase0-schema.{mmd,svg,png}`) with stakeholders; embed PNG in the ops deck.
 2. Draft schema proposals for collaboration & export jobs; review with Platform squad before Phase 3 kickoff.
 3. Implement ops automation: CI Storybook build, Stripe webhook replay script, Supabase migration smoke test.
 4. Update `SECURITY_AUDIT.md` with any secrets rotations or policy changes performed during Phase 0.

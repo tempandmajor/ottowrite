@@ -10,7 +10,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       >
         Skip to content
       </a>
-      <div className="mx-auto grid min-h-screen max-w-6xl gap-8 px-6 py-8 lg:grid-cols-[260px_1fr]">
+      <div className="mx-auto grid min-h-screen w-full max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[260px_1fr] lg:px-8">
         <DashboardNav />
         <main id="main-content" className="relative flex flex-1 flex-col pb-12">
           {children}

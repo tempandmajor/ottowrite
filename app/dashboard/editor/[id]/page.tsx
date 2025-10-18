@@ -10,6 +10,12 @@ import { ExportModal } from '@/components/editor/export-modal'
 import { VersionHistory } from '@/components/editor/version-history'
 import { ChapterSidebar, Chapter } from '@/components/editor/chapter-sidebar'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
@@ -22,6 +28,7 @@ import {
   History,
   Search,
   Sparkles,
+  MoreHorizontal,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
@@ -131,6 +138,12 @@ export default function EditorPage() {
   const autosaveTimerRef = useRef<number | null>(null)
   const autosaveControllerRef = useRef<AbortController | null>(null)
   const lastAutosaveSignatureRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setShowAI(false)
+    }
+  }, [])
 
   const activeSceneInfo = useMemo(() => {
     if (!activeSceneId) return null
@@ -746,7 +759,7 @@ const autosaveClassName = autosaveLabelData.className
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-4">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-4 sm:px-6">
           <div className="flex flex-1 items-center gap-3">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/dashboard/documents">
@@ -785,35 +798,94 @@ const autosaveClassName = autosaveLabelData.className
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
-                <Search className="mr-2 h-4 w-4" />
-                Plot analysis
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowVersionHistory(true)}>
-              <History className="mr-2 h-4 w-4" />
-              History
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowExportModal(true)}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowAI((prev) => !prev)}>
-              {showAI ? (
-                <>
-                  <PanelRightClose className="mr-2 h-4 w-4" />
-                  Hide AI
-                </>
-              ) : (
-                <>
-                  <PanelRightOpen className="mr-2 h-4 w-4" />
-                  Show AI
-                </>
-              )}
-            </Button>
-            <Button onClick={saveDocument} disabled={saving}>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3 md:ml-auto md:w-auto md:flex-row md:gap-2">
+            <div className="hidden items-center gap-2 md:flex">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
+                  <Search className="mr-2 h-4 w-4" />
+                  Plot analysis
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowVersionHistory(true)}>
+                <History className="mr-2 h-4 w-4" />
+                History
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowExportModal(true)}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowAI((prev) => !prev)}>
+                {showAI ? (
+                  <>
+                    <PanelRightClose className="mr-2 h-4 w-4" />
+                    Hide AI
+                  </>
+                ) : (
+                  <>
+                    <PanelRightOpen className="mr-2 h-4 w-4" />
+                    Show AI
+                  </>
+                )}
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <MoreHorizontal className="h-4 w-4" />
+                    Actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/editor/${document.id}/plot-analysis`} className="flex items-center gap-2">
+                      <Search className="h-4 w-4" />
+                      Plot analysis
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      setShowVersionHistory(true)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <History className="h-4 w-4" />
+                    Version history
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      setShowExportModal(true)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Export document
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      setShowAI((prev) => !prev)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    {showAI ? (
+                      <>
+                        <PanelRightClose className="h-4 w-4" />
+                        Hide AI panel
+                      </>
+                    ) : (
+                      <>
+                        <PanelRightOpen className="h-4 w-4" />
+                        Show AI panel
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <Button onClick={saveDocument} disabled={saving} size="sm" className="w-full sm:w-auto">
               <Save className="mr-2 h-4 w-4" />
               {saving ? 'Saving…' : 'Save'}
             </Button>
@@ -822,10 +894,10 @@ const autosaveClassName = autosaveLabelData.className
       </header>
 
       <main
-        className={`mx-auto grid max-w-6xl gap-6 px-6 py-6 ${
+        className={`mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 lg:gap-8 ${
           showStructureSidebar
-            ? 'lg:grid-cols-[280px_minmax(0,1fr)_320px]'
-            : 'lg:grid-cols-[minmax(0,1fr)_320px]'
+            ? 'lg:grid lg:grid-cols-[280px_minmax(0,1fr)_320px]'
+            : 'lg:grid lg:grid-cols-[minmax(0,1fr)_320px]'
         }`}
       >
         {showStructureSidebar && (

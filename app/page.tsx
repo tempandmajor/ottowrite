@@ -61,7 +61,7 @@ const testimonials = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background via-background to-muted/40">
+    <main className="min-h-screen bg-background">
       <div className="mx-auto flex max-w-6xl flex-col px-6 pb-24 pt-8 sm:px-8 md:px-12 lg:px-16">
         <header className="flex items-center justify-between">
           <Link href="/" className="text-lg font-semibold tracking-tight">

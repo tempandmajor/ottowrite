@@ -11,30 +11,39 @@ export async function middleware(request: NextRequest) {
   const supabaseAnonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY
 
+  // If Supabase env vars are not configured, just pass through
+  // Auth will be handled by the server component layout
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase environment variables are not fully configured')
+    console.warn('Middleware: Supabase env vars not configured, skipping session refresh')
+    return supabaseResponse
   }
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll()
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
       },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-        supabaseResponse = NextResponse.next({
-          request,
-        })
-        cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options)
-        )
-      },
-    },
-  })
+    })
 
-  // Just refresh the session, don't do auth checks
-  // Auth checks are now handled by the server component layout
-  await supabase.auth.getUser()
+    // Just refresh the session, don't do auth checks
+    // Auth checks are now handled by the server component layout
+    await supabase.auth.getUser()
+  } catch (error) {
+    console.error('Middleware: Error refreshing session:', error)
+    // Don't throw - let the request continue to the server component
+    // which will handle auth properly
+  }
 
   return supabaseResponse
 }

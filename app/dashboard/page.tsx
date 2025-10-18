@@ -38,40 +38,60 @@ export default function DashboardPage() {
       const supabase = createClient()
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser()
+
+      if (userError) {
+        console.error('Dashboard load: failed to fetch user', userError)
+        window.location.href = '/auth/login'
+        return
+      }
 
       if (!user) {
         window.location.href = '/auth/login'
         return
       }
 
-      const [{ data: projectsData, count: projectCount }, { count: documentCount }, { data: aiUsage }] =
-        await Promise.all([
-          supabase
-            .from('projects')
-            .select('*', { count: 'exact' })
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(5),
-          supabase
-            .from('documents')
-            .select('*', { count: 'exact' })
-            .eq('user_id', user.id),
-          supabase
-            .from('ai_usage')
-            .select('words_generated')
-            .eq('user_id', user.id),
-        ])
+      const [projectsResponse, documentsResponse, aiUsageResponse] = await Promise.all([
+        supabase
+          .from('projects')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('documents')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.id),
+        supabase
+          .from('ai_usage')
+          .select('words_generated')
+          .eq('user_id', user.id),
+      ])
+
+      if (projectsResponse.error) {
+        throw projectsResponse.error
+      }
+      if (documentsResponse.error) {
+        throw documentsResponse.error
+      }
+      if (aiUsageResponse.error) {
+        throw aiUsageResponse.error
+      }
+
+      const projectCount = projectsResponse.count ?? 0
+      const documentCount = documentsResponse.count ?? 0
+      const aiUsage = aiUsageResponse.data ?? []
 
       const totalWordsGenerated =
-        aiUsage?.reduce((sum, record) => sum + (record.words_generated || 0), 0) || 0
+        aiUsage.reduce((sum, record) => sum + (record?.words_generated || 0), 0) || 0
 
       setStats({
-        projectCount: projectCount || 0,
-        documentCount: documentCount || 0,
+        projectCount,
+        documentCount,
         totalWordsGenerated,
       })
-      setProjects(projectsData || [])
+      setProjects(projectsResponse.data ?? [])
     } catch (error) {
       console.error('Error loading dashboard:', error)
     } finally {

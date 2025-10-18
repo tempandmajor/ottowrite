@@ -1,12 +1,14 @@
-# UI Phase 3 → 5 QA Report
+# UI Phase 0 QA Baseline
 
-_Last updated: October 18, 2025_  
+_Last updated: October 17, 2025_  
 _Owner: Codex (ChatGPT)_
 
 ## 1. Scope & Builds
-- **Scope**: Dashboard detail editors (outlines list/detail, plot analysis), supporting filters, sticky summaries, and AI analytics controls.
-- **Build**: `npm run build` (last successful: Oct 18, 2025).  
-  `npm run lint` currently surfaces a deprecation warning (`next lint` removed in Next.js 16). Tracking under **Action Item A2**.
+- **Scope**: Dashboard editors (outlines, plot analysis, story structure), shared filters, and AI tool surfaces prepared for Phase 1.
+- **Build Health (Oct 17, 2025)**:
+  - `npm run lint` ✅ (warning: Node re-parses `eslint.config.js` as ESM – see Action Item A2)
+  - `npm run build` ✅ (no type errors; only experimental Type Stripping notice)
+  - `npm run build-storybook` ✅ (chunk-size warnings acceptable for now)
 
 ## 2. Regression Checklist
 
@@ -41,7 +43,7 @@ _Owner: Codex (ChatGPT)_
 | ID | Area | Severity | Status | Notes |
 |----|------|----------|--------|-------|
 | A1 | Footer/global shell | Medium | Open | Universal footer still pending from Phase 1 backlog. |
-| A2 | Tooling | Medium | Open | Replace `npm run lint` with `eslint .` (Next.js CLI deprecation). |
+| A2 | Tooling | Low | Resolved | Added `"type": "module"` to `package.json` and converted Tailwind config to ESM imports (Oct 17). |
 | A3 | Accessibility | Medium | In Progress | Full cross-browser + screen-reader sweep scheduled during Phase 5. |
 | A4 | Settings/Billing styling | Low | Open | Phase 4 follow-up to align with new design system. |
 
@@ -57,8 +59,6 @@ All blockers resolved for current release scope; remaining items scheduled for P
 | Firefox 129 (macOS) | 1440 × 900 | ⚠️ | Pending verification. |
 
 ## 5. Recommended Next Actions
-1. **Finalize tooling**: adopt ESLint CLI (`npx eslint . --max-warnings=0`) and update `package.json`.
-2. **Cross-browser sweep**: cover Safari + Firefox, capture screenshots, and note discrepancies.
-3. **Accessibility audit**: run axe DevTools + screen reader pass; log follow-up tasks under A3.
-4. **Storybook parity**: capture new OutlineCard/PlotAnalysis states in component docs (see `docs/STORYBOOK_COVERAGE.md`).
-
+1. **Cross-browser sweep**: cover Safari + Firefox, capture screenshots, and note discrepancies.
+2. **Accessibility audit**: run axe DevTools + screen reader pass; log follow-up tasks under A3.
+3. **Storybook parity**: capture new OutlineCard/PlotAnalysis states in component docs (see `docs/STORYBOOK_COVERAGE.md`).

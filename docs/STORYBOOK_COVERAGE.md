@@ -1,10 +1,10 @@
-# Storybook Coverage Plan (Phase 5)
+# Storybook Coverage Plan (Phase 0 Baseline)
 
-_Last updated: October 18, 2025_  
+_Last updated: October 17, 2025_  
 _Owner: Codex (ChatGPT)_
 
 ## 1. Goal
-Provide a Storybook-equivalent reference for new dashboard/editor components introduced during Phases 2–4, ensuring designers and QA can review states without booting the full app. Actual stories should live under `./stories` (to be added) with type-safe controls.
+Provide a Storybook-equivalent reference for dashboard/editor components going into Phase 1 so designers/QA can review states without booting the full app. Stories should live under `./stories` with type-safe controls and mocked data providers.
 
 ## 2. Component Matrix
 
@@ -28,13 +28,13 @@ Provide a Storybook-equivalent reference for new dashboard/editor components int
 - **Accessibility**: Enable `@storybook/addon-a11y` to validate focus rings, contrast, and keyboard navigation for each story.
 
 ## 4. Action Items
-1. Scaffold Storybook (`npx storybook@latest init --builder @storybook/nextjs --default`).  
-2. Port component stories according to matrix above.  
-3. Integrate into CI (run `npm run lint && npm run build-storybook`).  
-4. Share Storybook static build link with design/QA ahead of release sign-off.
+1. Replace placeholder starter stories with actual OttoWrite components (matrix above).  
+2. Add Chromatic (or static hosting) step to CI: `npm run lint && npm run build-storybook`.  
+3. Wire mock Supabase providers so stories render without network access.  
+4. Publish coverage summary in Sprint review deck once stories merge.
 
 ## 5. Sign-off Checklist
-- [x] Storybook command available (`npm run storybook`, `npm run build-storybook`).
+- [x] Storybook commands verified (`npm run storybook`, `npm run build-storybook` on Oct 17 2025).
 - [ ] All components in matrix documented with knobs/controls.
 - [ ] Accessibility addon passes for each story.
 - [ ] Linked from `README.md` (Design System section) once live.

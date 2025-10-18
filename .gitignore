@@ -28,6 +28,7 @@ yarn-error.log*
 .env
 .env.production
 VERCEL_ENV_VARS.md
+STRIPE_ENV_VALUES.md
 
 # TypeScript
 *.tsbuildinfo

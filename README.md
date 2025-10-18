@@ -42,7 +42,7 @@ npm install
 
 3. Set up environment variables:
 
-Create a `.env.local` file in the root directory:
+Create a `.env.local` file in the root directory (see `VERCEL_ENV_VARS.md` for the authoritative checklist and secret sources):
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -51,6 +51,16 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_ANON_KEY=your_supabase_anon_key         # optional fallback for SSR
 SUPABASE_URL=your_supabase_url                         # optional fallback for SSR
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+STRIPE_SECRET_KEY=your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
+STRIPE_PRICE_HOBBYIST=price_id_for_hobbyist_plan
+STRIPE_PRICE_PROFESSIONAL=price_id_for_professional_plan
+STRIPE_PRICE_STUDIO=price_id_for_studio_plan
+# Optional AI vendor keys
+# ANTHROPIC_API_KEY=your_anthropic_api_key
+# OPENAI_API_KEY=your_openai_api_key
+# DEEPSEEK_API_KEY=your_deepseek_api_key
 ```
 4. Run the development server:
 \`\`\`bash
@@ -65,13 +75,11 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 2. Import the project to Vercel
 
-3. Add the following environment variables in Vercel Dashboard → Settings → Environment Variables:
+3. Add the required variables in Vercel Dashboard → Settings → Environment Variables (Production, Preview, Development):
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (Server, Encrypted)
-- `SUPABASE_ANON_KEY` (Server, optional fallback)
-- `SUPABASE_URL` (Server, optional fallback)
+- Supabase: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- Stripe: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_HOBBYIST`, `STRIPE_PRICE_PROFESSIONAL`, `STRIPE_PRICE_STUDIO`
+- Optional AI vendors: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`
 4. Deploy!
 
 ### Apply database migrations

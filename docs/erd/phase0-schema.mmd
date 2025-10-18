@@ -1,0 +1,165 @@
+%% Phase 0 ERD (Mermaid)
+%% Generated: 2025-10-17
+
+erDiagram
+    AUTH_USERS ||--o{ USER_PROFILES : "has"
+    AUTH_USERS ||--o{ PROJECTS : "owns"
+    AUTH_USERS ||--o{ DOCUMENTS : "owns"
+    AUTH_USERS ||--o{ CHARACTERS : "creates"
+    AUTH_USERS ||--o{ LOCATIONS : "creates"
+    AUTH_USERS ||--o{ STORY_BEATS : "creates"
+    AUTH_USERS ||--o{ PLOT_ANALYSES : "runs"
+
+    USER_PROFILES {
+        uuid id PK
+        text email
+        text subscription_tier
+        text stripe_customer_id
+        integer ai_words_used_this_month
+    }
+
+    PROJECTS {
+        uuid id PK
+        uuid user_id FK
+        text name
+        text type
+    }
+
+    DOCUMENTS {
+        uuid id PK
+        uuid user_id FK
+        uuid project_id FK
+        text title
+        text type
+        jsonb content
+    }
+
+    DOCUMENT_VERSIONS {
+        uuid id PK
+        uuid document_id FK
+        uuid user_id FK
+        integer version_number
+        jsonb content
+    }
+
+    DOCUMENT_TEMPLATES {
+        uuid id PK
+        uuid created_by FK
+        text type
+        jsonb content
+        boolean is_public
+    }
+
+    STORY_BEATS {
+        uuid id PK
+        uuid project_id FK
+        uuid user_id FK
+        text beat_type
+        integer order_position
+    }
+
+    BEAT_TEMPLATES {
+        uuid id PK
+        text name
+        jsonb structure
+    }
+
+    OUTLINES {
+        uuid id PK
+        uuid project_id FK
+        uuid document_id FK
+        text title
+        text status
+    }
+
+    OUTLINE_SECTIONS {
+        uuid id PK
+        uuid outline_id FK
+        text heading
+        text summary
+    }
+
+    PLOT_ANALYSES {
+        uuid id PK
+        uuid project_id FK
+        uuid document_id FK
+        uuid user_id FK
+        text analysis_type
+        jsonb summary
+    }
+
+    PLOT_ISSUES {
+        uuid id PK
+        uuid analysis_id FK
+        text severity
+        text category
+        boolean is_resolved
+    }
+
+    CHARACTERS {
+        uuid id PK
+        uuid user_id FK
+        uuid project_id FK
+        text name
+        text role
+    }
+
+    CHARACTER_RELATIONSHIPS {
+        uuid id PK
+        uuid user_id FK
+        uuid project_id FK
+        uuid source_character_id FK
+        uuid target_character_id FK
+        text relationship_type
+    }
+
+    CHARACTER_ARCS {
+        uuid id PK
+        uuid character_id FK
+        text arc_type
+        text summary
+    }
+
+    LOCATIONS {
+        uuid id PK
+        uuid user_id FK
+        uuid project_id FK
+        text name
+        text category
+    }
+
+    LOCATION_EVENTS {
+        uuid id PK
+        uuid location_id FK
+        uuid project_id FK
+        uuid user_id FK
+        text title
+        text occurs_at
+    }
+
+    AI_USAGE {
+        uuid id PK
+        uuid user_id FK
+        uuid document_id FK
+        text model
+        integer words_generated
+    }
+
+    %% Relationships
+    PROJECTS ||--o{ DOCUMENTS : "contains"
+    PROJECTS ||--o{ STORY_BEATS : "tracks"
+    PROJECTS ||--o{ OUTLINES : "organizes"
+    PROJECTS ||--o{ PLOT_ANALYSES : "analyzes"
+    PROJECTS ||--o{ CHARACTERS : "hosts"
+    PROJECTS ||--o{ LOCATIONS : "hosts"
+
+    DOCUMENTS ||--o{ DOCUMENT_VERSIONS : "snapshots"
+    DOCUMENTS ||--o{ OUTLINES : "references"
+    DOCUMENTS ||--o{ PLOT_ANALYSES : "feeds"
+    DOCUMENTS ||--o{ AI_USAGE : "tracks"
+
+    OUTLINES ||--o{ OUTLINE_SECTIONS : "segments"
+    PLOT_ANALYSES ||--o{ PLOT_ISSUES : "emits"
+    CHARACTERS ||--o{ CHARACTER_ARCS : "evolves"
+    CHARACTERS ||--o{ CHARACTER_RELATIONSHIPS : "links"
+    LOCATIONS ||--o{ LOCATION_EVENTS : "timelines"

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Check } from 'lucide-react'
+import { Check, CreditCard, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/hooks/use-toast'
 
 const plans = [
   {
@@ -27,9 +28,9 @@ const plans = [
   },
   {
     name: 'Hobbyist',
-    price: '$12',
+    price: '$20',
     period: '/month',
-    priceId: 'price_1SImHmA2PfDiF2t51g2eMfQF',
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_HOBBYIST || 'price_hobbyist',
     description: 'For serious writers',
     features: [
       '100,000 AI words/month',
@@ -45,9 +46,9 @@ const plans = [
   },
   {
     name: 'Professional',
-    price: '$24',
+    price: '$60',
     period: '/month',
-    priceId: 'price_1SImHzA2PfDiF2t5WLRx7tN0',
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PROFESSIONAL || 'price_professional',
     description: 'For professional authors',
     features: [
       '500,000 AI words/month',
@@ -63,9 +64,9 @@ const plans = [
   },
   {
     name: 'Studio',
-    price: '$49',
+    price: '$100',
     period: '/month',
-    priceId: 'price_1SImIBA2PfDiF2t5L1x0YMwt',
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_STUDIO || 'price_studio',
     description: 'For teams and studios',
     features: [
       '2,000,000 AI words/month',
@@ -84,6 +85,28 @@ const plans = [
 export default function PricingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
+  const [portalLoading, setPortalLoading] = useState(false)
+  const [currentPlan, setCurrentPlan] = useState<string | null>(null)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    const fetchUsage = async () => {
+      try {
+        const response = await fetch('/api/account/usage', { cache: 'no-store' })
+        if (!response.ok) {
+          return
+        }
+        const payload = await response.json()
+        if (payload?.plan) {
+          setCurrentPlan(payload.plan)
+        }
+      } catch (error) {
+        console.warn('Failed to load plan info:', error)
+      }
+    }
+
+    void fetchUsage()
+  }, [])
 
   const handleSubscribe = async (priceId?: string) => {
     if (!priceId) {
@@ -101,21 +124,70 @@ export default function PricingPage() {
         },
         body: JSON.stringify({ priceId }),
       })
-
-      const { url, error } = await response.json()
-
-      if (error) {
-        console.error('Checkout error:', error)
+      if (response.status === 401) {
+        router.push('/auth/login?redirect=/pricing')
         return
       }
 
-      if (url) {
-        window.location.href = url
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast({
+          title: 'Unable to start checkout',
+          description: payload.error ?? 'Please try again in a moment.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      if (typeof payload.url === 'string' && payload.url.length > 0) {
+        window.location.href = payload.url
+      } else {
+        toast({
+          title: 'Checkout unavailable',
+          description: 'Stripe did not return a checkout URL. Please try again shortly.',
+          variant: 'destructive',
+        })
       }
     } catch (error) {
       console.error('Subscription error:', error)
+      toast({
+        title: 'Unable to start checkout',
+        description: error instanceof Error ? error.message : 'Please try again shortly.',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(null)
+    }
+  }
+
+  const openCustomerPortal = async () => {
+    try {
+      setPortalLoading(true)
+      const response = await fetch('/api/checkout/customer-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (response.status === 401) {
+        router.push('/auth/login?redirect=/pricing')
+        return
+      }
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || typeof payload.url !== 'string') {
+        throw new Error(payload.error ?? 'Could not open Stripe portal')
+      }
+
+      window.location.href = payload.url
+    } catch (error) {
+      console.error('Customer portal error:', error)
+      toast({
+        title: 'Unable to manage subscription',
+        description: error instanceof Error ? error.message : 'Please try again shortly.',
+        variant: 'destructive',
+      })
+    } finally {
+      setPortalLoading(false)
     }
   }
 
@@ -134,6 +206,20 @@ export default function PricingPage() {
             <Link href="/auth/signup">
               <Button>Sign Up</Button>
             </Link>
+            {currentPlan && currentPlan !== 'free' && (
+              <Button
+                variant="outline"
+                onClick={openCustomerPortal}
+                disabled={portalLoading}
+              >
+                {portalLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CreditCard className="mr-2 h-4 w-4" />
+                )}
+                Manage subscription
+              </Button>
+            )}
           </div>
         </div>
       </header>

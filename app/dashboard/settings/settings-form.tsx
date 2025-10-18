@@ -10,7 +10,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles, CreditCard } from 'lucide-react'
+import { Progress } from '@/components/ui/progress'
+import Link from 'next/link'
 
 type ProfileSettings = {
   id: string
@@ -30,9 +32,48 @@ const WRITING_FOCUS_OPTIONS = [
 type SettingsFormProps = {
   profile: ProfileSettings
   email: string
+  usageSummary: {
+    plan: string
+    limits: {
+      max_projects: number | null
+      max_documents: number | null
+      max_document_snapshots: number | null
+      max_templates: number | null
+      ai_words_per_month: number | null
+      ai_requests_per_month: number | null
+    } | null
+    usage: {
+      projects: number
+      documents: number
+      document_snapshots: number
+      templates_created: number
+      ai_words_used_month: number
+      ai_requests_month: number
+      ai_prompt_tokens: number
+      ai_completion_tokens: number
+      ai_cost_month: number
+    }
+    currentPeriod: { start: string; end: string }
+    latestSnapshot: {
+      projects_count: number
+      documents_count: number
+      document_snapshots_count: number
+      templates_created: number
+      ai_words_used: number
+      ai_requests_count: number
+      period_start: string
+      period_end: string
+      created_at: string
+    } | null
+  }
 }
 
-export function SettingsForm({ profile, email }: SettingsFormProps) {
+const formatNumber = (value: number) => new Intl.NumberFormat().format(value)
+
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+
+export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps) {
   const supabase = useMemo(() => createClient(), [])
   const { toast } = useToast()
 
@@ -43,6 +84,26 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
   const [voiceNotes, setVoiceNotes] = useState(profile.writingPreferences?.voice ?? '')
   const [timezone, setTimezone] = useState(profile.timezone ?? '')
   const [saving, setSaving] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
+
+  const planName = usageSummary.plan.charAt(0).toUpperCase() + usageSummary.plan.slice(1)
+  const projectsLimit = usageSummary.limits?.max_projects ?? null
+  const documentsLimit = usageSummary.limits?.max_documents ?? null
+  const aiWordsLimit = usageSummary.limits?.ai_words_per_month ?? null
+  const aiRequestsLimit = usageSummary.limits?.ai_requests_per_month ?? null
+
+  const projectUsagePercent = projectsLimit
+    ? Math.min(100, Math.round((usageSummary.usage.projects / projectsLimit) * 100))
+    : 0
+  const documentUsagePercent = documentsLimit
+    ? Math.min(100, Math.round((usageSummary.usage.documents / documentsLimit) * 100))
+    : 0
+  const aiWordsPercent = aiWordsLimit
+    ? Math.min(100, Math.round((usageSummary.usage.ai_words_used_month / aiWordsLimit) * 100))
+    : 0
+  const aiRequestPercent = aiRequestsLimit
+    ? Math.min(100, Math.round((usageSummary.usage.ai_requests_month / aiRequestsLimit) * 100))
+    : 0
 
   const preferredGenres = genresInput
     .split(',')
@@ -98,6 +159,38 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
     }
   }
 
+  const openCustomerPortal = async () => {
+    try {
+      setPortalLoading(true)
+      const response = await fetch('/api/checkout/customer-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload.error ?? 'Unable to open subscription portal')
+      }
+
+      const payload = await response.json()
+      if (typeof payload.url !== 'string' || payload.url.length === 0) {
+        throw new Error('No portal URL returned from Stripe')
+      }
+
+      window.location.href = payload.url
+    } catch (error) {
+      console.error('Customer portal error:', error)
+      toast({
+        title: 'Upgrade portal unavailable',
+        description:
+          error instanceof Error ? error.message : 'We could not open Stripe. Please try again shortly.',
+        variant: 'destructive',
+      })
+    } finally {
+      setPortalLoading(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-10">
       <section className="rounded-3xl border bg-card/80 p-6 shadow-card">
@@ -122,6 +215,87 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
           </div>
         </div>
       </section>
+
+      <Card className="border-none bg-card/80 shadow-card">
+        <CardHeader>
+          <CardTitle>Plan usage</CardTitle>
+          <CardDescription>
+            Current period {formatDate(usageSummary.currentPeriod.start)} – {formatDate(usageSummary.currentPeriod.end)} (resets monthly).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Active plan</p>
+                <p className="text-lg font-semibold text-foreground">{planName}</p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openCustomerPortal}
+                  disabled={portalLoading}
+                >
+                  {portalLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <CreditCard className="mr-2 h-4 w-4" />
+                  )}
+                  Manage subscription
+                </Button>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/pricing">View plans</Link>
+                </Button>
+              </div>
+            </div>
+            <UsageMeter
+              label="Projects"
+              value={usageSummary.usage.projects}
+              limit={projectsLimit}
+              percent={projectUsagePercent}
+            />
+            <UsageMeter
+              label="Documents"
+              value={usageSummary.usage.documents}
+              limit={documentsLimit}
+              percent={documentUsagePercent}
+            />
+          </div>
+
+          <div className="space-y-4">
+            <UsageMeter
+              label="AI words this month"
+              value={usageSummary.usage.ai_words_used_month}
+              limit={aiWordsLimit}
+              percent={aiWordsPercent}
+              unit="words"
+            />
+            <UsageMeter
+              label="AI requests this month"
+              value={usageSummary.usage.ai_requests_month}
+              limit={aiRequestsLimit}
+              percent={aiRequestPercent}
+              unit="requests"
+            />
+            <div className="rounded-xl border border-border/60 bg-background/60 p-4 text-sm text-muted-foreground">
+              <p>
+                <span className="font-semibold text-foreground">${usageSummary.usage.ai_cost_month.toFixed(2)}</span> estimated AI spend this
+                period
+              </p>
+              <p className="mt-1 text-xs">
+                Prompt tokens: {formatNumber(usageSummary.usage.ai_prompt_tokens)} · Completion tokens:{' '}
+                {formatNumber(usageSummary.usage.ai_completion_tokens)}
+              </p>
+              {usageSummary.latestSnapshot && (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Snapshot saved {formatDate(usageSummary.latestSnapshot.created_at)}
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <form className="space-y-8" onSubmit={handleSave}>
         <Card className="border-none bg-card/80 shadow-card">
@@ -250,6 +424,39 @@ export function SettingsForm({ profile, email }: SettingsFormProps) {
           </Button>
         </div>
       </form>
+    </div>
+  )
+}
+
+type UsageMeterProps = {
+  label: string
+  value: number
+  limit: number | null
+  percent: number
+  unit?: string
+}
+
+function UsageMeter({ label, value, limit, percent, unit }: UsageMeterProps) {
+  const displayUnit = unit ? ` ${unit}` : ''
+  const limitLabel = limit === null ? 'Unlimited' : `${formatNumber(limit)}${displayUnit}`
+  const showProgress = limit !== null && limit > 0
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>{label}</span>
+        <span className="font-medium text-foreground">
+          {formatNumber(value)}{displayUnit}
+          {limit !== null && ` / ${limitLabel}`}
+        </span>
+      </div>
+      {showProgress ? (
+        <Progress value={percent} className="h-2.5" />
+      ) : (
+        <div className="rounded-full border border-dashed border-border/60 px-3 py-1 text-xs text-muted-foreground">
+          {limitLabel}
+        </div>
+      )}
     </div>
   )
 }

@@ -215,7 +215,18 @@ export default function ProjectDetailPage() {
       loadProjectBundle()
     } catch (error) {
       console.error('Error creating document:', error)
-      toast({ title: 'Error', description: 'Could not create document.', variant: 'destructive' })
+      const message =
+        error && typeof error === 'object' && 'message' in error && typeof (error as { message?: unknown }).message === 'string'
+          ? (error as { message: string }).message
+          : error instanceof Error
+          ? error.message
+          : 'Could not create document.'
+      const isLimit = /plan .* allows/i.test(message)
+      toast({
+        title: isLimit ? 'Plan limit reached' : 'Error',
+        description: message,
+        variant: 'destructive',
+      })
     }
   }
 
@@ -530,6 +541,21 @@ export default function ProjectDetailPage() {
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/dashboard/projects/${project.id}/outlines`}>
                           Outline assistant
+                        </Link>
+                      </Button>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/dashboard/projects/${project.id}/beat-board`}>
+                          Beat board
+                        </Link>
+                      </Button>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/dashboard/projects/${project.id}/coverage`}>
+                          Script coverage
+                        </Link>
+                      </Button>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/dashboard/projects/${project.id}/production-tools`}>
+                          Format & production
                         </Link>
                       </Button>
                     </div>

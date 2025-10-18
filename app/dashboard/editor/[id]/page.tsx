@@ -9,6 +9,7 @@ import { AIAssistant } from '@/components/editor/ai-assistant'
 import { EnsembleGenerator } from '@/components/ai/ensemble-generator'
 import { BackgroundTaskMonitor } from '@/components/ai/background-task-monitor'
 import { ResearchPanel } from '@/components/research/research-panel'
+import { ReadabilityPanel } from '@/components/analysis/readability'
 import { ExportModal } from '@/components/editor/export-modal'
 import { VersionHistory } from '@/components/editor/version-history'
 import { ChapterSidebar, Chapter } from '@/components/editor/chapter-sidebar'
@@ -1033,7 +1034,12 @@ const autosaveClassName = autosaveLabelData.className
             </CardContent>
           </Card>
 
-          <EnsembleGenerator currentContext={content} onInsert={insertAIText} />
+          <EnsembleGenerator
+            currentContext={content}
+            onInsert={insertAIText}
+            projectId={document.project_id}
+            documentId={document.id}
+          />
 
           <BackgroundTaskMonitor
             documentId={document.id}
@@ -1047,6 +1053,8 @@ const autosaveClassName = autosaveLabelData.className
             projectId={document.project_id}
             context={content}
           />
+
+          <ReadabilityPanel initialText={content} />
 
           <Card className="border-none bg-card/80 shadow-card">
             <CardHeader>

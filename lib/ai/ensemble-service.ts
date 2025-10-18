@@ -1,7 +1,11 @@
-import { generateWithClaude, generateWithGPT5, generateWithDeepSeek } from '@/lib/ai/service'
+import {
+  generateWithClaude,
+  generateWithGPT5,
+  generateWithDeepSeek,
+} from '@/lib/ai/service'
 
 export type EnsembleSuggestion = {
-  model: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-v3'
+  model: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-v3' | 'blend'
   content: string
   usage: {
     inputTokens: number
@@ -24,4 +28,55 @@ export async function generateEnsembleSuggestions(params: {
   ])
 
   return [claude, gpt, deepseek]
+}
+
+type BlendParams = {
+  prompt: string
+  suggestions: Array<{
+    model: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-v3'
+    content: string
+  }>
+  context?: string
+  additionalInstructions?: string
+  maxTokens?: number
+}
+
+export async function generateBlendedSuggestion({
+  prompt,
+  suggestions,
+  context,
+  additionalInstructions,
+  maxTokens = 900,
+}: BlendParams): Promise<EnsembleSuggestion> {
+  if (suggestions.length < 2) {
+    throw new Error('Provide at least two suggestions to blend.')
+  }
+
+  const systemPrompt = `You are a collaborative writing editor that merges multiple AI drafts into a cohesive, high-quality passage.
+Respect character voice, continuity, and stylistic cues from the original prompt.
+Blend the strongest elements from each suggestion while eliminating redundancy or contradictions.
+Return polished prose, ready for insertion into the manuscript.`
+
+  const suggestionBlock = suggestions
+    .map(
+      (suggestion, index) =>
+        `Suggestion ${index + 1} (${suggestion.model}):\n${suggestion.content}`
+    )
+    .join('\n\n')
+
+  const userPrompt = `Original prompt:\n${prompt}
+
+${context ? `Context excerpt:\n${context}\n\n` : ''}${
+    additionalInstructions
+      ? `Writer instructions:\n${additionalInstructions.trim()}\n\n`
+      : ''
+  }Combine the following model outputs into a single refined draft:\n\n${suggestionBlock}`
+
+  const result = await generateWithGPT5(userPrompt, systemPrompt, maxTokens)
+
+  return {
+    model: 'blend',
+    content: result.content,
+    usage: result.usage,
+  }
 }

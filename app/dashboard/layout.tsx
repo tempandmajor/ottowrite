@@ -8,20 +8,32 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
 
-  if (!user) {
+    if (error) {
+      console.error('Dashboard layout: Supabase auth error:', error)
+      redirect('/auth/login')
+    }
+
+    if (!user) {
+      redirect('/auth/login')
+    }
+
+    return (
+      <div className="min-h-screen bg-background font-sans text-foreground">
+        <DashboardHeader email={user.email ?? ''} />
+        <DashboardShell>{children}</DashboardShell>
+      </div>
+    )
+  } catch (error) {
+    console.error('Dashboard layout: Failed to create Supabase client:', error)
+    // Redirect to login if Supabase client creation fails
     redirect('/auth/login')
   }
-
-  return (
-    <div className="min-h-screen bg-background font-sans text-foreground">
-      <DashboardHeader email={user.email ?? ''} />
-      <DashboardShell>{children}</DashboardShell>
-    </div>
-  )
 }

@@ -49,6 +49,9 @@ import {
   Sparkles,
   Compass,
 } from 'lucide-react'
+import { WorldElementCard, type WorldElement } from '@/components/world/world-element-card'
+import { ConsistencyChecker } from '@/components/world/consistency-checker'
+import { SystemDesigner, type SystemDesign } from '@/components/world/system-designer'
 
 type Project = {
   id: string
@@ -81,6 +84,29 @@ type Location = {
   location_events?: LocationEvent[]
   created_at: string
   updated_at: string
+}
+
+const WORLD_ELEMENT_TYPES = [
+  { value: 'location', label: 'Location' },
+  { value: 'culture', label: 'Culture' },
+  { value: 'faction', label: 'Faction/Organization' },
+  { value: 'magic_system', label: 'Magic system' },
+  { value: 'technology', label: 'Technology' },
+  { value: 'history', label: 'History/Event' },
+  { value: 'language', label: 'Language' },
+  { value: 'artifact', label: 'Artifact' },
+  { value: 'other', label: 'Other' },
+]
+
+const DEFAULT_WORLD_ELEMENT = {
+  type: 'location',
+  name: '',
+  summary: '',
+  description: '',
+  tags: '',
+  properties: '',
+  ai_prompt: '',
+  use_ai: true,
 }
 
 const CATEGORY_OPTIONS = [
@@ -136,6 +162,49 @@ export default function WorldBuildingPage() {
   })
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
+  const [worldElements, setWorldElements] = useState<WorldElement[]>([])
+  const [worldLoading, setWorldLoading] = useState(true)
+  const [worldDialogOpen, setWorldDialogOpen] = useState(false)
+  const [worldForm, setWorldForm] = useState({ ...DEFAULT_WORLD_ELEMENT })
+  const [editingWorldElement, setEditingWorldElement] = useState<WorldElement | null>(null)
+  const [worldSubmitting, setWorldSubmitting] = useState(false)
+  const [systemDesignerOpen, setSystemDesignerOpen] = useState(false)
+  const [systemDesign, setSystemDesign] = useState<SystemDesign | null>(null)
+
+  const resetWorldForm = useCallback(() => {
+    setWorldForm({ ...DEFAULT_WORLD_ELEMENT })
+    setEditingWorldElement(null)
+  }, [])
+
+  const openNewWorldElement = () => {
+    resetWorldForm()
+    setWorldDialogOpen(true)
+  }
+
+  const openEditWorldElement = (element: WorldElement) => {
+    setEditingWorldElement(element)
+    setWorldForm({
+      type: element.type,
+      name: element.name,
+      summary: element.summary ?? '',
+      description: element.description ?? '',
+      tags: (element.tags ?? []).join(', '),
+      properties: element.properties ? JSON.stringify(element.properties, null, 2) : '',
+      ai_prompt: '',
+      use_ai: false,
+    })
+    setWorldDialogOpen(true)
+  }
+
+  const parsePropertyInput = useCallback((input: string) => {
+    if (!input.trim()) return {}
+    try {
+      return JSON.parse(input)
+    } catch (error) {
+      console.error('Invalid JSON for world element properties', error)
+      return { notes: input }
+    }
+  }, [])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -207,9 +276,117 @@ export default function WorldBuildingPage() {
     }
   }, [projectId, toast])
 
+  const loadWorldElements = useCallback(async () => {
+    setWorldLoading(true)
+    try {
+      const response = await fetch(`/api/world-elements?project_id=${projectId}`)
+      if (!response.ok) {
+        throw new Error('Failed to load world elements')
+      }
+      const payload = await response.json()
+      setWorldElements(payload.elements ?? [])
+    } catch (error) {
+      console.error('Error loading world elements:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load world bible entries',
+        variant: 'destructive',
+      })
+    } finally {
+      setWorldLoading(false)
+    }
+  }, [projectId, toast])
+
+  const handleSubmitWorldElement = useCallback(async () => {
+    setWorldSubmitting(true)
+    try {
+      const payload: Record<string, unknown> = {
+        project_id: projectId,
+        type: worldForm.type,
+        name: worldForm.name,
+        summary: worldForm.summary,
+        description: worldForm.description,
+        tags: worldForm.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        properties: parsePropertyInput(worldForm.properties),
+      }
+
+      if (worldForm.use_ai) {
+        payload.use_ai = true
+        payload.ai_prompt = worldForm.ai_prompt
+      }
+
+      const method = editingWorldElement ? 'PATCH' : 'POST'
+      const body = editingWorldElement
+        ? { id: editingWorldElement.id, ...payload }
+        : payload
+
+      const response = await fetch('/api/world-elements', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? 'Failed to save world entry')
+      }
+
+      await loadWorldElements()
+      setWorldDialogOpen(false)
+      resetWorldForm()
+      toast({
+        title: editingWorldElement ? 'World entry updated' : 'World entry created',
+        description: editingWorldElement
+          ? 'Changes saved successfully.'
+          : 'New lore added to your world bible.',
+      })
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save world entry',
+        variant: 'destructive',
+      })
+    } finally {
+      setWorldSubmitting(false)
+    }
+  }, [editingWorldElement, loadWorldElements, parsePropertyInput, projectId, resetWorldForm, toast, worldForm])
+
+  const handleDeleteWorldElement = useCallback(
+    async (element: WorldElement) => {
+      if (!confirm(`Delete world entry "${element.name}"?`)) return
+      try {
+        const response = await fetch(`/api/world-elements?id=${element.id}`, {
+          method: 'DELETE',
+        })
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}))
+          throw new Error(data.error ?? 'Failed to delete world entry')
+        }
+        setWorldElements((prev) => prev.filter((item) => item.id !== element.id))
+        toast({ title: 'World entry removed' })
+      } catch (error) {
+        console.error(error)
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to delete world entry',
+          variant: 'destructive',
+        })
+      }
+    },
+    [toast]
+  )
+
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    loadWorldElements()
+  }, [loadWorldElements])
 
   function openCreateLocation() {
     setEditingLocation(null)
@@ -467,6 +644,113 @@ export default function WorldBuildingPage() {
         </Button>
       </section>
 
+      <section className="space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">World bible</h2>
+            <p className="text-sm text-muted-foreground">
+              Capture cultures, factions, magic systems, and lore entries with AI assistance.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="outline" size="sm" onClick={() => loadWorldElements()} disabled={worldLoading}>
+              Refresh
+            </Button>
+            <Button size="sm" onClick={openNewWorldElement}>
+              <Sparkles className="mr-2 h-4 w-4" /> New entry
+            </Button>
+          </div>
+        </div>
+
+        <ConsistencyChecker elements={worldElements} />
+
+        <SystemDesigner
+          open={systemDesignerOpen}
+          onOpenChange={setSystemDesignerOpen}
+          projectId={projectId}
+          onSave={(design) => setSystemDesign(design)}
+        />
+
+        {systemDesign && (
+          <Card className="border border-muted/70 bg-card/60">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                Draft Magic/Tech System
+                <Button size="sm" onClick={() => setSystemDesignerOpen(true)}>
+                  Refine system
+                </Button>
+              </CardTitle>
+              <CardDescription>
+                Generate or refine a structured system before committing it to the world bible.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Core rules</p>
+                <p className="whitespace-pre-wrap text-foreground">{systemDesign.rules}</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Costs</p>
+                  <p className="whitespace-pre-wrap text-foreground">{systemDesign.costs}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Limitations</p>
+                  <p className="whitespace-pre-wrap text-foreground">{systemDesign.limitations}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Failure modes</p>
+                  <p className="whitespace-pre-wrap text-foreground">{systemDesign.failureModes}</p>
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Applications</p>
+                  <p className="whitespace-pre-wrap text-foreground">{systemDesign.applications}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Potential conflicts</p>
+                  <p className="whitespace-pre-wrap text-foreground">{systemDesign.conflicts}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {systemDesign.tags.map((tag) => (
+                  <Badge key={tag} variant="outline" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {worldLoading ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-40 w-full rounded-2xl" />
+            ))}
+          </div>
+        ) : worldElements.length === 0 ? (
+          <EmptyState
+            icon={Compass}
+            title="No world entries yet"
+            description="Use the AI prompt to generate lore, cultures, or artifacts."
+            action={{ label: 'Create entry', onClick: openNewWorldElement }}
+          />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {worldElements.map((element) => (
+              <WorldElementCard
+                key={element.id}
+                element={element}
+                onEdit={openEditWorldElement}
+                onDelete={handleDeleteWorldElement}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
       <section className="grid gap-4 md:grid-cols-3">
         {CATEGORY_OPTIONS.filter((opt) => opt.value !== 'all').map((option) => (
           <Card key={option.value} className="border-none bg-card/80 shadow-card">
@@ -673,6 +957,140 @@ export default function WorldBuildingPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={worldDialogOpen} onOpenChange={(open) => {
+        setWorldDialogOpen(open)
+        if (!open) {
+          resetWorldForm()
+        }
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingWorldElement ? 'Edit world entry' : 'New world entry'}</DialogTitle>
+            <DialogDescription>
+              {worldForm.use_ai
+                ? 'Describe what you need and let the AI draft it. You can tweak before saving.'
+                : 'Manually craft the details for this world element.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2 sm:grid-cols-[1.2fr_1fr] sm:items-center sm:gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="world-name">Name</Label>
+                <Input
+                  id="world-name"
+                  value={worldForm.name}
+                  onChange={(event) => setWorldForm((prev) => ({ ...prev, name: event.target.value }))}
+                  disabled={worldForm.use_ai && !editingWorldElement}
+                  placeholder="Crystal Expanse"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="world-type">Type</Label>
+                <Select
+                  value={worldForm.type}
+                  onValueChange={(value) => setWorldForm((prev) => ({ ...prev, type: value }))}
+                >
+                  <SelectTrigger id="world-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WORLD_ELEMENT_TYPES.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="world-use-ai"
+                type="checkbox"
+                className="h-4 w-4 rounded border border-input"
+                checked={worldForm.use_ai}
+                onChange={(event) => setWorldForm((prev) => ({ ...prev, use_ai: event.target.checked }))}
+              />
+              <Label htmlFor="world-use-ai" className="text-sm">
+                Use AI to draft this entry
+              </Label>
+            </div>
+
+            {worldForm.use_ai && (
+              <div className="space-y-2">
+                <Label htmlFor="world-ai-prompt">AI prompt</Label>
+                <Textarea
+                  id="world-ai-prompt"
+                  rows={4}
+                  value={worldForm.ai_prompt}
+                  onChange={(event) => setWorldForm((prev) => ({ ...prev, ai_prompt: event.target.value }))}
+                  placeholder="Describe the element you want generated, including mood, conflicts, and relevance to your story."
+                />
+                <p className="text-xs text-muted-foreground">
+                  The assistant will generate name, summary, description, and structured properties.
+                </p>
+              </div>
+            )}
+
+            {!worldForm.use_ai && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="world-summary">Summary</Label>
+                  <Textarea
+                    id="world-summary"
+                    rows={2}
+                    value={worldForm.summary}
+                    onChange={(event) => setWorldForm((prev) => ({ ...prev, summary: event.target.value }))}
+                    placeholder="Short pitch (2 sentences)."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="world-description">Description</Label>
+                  <Textarea
+                    id="world-description"
+                    rows={5}
+                    value={worldForm.description}
+                    onChange={(event) => setWorldForm((prev) => ({ ...prev, description: event.target.value }))}
+                    placeholder="Full description of the element."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="world-tags">Tags (comma separated)</Label>
+                  <Input
+                    id="world-tags"
+                    value={worldForm.tags}
+                    onChange={(event) => setWorldForm((prev) => ({ ...prev, tags: event.target.value }))}
+                    placeholder="empire, trade, arcane"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="world-properties">Structured properties (JSON)</Label>
+                  <Textarea
+                    id="world-properties"
+                    rows={4}
+                    value={worldForm.properties}
+                    onChange={(event) => setWorldForm((prev) => ({ ...prev, properties: event.target.value }))}
+                    placeholder='{"leader": "High Magus Arien", "economy": ["crystal trade", "ancient relic auctions"]}'
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setWorldDialogOpen(false)
+              resetWorldForm()
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmitWorldElement} disabled={worldSubmitting}>
+              {worldSubmitting ? 'Saving…' : editingWorldElement ? 'Update entry' : 'Create entry'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
         <DialogContent className="max-w-3xl">

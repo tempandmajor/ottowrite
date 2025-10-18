@@ -63,7 +63,7 @@ const PRICING = {
 /**
  * Generate text using Claude Sonnet 4.5
  */
-async function generateWithClaude(
+export async function generateWithClaude(
   prompt: string,
   context?: string,
   maxTokens: number = 2000
@@ -108,7 +108,7 @@ async function generateWithClaude(
 /**
  * Generate text using GPT-5
  */
-async function generateWithGPT5(
+export async function generateWithGPT5(
   prompt: string,
   context?: string,
   maxTokens: number = 2000
@@ -154,7 +154,7 @@ async function generateWithGPT5(
 /**
  * Generate text using DeepSeek V3
  */
-async function generateWithDeepSeek(
+export async function generateWithDeepSeek(
   prompt: string,
   context?: string,
   maxTokens: number = 2000

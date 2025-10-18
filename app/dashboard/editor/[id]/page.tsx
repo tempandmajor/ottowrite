@@ -6,6 +6,9 @@ import { createClient } from '@/lib/supabase/client'
 import { TiptapEditor } from '@/components/editor/tiptap-editor'
 import { ScreenplayEditor } from '@/components/editor/screenplay-editor'
 import { AIAssistant } from '@/components/editor/ai-assistant'
+import { EnsembleGenerator } from '@/components/ai/ensemble-generator'
+import { BackgroundTaskMonitor } from '@/components/ai/background-task-monitor'
+import { ResearchPanel } from '@/components/research/research-panel'
 import { ExportModal } from '@/components/editor/export-modal'
 import { VersionHistory } from '@/components/editor/version-history'
 import { ChapterSidebar, Chapter } from '@/components/editor/chapter-sidebar'
@@ -1029,6 +1032,21 @@ const autosaveClassName = autosaveLabelData.className
               )}
             </CardContent>
           </Card>
+
+          <EnsembleGenerator currentContext={content} onInsert={insertAIText} />
+
+          <BackgroundTaskMonitor
+            documentId={document.id}
+            projectId={document.project_id}
+            documentTitle={document.title}
+            documentContent={content}
+          />
+
+          <ResearchPanel
+            documentId={document.id}
+            projectId={document.project_id}
+            context={content}
+          />
 
           <Card className="border-none bg-card/80 shadow-card">
             <CardHeader>

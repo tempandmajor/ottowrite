@@ -30,6 +30,9 @@ import { ImageUpload } from '@/components/ui/image-upload'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SectionNav } from '@/components/dashboard/section-nav'
 import { useToast } from '@/hooks/use-toast'
+import { DialogueAnalyzer } from '@/components/characters/dialogue-analyzer'
+import { ArcTimeline, type CharacterArcStage } from '@/components/characters/arc-timeline'
+import { ArcGraph } from '@/components/characters/arc-graph'
 
 type Character = {
   id?: string
@@ -84,6 +87,8 @@ export default function CharacterEditorPage() {
   const [character, setCharacter] = useState<Character>(() => createInitialCharacter(projectId))
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!isNew)
+  const [arcStages, setArcStages] = useState<CharacterArcStage[]>([])
+  const [arcLoading, setArcLoading] = useState(true)
 
   // Tag input states
   const [newTag, setNewTag] = useState('')
@@ -149,6 +154,96 @@ export default function CharacterEditorPage() {
     resetListInputs()
     loadCharacter()
   }, [isNew, projectId, loadCharacter])
+  const loadArcStages = useCallback(async () => {
+    setArcLoading(true)
+    try {
+      const response = await fetch(`/api/characters/arcs?character_id=${characterId}`)
+      if (!response.ok) {
+        throw new Error('Failed to load arc stages')
+      }
+      const payload = await response.json()
+      setArcStages(payload.arcStages ?? [])
+    } catch (error) {
+      console.error('Error loading character arcs:', error)
+    } finally {
+      setArcLoading(false)
+    }
+  }, [characterId])
+
+  useEffect(() => {
+    if (!isNew) {
+      void loadArcStages()
+    } else {
+      setArcStages([])
+      setArcLoading(false)
+    }
+  }, [isNew, loadArcStages])
+
+  const handleCreateArcStage = useCallback(
+    async (stage: Omit<CharacterArcStage, 'id' | 'created_at'>) => {
+      const response = await fetch('/api/characters/arcs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          character_id: characterId,
+          stage_name: stage.stage_name,
+          stage_order: stage.stage_order,
+          description: stage.description,
+          location: stage.location,
+          chapter_scene: stage.chapter_scene,
+          page_number: stage.page_number,
+          emotional_state: stage.emotional_state,
+          beliefs: stage.beliefs,
+          relationships_status: stage.relationships_status,
+          is_completed: stage.is_completed ?? false,
+          notes: stage.notes,
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload.error ?? 'Failed to create arc stage')
+      }
+
+      const payload = await response.json()
+      setArcStages((prev) => [...prev, payload.arcStage])
+    },
+    [characterId]
+  )
+
+  const handleUpdateArcStage = useCallback(async (id: string, updates: Partial<CharacterArcStage>) => {
+    const response = await fetch('/api/characters/arcs', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        ...updates,
+      }),
+    })
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}))
+      throw new Error(payload.error ?? 'Failed to update arc stage')
+    }
+
+    const payload = await response.json()
+    setArcStages((prev) =>
+      prev.map((stage) => (stage.id === payload.arcStage.id ? payload.arcStage : stage))
+    )
+  }, [])
+
+  const handleDeleteArcStage = useCallback(async (id: string) => {
+    const response = await fetch(`/api/characters/arcs?id=${id}`, {
+      method: 'DELETE',
+    })
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}))
+      throw new Error(payload.error ?? 'Failed to delete arc stage')
+    }
+
+    setArcStages((prev) => prev.filter((stage) => stage.id !== id))
+  }, [])
 
   async function saveCharacter() {
     if (!character.name || !character.role) {
@@ -204,6 +299,7 @@ export default function CharacterEditorPage() {
     { id: 'profile', label: 'Profile' },
     { id: 'psyche', label: 'Psychology' },
     { id: 'story', label: 'Story Arc' },
+    { id: 'voice', label: 'Voice & Dialogue' },
     { id: 'notes', label: 'Notes' },
   ]
 
@@ -218,7 +314,7 @@ export default function CharacterEditorPage() {
   }
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[260px_1fr]">
+    <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:grid-cols-[260px_1fr]">
       <div className="space-y-6 lg:sticky lg:top-28 lg:h-fit">
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/dashboard/projects/${projectId}/characters`}>
@@ -543,6 +639,15 @@ export default function CharacterEditorPage() {
           </TabsContent>
 
           <TabsContent value="story" className="space-y-6">
+            <ArcGraph arcs={arcStages} />
+            <ArcTimeline
+              arcs={arcStages}
+              loading={arcLoading}
+              onCreate={handleCreateArcStage}
+              onUpdate={handleUpdateArcStage}
+              onDelete={handleDeleteArcStage}
+            />
+
             <Card>
               <CardHeader>
                 <CardTitle>Backstory & arc</CardTitle>
@@ -657,6 +762,15 @@ export default function CharacterEditorPage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="voice" className="space-y-6">
+            <DialogueAnalyzer
+              projectId={projectId}
+              characterId={characterId}
+              characterName={character.name || 'Character'}
+              voiceDescription={character.voice_description}
+            />
           </TabsContent>
 
           <TabsContent value="notes" className="space-y-6">

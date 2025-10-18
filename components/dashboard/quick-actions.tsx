@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowUpRight, FileText, PenSquare, Users } from 'lucide-react'
+import { ArrowUpRight, FileText, PenSquare, Users, LayoutPanelLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const actions = [
@@ -16,6 +16,12 @@ const actions = [
     description: 'Use the AI assistant to shape your next chapter or episode.',
     href: '/dashboard/outlines?new=true',
     icon: FileText,
+  },
+  {
+    title: 'Writing Analytics',
+    description: 'Review word counts, streaks, and writing session trends.',
+    href: '/dashboard/analytics',
+    icon: LayoutPanelLeft,
   },
   {
     title: 'Invite Collaborator',

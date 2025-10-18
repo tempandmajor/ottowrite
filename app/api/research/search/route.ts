@@ -1,0 +1,165 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { createBackgroundResponse, extractResponseText } from '@/lib/ai/responses-api-service'
+
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+
+const SYSTEM_PROMPT = `You are an AI research assistant with real-time web access. When asked a question you:
+- Perform targeted web searches to gather up-to-date information and cite reputable sources.
+- Summarize findings concisely and structure the response for writers.
+- Provide source references with titles and URLs.
+- Flag uncertain or conflicting information.
+`
+
+async function requireUser() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { supabase, user: null }
+  }
+  return { supabase, user }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { supabase, user } = await requireUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const {
+      query,
+      document_id,
+      project_id,
+      context,
+    }: {
+      query?: string
+      document_id?: string | null
+      project_id?: string | null
+      context?: string | null
+    } = body ?? {}
+
+    if (!query || query.trim().length < 5) {
+      return NextResponse.json(
+        { error: 'Query must be at least 5 characters long.' },
+        { status: 400 }
+      )
+    }
+
+    const { data: requestRecord, error: insertError } = await supabase
+      .from('research_requests')
+      .insert({
+        user_id: user.id,
+        document_id: document_id ?? null,
+        project_id: project_id ?? null,
+        query: query.trim(),
+        status: 'queued',
+      })
+      .select()
+      .single()
+
+    if (insertError || !requestRecord) {
+      throw insertError ?? new Error('Failed to store research request')
+    }
+
+    let updatedRecord = requestRecord
+
+    try {
+      const prompt = `${SYSTEM_PROMPT}\n\nUSER QUERY: ${query.trim()}\n\nWRITING CONTEXT: ${context ?? 'Not provided.'}`
+
+      const response = await createBackgroundResponse(prompt, {
+        task_type: 'research',
+        document_id: document_id ?? undefined,
+        project_id: project_id ?? undefined,
+      })
+
+      const result = extractResponseText(response)
+
+      const { data: note } = await supabase
+        .from('research_notes')
+        .insert({
+          user_id: user.id,
+          document_id: document_id ?? null,
+          project_id: project_id ?? null,
+          research_request_id: requestRecord.id,
+          title: query.trim(),
+          content: result.text,
+          sources: [],
+        })
+        .select()
+        .single()
+
+      const { data: updated } = await supabase
+        .from('research_requests')
+        .update({
+          status: 'succeeded',
+          response: result,
+        })
+        .eq('id', requestRecord.id)
+        .select()
+        .single()
+
+      if (updated) {
+        updatedRecord = updated
+      }
+
+      return NextResponse.json({ request: updatedRecord, note })
+    } catch (error) {
+      console.error('Research execution failed:', error)
+      const { data: failed } = await supabase
+        .from('research_requests')
+        .update({ status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' })
+        .eq('id', requestRecord.id)
+        .select()
+        .single()
+
+      if (failed) {
+        updatedRecord = failed
+      }
+
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Research failed', request: updatedRecord },
+        { status: 500 }
+      )
+    }
+  } catch (error) {
+    console.error('Error starting research:', error)
+    return NextResponse.json({ error: 'Failed to start research' }, { status: 500 })
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { supabase, user } = await requireUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const documentId = searchParams.get('document_id')
+
+    const query = supabase
+      .from('research_notes')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    const { data, error } = documentId
+      ? await query.eq('document_id', documentId)
+      : await query.limit(50)
+
+    if (error) {
+      throw error
+    }
+
+    return NextResponse.json({ notes: data ?? [] })
+  } catch (error) {
+    console.error('Error fetching research notes:', error)
+    return NextResponse.json({ error: 'Failed to fetch research notes' }, { status: 500 })
+  }
+}

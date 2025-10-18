@@ -1,9 +1,10 @@
 import type { NextConfig } from 'next'
+import path from 'node:path'
 
 const nextConfig: NextConfig = {
   experimental: {},
   output: 'standalone',
-  outputFileTracingRoot: '/Users/emmanuelakangbou/ottowrite',
+  outputFileTracingRoot: path.join(process.cwd()),
 }
 
 export default nextConfig

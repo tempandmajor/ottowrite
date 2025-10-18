@@ -12,11 +12,22 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: [
+          '"Inter"',
+          '"IBM Plex Sans"',
+          '"Segoe UI"',
+          'ui-sans-serif',
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Helvetica Neue"',
+          'Arial',
+          'sans-serif',
+        ],
+        mono: [
           '"IBM Plex Mono"',
           '"Space Mono"',
           '"Courier Prime"',
           '"Courier New"',
-          'Courier',
           'ui-monospace',
           'SFMono-Regular',
           'Menlo',

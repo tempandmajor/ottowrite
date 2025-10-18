@@ -147,6 +147,17 @@ New dependencies added:
 
 All installed via `npm install` and committed to package-lock.json
 
+### 5. Custom Domain Re-alias
+
+**Status**: ✅ REQUIRED FOR EACH RELEASE
+
+- [ ] Promote the latest deployment in Vercel or note its build id.
+- [ ] In Vercel → Project Settings → Domains, remove `www.ottowrite.app`.
+- [ ] Re-add `www.ottowrite.app` so it points at the latest deployment.
+- [ ] Wait 1–2 minutes, then confirm `https://www.ottowrite.app/dashboard` returns 401 when unauthenticated.
+- [ ] If caching persists, purge the CDN for the domain and re-check.
+- Tip: run `scripts/refresh-domain-alias.sh www.ottowrite.app` after setting `VERCEL_DEPLOYMENT_URL`.
+
 ---
 
 ## Post-Deployment Verification

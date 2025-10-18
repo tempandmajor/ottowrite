@@ -3,7 +3,7 @@ import { DashboardNav } from './dashboard-nav'
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative min-h-screen bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.08),_transparent_55%)]">
+    <div className="relative min-h-screen bg-background">
       <a
         href="#main-content"
         className="absolute left-4 top-4 z-50 -translate-y-full rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg transition focus-visible:translate-y-0"

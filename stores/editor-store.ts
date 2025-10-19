@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { shallow } from 'zustand/shallow'
+import { useShallow } from 'zustand/react/shallow'
 
 import type { Chapter } from '@/components/editor/chapter-sidebar'
 
@@ -173,7 +173,7 @@ export const selectSceneNavigation = (state: EditorState) => ({
  * )
  */
 export function useEditorStoreShallow<T>(selector: (state: EditorState) => T): T {
-  return useEditorStore(selector, shallow)
+  return useEditorStore(useShallow(selector))
 }
 
 /**
@@ -196,14 +196,13 @@ export function useEditorContent() {
  */
 export function useDocumentMeta() {
   return useEditorStore(
-    (state) => ({
+    useShallow((state) => ({
       id: state.document?.id,
       title: state.title,
       type: state.document?.type,
       wordCount: state.document?.word_count ?? 0,
       projectId: state.document?.project_id,
-    }),
-    shallow
+    }))
   )
 }
 
@@ -213,12 +212,11 @@ export function useDocumentMeta() {
  */
 export function useSaveStatus() {
   return useEditorStore(
-    (state) => ({
+    useShallow((state) => ({
       isDirty: state.isDirty,
       saving: state.saving,
       lastSavedAt: state.lastSavedAt,
-    }),
-    shallow
+    }))
   )
 }
 
@@ -228,12 +226,11 @@ export function useSaveStatus() {
  */
 export function useAIContext() {
   return useEditorStore(
-    (state) => ({
+    useShallow((state) => ({
       content: state.content,
       structure: state.structure,
       type: state.document?.type,
       wordCount: state.document?.word_count ?? 0,
-    }),
-    shallow
+    }))
   )
 }

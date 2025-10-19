@@ -31,7 +31,7 @@ async function runRLSTests() {
   console.log('━'.repeat(60))
 
   // Create service role client (bypasses RLS for test setup)
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -119,7 +119,7 @@ async function verifyRLSEnabled() {
   console.log('\n🛡️  Verifying RLS is enabled on all tables...\n')
   console.log('━'.repeat(60))
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

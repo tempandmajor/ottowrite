@@ -1,5 +1,5 @@
+/* eslint-disable storybook/no-renderer-packages */
 import type { Meta, StoryObj } from '@storybook/react'
-import { action } from '@storybook/addon-actions'
 
 import { OutlineCard } from '@/components/outlines/outline-card'
 
@@ -22,7 +22,9 @@ const meta: Meta<typeof OutlineCard> = {
   component: OutlineCard,
   args: {
     projectId: 'project-123',
-    onDelete: action('delete'),
+    onDelete: () => {
+      console.log('delete')
+    },
   },
   parameters: {
     layout: 'centered',

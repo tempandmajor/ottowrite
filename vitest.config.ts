@@ -41,7 +41,6 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           globals: true,
-          reporters: ['default'],
         },
       },
     ],

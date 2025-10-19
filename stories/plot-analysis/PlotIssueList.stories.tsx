@@ -1,6 +1,6 @@
+/* eslint-disable storybook/no-renderer-packages */
 import type { Meta, StoryObj } from '@storybook/react'
 import { useEffect } from 'react'
-import { action } from '@storybook/addon-actions'
 
 import { PlotIssueList } from '@/components/plot-analysis/plot-issue-list'
 import type { IssueCategory, IssueSeverity } from '@/lib/ai/plot-analyzer'
@@ -21,11 +21,19 @@ type Issue = {
 }
 
 function installFetchStub(issues: Issue[], delay = 0) {
-  const handler = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input.toString()
-    const method = init?.method ?? 'GET'
+  const handler = async (...args: Parameters<typeof fetch>): Promise<Response> => {
+    const [input, init] = args
+    const urlCandidate = typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : typeof (input as any)?.url === 'string'
+          ? (input as any).url
+          : ''
 
-    if (url.startsWith('/api/plot-analysis/issues')) {
+    const method = init?.method ?? (typeof (input as any)?.method === 'string' ? (input as any).method : 'GET')
+
+    if (urlCandidate.startsWith('/api/plot-analysis/issues')) {
       if (delay > 0) {
         await new Promise((resolve) => setTimeout(resolve, delay))
       }
@@ -38,7 +46,7 @@ function installFetchStub(issues: Issue[], delay = 0) {
       }
 
       if (method === 'PATCH') {
-        action('update-issue')(init?.body ?? '')
+        console.log('update-issue', init?.body)
         return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },

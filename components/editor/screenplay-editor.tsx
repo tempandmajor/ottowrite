@@ -162,6 +162,13 @@ export function ScreenplayEditor({
     })
   }
 
+  const formatContent = useCallback((value: string, type: ElementType) => {
+    if (type === 'scene' || type === 'character' || type === 'transition') {
+      return value.toUpperCase()
+    }
+    return value
+  }, [])
+
   const insertTextAtCursor = useCallback(
     (rawText: string) => {
       const normalized = rawText.replace(/\r\n/g, '\n')
@@ -271,13 +278,6 @@ export function ScreenplayEditor({
       default:
         return 'Type here...'
     }
-  }
-
-  const formatContent = (value: string, type: ElementType): string => {
-    if (type === 'scene' || type === 'character' || type === 'transition') {
-      return value.toUpperCase()
-    }
-    return value
   }
 
   // Calculate page count (1 page ≈ 1 minute screen time)

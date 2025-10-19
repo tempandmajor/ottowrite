@@ -561,7 +561,7 @@ export default function EditorPage() {
       .trim()
       .split(/\s+/)
       .filter((w) => w.length > 0).length
-  }, [document, content])
+  }, [document, content, screenplayContent])
 
 
   const autosaveLabelData = useMemo(() => {

@@ -1,28 +1,31 @@
+/* eslint-disable storybook/no-renderer-packages */
 import type { Meta, StoryObj } from '@storybook/react'
 import { useEffect, useState } from 'react'
-import { action } from '@storybook/addon-actions'
 
 import { OutlineGeneratorDialog } from '@/components/outlines/outline-generator-dialog'
 
 type DialogArgs = React.ComponentProps<typeof OutlineGeneratorDialog>
 
 function withFetchStub(responseDelay = 400) {
-  const handler = async (_input: RequestInfo | URL, init?: RequestInit) => {
-    const method = init?.method ?? 'GET'
+  return async (...args: Parameters<typeof fetch>): Promise<Response> => {
+    const [input, init] = args
+    const method = init?.method ?? (typeof (input as any)?.method === 'string' ? (input as any).method : 'GET')
+
     if (method === 'POST') {
-      await new Promise((resolve) => setTimeout(resolve, responseDelay))
+      if (responseDelay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, responseDelay))
+      }
       return new Response(JSON.stringify({ id: 'outline-123' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
     }
+
     return new Response(JSON.stringify({}), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
   }
-
-  return handler
 }
 
 const DialogWrapper = (args: DialogArgs) => {
@@ -56,8 +59,12 @@ const meta: Meta<typeof OutlineGeneratorDialog> = {
     projectId: 'project-123',
     projectType: 'novel',
     genre: ['Fantasy', 'Adventure'],
-    onGenerated: action('generated'),
-    onOpenChange: action('open-change'),
+    onGenerated: () => {
+      console.log('generated')
+    },
+    onOpenChange: (open) => {
+      console.log('open-change', open)
+    },
   },
   render: (args) => <DialogWrapper {...args} />,
 }

@@ -34,8 +34,6 @@ type PacingCategory = {
 }
 
 const WORDS_PER_MINUTE = 230
-const SENTENCE_LENGTH_COMFORTABLE = 18
-
 export function ReadingPacingPanel({ contentHtml, structure, wordCount }: ReadingPacingPanelProps) {
   const metrics = useMemo(() => computeMetrics(contentHtml, structure, wordCount), [
     contentHtml,

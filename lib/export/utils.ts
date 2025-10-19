@@ -2,6 +2,7 @@ import JsPDF from 'jspdf'
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel } from 'docx'
 import { saveAs } from 'file-saver'
 import JSZip from 'jszip'
+import { stripHtml } from '@/lib/utils/text-diff'
 
 export type ExportFormat = 'pdf' | 'docx' | 'markdown' | 'txt' | 'epub' | 'fountain' | 'fdx'
 
@@ -11,22 +12,6 @@ export interface ExportOptions {
   content: string | any[] // HTML string for prose, screenplay array for screenplay
   author?: string
   isScreenplay?: boolean
-}
-
-/**
- * Strip HTML tags and return plain text
- */
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim()
 }
 
 /**

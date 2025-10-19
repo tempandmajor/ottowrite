@@ -11,6 +11,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import type { Chapter } from '@/components/editor/chapter-sidebar'
+import { stripHtml, splitSentences } from '@/lib/utils/text-diff'
 
 type ReadingPacingPanelProps = {
   contentHtml: string
@@ -116,22 +117,6 @@ function computeMetrics(contentHtml: string, chapters: Chapter[], wordCount: num
     averageSentenceLength: sentences.length > 0 ? wordCount / sentences.length : wordCount,
     pacingBreakdown,
   }
-}
-
-function stripHtml(html: string) {
-  return html
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function splitSentences(text: string) {
-  return text
-    .split(/[.!?]+\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
 }
 
 function categorizeReadingTime(wordCount: number): ReadingCategory {

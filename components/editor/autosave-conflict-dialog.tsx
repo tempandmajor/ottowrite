@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { diffWords } from 'diff'
 import {
   Dialog,
   DialogContent,
@@ -14,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AlertTriangle, Check, X, FileText, Clock } from 'lucide-react'
+import { stripHtmlWithDOM, computeWordDiff, calculateDiffStats } from '@/lib/utils/text-diff'
 
 type AutosaveConflictDialogProps = {
   open: boolean
@@ -38,34 +38,15 @@ export function AutosaveConflictDialog({
 }: AutosaveConflictDialogProps) {
   const [selectedView, setSelectedView] = useState<'diff' | 'local' | 'server'>('diff')
 
-  // Strip HTML tags for text comparison
-  const stripHtml = (html: string): string => {
-    const tmp = document.createElement('div')
-    tmp.innerHTML = html
-    return tmp.textContent || tmp.innerText || ''
-  }
-
-  const localText = useMemo(() => stripHtml(localContent), [localContent])
-  const serverText = useMemo(() => stripHtml(serverContent), [serverContent])
+  const localText = useMemo(() => stripHtmlWithDOM(localContent), [localContent])
+  const serverText = useMemo(() => stripHtmlWithDOM(serverContent), [serverContent])
 
   const diff = useMemo(() => {
-    return diffWords(serverText, localText)
+    return computeWordDiff(serverText, localText)
   }, [localText, serverText])
 
   const stats = useMemo(() => {
-    let additions = 0
-    let deletions = 0
-
-    diff.forEach((part) => {
-      const wordCount = part.value.split(/\s+/).filter((w) => w.length > 0).length
-      if (part.added) {
-        additions += wordCount
-      } else if (part.removed) {
-        deletions += wordCount
-      }
-    })
-
-    return { additions, deletions }
+    return calculateDiffStats(diff)
   }, [diff])
 
   return (

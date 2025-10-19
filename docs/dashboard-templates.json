@@ -1,0 +1,281 @@
+{
+  "dashboards": [
+    {
+      "name": "AI Operations",
+      "description": "Monitor AI generation requests, latency, cost, and errors",
+      "widgets": [
+        {
+          "title": "AI Requests per Minute",
+          "type": "timeseries",
+          "query": "context.operation:ai:* | timeseries count() by context.model"
+        },
+        {
+          "title": "AI Generation P95 Latency by Model",
+          "type": "timeseries",
+          "query": "context.operation:ai:* | timeseries p95(context.duration) by context.model"
+        },
+        {
+          "title": "AI Cost per Hour",
+          "type": "timeseries",
+          "query": "context.operation:ai:* | timeseries sum(context.cost)"
+        },
+        {
+          "title": "AI Error Rate",
+          "type": "gauge",
+          "query": "context.operation:ai:* level:error | stats (count() / total()) * 100"
+        },
+        {
+          "title": "Token Usage by Model",
+          "type": "bar",
+          "query": "context.operation:ai:* | stats sum(context.tokensUsed) by context.model"
+        },
+        {
+          "title": "Top Users by AI Usage",
+          "type": "table",
+          "query": "context.operation:ai:* | stats count(), sum(context.cost) by context.userId | sort count desc | limit 10"
+        }
+      ]
+    },
+    {
+      "name": "Autosave Health",
+      "description": "Monitor autosave operations, conflicts, and performance",
+      "widgets": [
+        {
+          "title": "Autosave Operations",
+          "type": "pie",
+          "query": "context.operation:autosave:* | stats count() by context.operation"
+        },
+        {
+          "title": "Autosave Latency P95/P99",
+          "type": "timeseries",
+          "query": "context.operation:autosave:complete | timeseries p95(context.duration), p99(context.duration)"
+        },
+        {
+          "title": "Autosave Conflicts",
+          "type": "timeseries",
+          "query": "context.operation:autosave:conflict | timeseries count()"
+        },
+        {
+          "title": "Conflict Resolution Methods",
+          "type": "pie",
+          "query": "context.operation:autosave:conflict | stats count() by context.conflictResolution"
+        },
+        {
+          "title": "Failed Autosaves by User",
+          "type": "table",
+          "query": "context.operation:autosave:error | stats count() by context.userId | sort count desc | limit 10"
+        },
+        {
+          "title": "Retry Count Distribution",
+          "type": "histogram",
+          "query": "context.operation:autosave:* | stats count() by context.retryCount"
+        }
+      ]
+    },
+    {
+      "name": "Performance & SLOs",
+      "description": "Track SLO compliance, latency, and error budgets",
+      "widgets": [
+        {
+          "title": "SLO Compliance by Service",
+          "type": "gauge",
+          "query": "level:warn message:*SLO violation* | stats count() by context.serviceType"
+        },
+        {
+          "title": "API Latency P95",
+          "type": "timeseries",
+          "query": "context.component:api | timeseries p95(context.duration) by context.path"
+        },
+        {
+          "title": "Database Query Performance",
+          "type": "timeseries",
+          "query": "context.component:database | timeseries p95(context.duration), p99(context.duration)"
+        },
+        {
+          "title": "Error Budget Consumption",
+          "type": "gauge",
+          "query": "level:error | stats (count() / total()) * 100 by context.component"
+        },
+        {
+          "title": "Slow Requests (>3s)",
+          "type": "table",
+          "query": "context.duration:>3000 | stats count(), avg(context.duration) by context.operation | sort count desc"
+        },
+        {
+          "title": "Service Health Status",
+          "type": "status",
+          "query": "* | stats p95(context.duration), (count(level:error) / count()) * 100 as error_rate by context.component"
+        }
+      ]
+    },
+    {
+      "name": "Error Budget",
+      "description": "Monitor error rates and budget consumption",
+      "widgets": [
+        {
+          "title": "Error Rate by Service",
+          "type": "timeseries",
+          "query": "level:error | timeseries (count() / total()) * 100 by context.component"
+        },
+        {
+          "title": "Error Budget Remaining",
+          "type": "gauge",
+          "query": "* | stats (1 - (count(level:error) / count())) * 100 by context.component"
+        },
+        {
+          "title": "Top Errors",
+          "type": "table",
+          "query": "level:error | stats count() by message | sort count desc | limit 20"
+        },
+        {
+          "title": "Error Trends",
+          "type": "timeseries",
+          "query": "level:error | timeseries count()"
+        },
+        {
+          "title": "MTTR (Mean Time to Recovery)",
+          "type": "stat",
+          "query": "level:error | stats avg(context.duration)"
+        },
+        {
+          "title": "Recent Critical Errors",
+          "type": "table",
+          "query": "level:fatal OR level:error | sort @timestamp desc | limit 50"
+        }
+      ]
+    },
+    {
+      "name": "User Analytics",
+      "description": "Track user activity, sessions, and feature usage",
+      "widgets": [
+        {
+          "title": "Active Users",
+          "type": "stat",
+          "query": "context.operation:analytics:* | stats uniqueCount(context.userId)"
+        },
+        {
+          "title": "Sessions by Subscription Tier",
+          "type": "pie",
+          "query": "context.operation:analytics:session_* | stats count() by context.subscriptionTier"
+        },
+        {
+          "title": "Average Session Duration",
+          "type": "stat",
+          "query": "context.operation:analytics:session_end | stats avg(context.value)"
+        },
+        {
+          "title": "Words Written per Day",
+          "type": "timeseries",
+          "query": "context.operation:analytics:words_written | timeseries sum(context.value)"
+        },
+        {
+          "title": "Feature Usage",
+          "type": "bar",
+          "query": "context.operation:analytics:* | stats count() by context.event | sort count desc"
+        },
+        {
+          "title": "Top Projects by Activity",
+          "type": "table",
+          "query": "context.projectId:* | stats count(), uniqueCount(context.userId) by context.projectId | sort count desc | limit 10"
+        }
+      ]
+    }
+  ],
+  "alerts": [
+    {
+      "name": "High Error Rate",
+      "description": "Alert when error rate exceeds 5% for 5 minutes",
+      "query": "level:error | stats (count() / total()) * 100 as error_rate",
+      "threshold": "error_rate > 5",
+      "window": "5m",
+      "severity": "critical",
+      "channels": ["slack", "email", "pagerduty"]
+    },
+    {
+      "name": "SLO Violation",
+      "description": "Alert when P95 latency exceeds SLO target",
+      "query": "level:warn message:*SLO violation* | stats count()",
+      "threshold": "count > 10",
+      "window": "5m",
+      "severity": "warning",
+      "channels": ["slack"]
+    },
+    {
+      "name": "AI Generation Failures",
+      "description": "Alert when AI generation error rate exceeds 10%",
+      "query": "context.operation:ai:* level:error | stats (count() / total()) * 100 as error_rate",
+      "threshold": "error_rate > 10",
+      "window": "10m",
+      "severity": "warning",
+      "channels": ["email"]
+    },
+    {
+      "name": "Autosave Conflict Spike",
+      "description": "Alert when autosave conflicts exceed 50 per hour",
+      "query": "context.operation:autosave:conflict | stats count()",
+      "threshold": "count > 50",
+      "window": "1h",
+      "severity": "warning",
+      "channels": ["slack"]
+    },
+    {
+      "name": "Database Slow Queries",
+      "description": "Alert when database P95 latency exceeds 500ms",
+      "query": "context.component:database | stats p95(context.duration) as p95",
+      "threshold": "p95 > 500",
+      "window": "5m",
+      "severity": "warning",
+      "channels": ["slack"]
+    },
+    {
+      "name": "API Response Time Degradation",
+      "description": "Alert when API P95 latency exceeds 1 second",
+      "query": "context.component:api | stats p95(context.duration) as p95",
+      "threshold": "p95 > 1000",
+      "window": "5m",
+      "severity": "warning",
+      "channels": ["slack"]
+    },
+    {
+      "name": "Background Task Failures",
+      "description": "Alert when background task error rate exceeds 5%",
+      "query": "context.component:background_worker level:error | stats (count() / total()) * 100 as error_rate",
+      "threshold": "error_rate > 5",
+      "window": "15m",
+      "severity": "warning",
+      "channels": ["email"]
+    }
+  ],
+  "slo_targets": {
+    "api": {
+      "p95_latency_ms": 1000,
+      "p99_latency_ms": 3000,
+      "error_budget_percent": 1.0,
+      "availability_percent": 99.0
+    },
+    "ai_generation": {
+      "p95_latency_ms": 10000,
+      "p99_latency_ms": 30000,
+      "error_budget_percent": 5.0,
+      "availability_percent": 95.0
+    },
+    "autosave": {
+      "p95_latency_ms": 500,
+      "p99_latency_ms": 2000,
+      "error_budget_percent": 0.5,
+      "availability_percent": 99.5
+    },
+    "database": {
+      "p95_latency_ms": 200,
+      "p99_latency_ms": 1000,
+      "error_budget_percent": 0.1,
+      "availability_percent": 99.9
+    },
+    "background_task": {
+      "p95_latency_ms": 60000,
+      "p99_latency_ms": 300000,
+      "error_budget_percent": 2.0,
+      "availability_percent": 98.0
+    }
+  }
+}

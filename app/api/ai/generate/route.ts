@@ -4,6 +4,8 @@ import { generateWithAI, type AIModel } from '@/lib/ai/service'
 import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
 import { checkAIRequestQuota } from '@/lib/account/quota'
 import { classifyIntent, type AICommand } from '@/lib/ai/intent'
+import { logger } from '@/lib/monitoring/structured-logger'
+import { PerformanceTimer } from '@/lib/monitoring/performance'
 
 const MAX_PROMPT_LENGTH = 5000
 const MAX_COMPLETION_TOKENS = 3000
@@ -31,6 +33,7 @@ export async function POST(request: NextRequest) {
   let sanitizedContext: string | undefined
   let userId: string | null = null
   const startedAt = Date.now()
+  const timer = new PerformanceTimer('ai_generation', 'ai_generation')
 
   try {
     const {
@@ -229,8 +232,31 @@ export async function POST(request: NextRequest) {
     try {
       await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
     } catch (refreshError) {
-      console.warn('refresh_user_plan_usage failed after AI generation', refreshError)
+      logger.warn('refresh_user_plan_usage failed after AI generation', {
+        userId: user.id,
+        operation: 'refresh_user_plan_usage',
+      }, refreshError instanceof Error ? refreshError : undefined)
     }
+
+    // Log successful AI generation with structured logging
+    logger.aiRequest({
+      operation: command || 'generate',
+      model: selectedModel,
+      promptLength: sanitizedPrompt.length,
+      completionLength: response.content.length,
+      duration: latencyMs,
+      tokensUsed: response.usage.inputTokens + response.usage.outputTokens,
+      cost: response.usage.totalCost,
+      userId: user.id,
+      documentId: documentIdValue || undefined,
+      success: true,
+    })
+
+    timer.end(true, {
+      model: selectedModel,
+      wordsGenerated,
+      tokensUsed: response.usage.inputTokens + response.usage.outputTokens,
+    })
 
     return NextResponse.json({
       content: response.content,
@@ -247,7 +273,22 @@ export async function POST(request: NextRequest) {
       intent: classification.intent,
     })
   } catch (error) {
-    console.error('AI generation error:', error)
+    // Log AI generation failure with structured logging
+    logger.aiRequest({
+      operation: command || 'generate',
+      model: selectedModel || 'unknown',
+      promptLength: sanitizedPrompt.length,
+      duration: Date.now() - startedAt,
+      userId: userId || undefined,
+      documentId: documentIdValue || undefined,
+      success: false,
+      error: error instanceof Error ? error : new Error(String(error)),
+    })
+
+    timer.end(false, {
+      errorMessage: error instanceof Error ? error.message : String(error),
+    })
+
     if (classification && selectedModel && userId) {
       try {
         await supabase.from('ai_requests').insert({
@@ -268,7 +309,10 @@ export async function POST(request: NextRequest) {
           selection_preview: selectionValue ? selectionValue.substring(0, 200) : null,
         })
       } catch (logError) {
-        console.warn('Failed to log AI request failure', logError)
+        logger.error('Failed to log AI request failure', {
+          userId,
+          operation: 'log_ai_failure',
+        }, logError instanceof Error ? logError : undefined)
       }
     }
     return NextResponse.json(

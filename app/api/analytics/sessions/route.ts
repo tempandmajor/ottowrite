@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/monitoring/structured-logger'
+import { PerformanceTimer } from '@/lib/monitoring/performance'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -19,14 +21,23 @@ function startOfDay(date: Date) {
 }
 
 export async function GET(request: NextRequest) {
+  const timer = new PerformanceTimer('get_analytics_sessions', 'api')
+
   try {
     const { supabase, user } = await requireUser()
     if (!user) {
+      timer.end(false)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
+
+    logger.analytics({
+      event: 'fetch_analytics',
+      userId: user.id,
+      projectId: projectId || undefined,
+    })
 
     const sessionsQuery = supabase
       .from('writing_sessions')
@@ -138,6 +149,11 @@ export async function GET(request: NextRequest) {
       }
     }) ?? []
 
+    timer.end(true, {
+      sessionCount: sessions?.length ?? 0,
+      totalWords,
+    })
+
     return NextResponse.json({
       summary: {
         totalWords,
@@ -152,15 +168,22 @@ export async function GET(request: NextRequest) {
       sessions: sessions ?? [],
     })
   } catch (error) {
-    console.error('Error fetching analytics summary:', error)
+    logger.error('Error fetching analytics summary', {
+      operation: 'get_analytics_sessions',
+      component: 'analytics',
+    }, error instanceof Error ? error : undefined)
+    timer.end(false)
     return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
+  const timer = new PerformanceTimer('record_writing_session', 'database')
+
   try {
     const { supabase, user } = await requireUser()
     if (!user) {
+      timer.end(false)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -175,6 +198,8 @@ export async function POST(request: NextRequest) {
       session_end,
     } = body ?? {}
 
+    const net_words = words_added - words_deleted
+
     const { data, error } = await supabase
       .from('writing_sessions')
       .insert({
@@ -183,7 +208,7 @@ export async function POST(request: NextRequest) {
         project_id: project_id ?? null,
         words_added,
         words_deleted,
-        net_words: words_added - words_deleted,
+        net_words,
         session_duration_seconds,
         session_start: session_start ?? new Date().toISOString(),
         session_end: session_end ?? new Date().toISOString(),
@@ -193,9 +218,31 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
+    logger.analytics({
+      event: 'session_recorded',
+      userId: user.id,
+      projectId: project_id || undefined,
+      documentId: document_id || undefined,
+      value: session_duration_seconds,
+      metadata: {
+        wordsAdded: words_added,
+        wordsDeleted: words_deleted,
+        netWords: net_words,
+      },
+    })
+
+    timer.end(true, {
+      wordsAdded: words_added,
+      netWords: net_words,
+    })
+
     return NextResponse.json({ session: data })
   } catch (error) {
-    console.error('Error recording session:', error)
+    logger.error('Error recording session', {
+      operation: 'record_writing_session',
+      component: 'analytics',
+    }, error instanceof Error ? error : undefined)
+    timer.end(false)
     return NextResponse.json({ error: 'Failed to record session' }, { status: 500 })
   }
 }

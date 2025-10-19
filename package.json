@@ -10,6 +10,8 @@
     "lint": "eslint .",
     "test": "vitest",
     "test:ui": "vitest --ui",
+    "test:rls": "tsx scripts/run-rls-tests.ts",
+    "security:audit": "tsx scripts/run-rls-tests.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
@@ -90,6 +92,7 @@
     "jsdom": "^27.0.1",
     "playwright": "^1.56.1",
     "storybook": "^9.1.13",
+    "tsx": "^4.20.6",
     "vitest": "^3.2.4"
   }
 }

@@ -501,6 +501,13 @@ export default function EditorPage() {
     })
   }
 
+  const resolveActiveSelection = useCallback(() => {
+    if (isScriptType(document?.type)) {
+      return screenplayApiRef.current?.getSelectedText() ?? ''
+    }
+    return tiptapApiRef.current?.getSelectedText() ?? ''
+  }, [document?.type])
+
   const handleRestoreVersion = (versionContent: any, versionTitle: string) => {
     setTitle(versionTitle)
     if (isScriptType(document?.type)) {
@@ -1051,6 +1058,7 @@ const autosaveClassName = autosaveLabelData.className
                     documentId={document.id}
                     currentContent={content}
                     onInsertText={insertAIText}
+                    getSelection={resolveActiveSelection}
                   />
                 </div>
               ) : (

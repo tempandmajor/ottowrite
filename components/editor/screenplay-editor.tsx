@@ -13,6 +13,7 @@ export type ScreenplayElement = {
 
 export type ScreenplayEditorApi = {
   insertTextAtCursor: (text: string) => void
+  getSelectedText: () => string
 }
 
 interface ScreenplayEditorProps {
@@ -179,6 +180,49 @@ export function ScreenplayEditor({
 
       if (index != null && currentElements[index]) {
         const target = currentElements[index]
+
+        // Check if text contains paragraph breaks
+        const hasParagraphBreaks = /\n{2,}/.test(normalized)
+
+        if (hasParagraphBreaks) {
+          // Split into segments
+          const segments = normalized
+            .split(/\n{2,}/)
+            .map((segment) => segment.trim())
+            .filter(Boolean)
+
+          if (segments.length === 0) return
+
+          // Insert first segment at cursor position
+          const firstSegment = segments[0]
+          const before = target.content.slice(0, start)
+          const after = target.content.slice(end)
+          const updatedContent = formatContent(`${before}${firstSegment}${after}`, target.type)
+
+          // Create new elements for remaining segments
+          const newElements = segments.slice(1).map((segment) => ({
+            id: generateElementId(),
+            type: 'action' as ElementType,
+            content: formatContent(segment, 'action'),
+          }))
+
+          updateElements((current) => {
+            const next = [...current]
+            next[index] = { ...next[index], content: updatedContent }
+            // Insert new elements after current element
+            next.splice(index + 1, 0, ...newElements)
+            return next
+          })
+
+          requestAnimationFrame(() => {
+            // Focus last created element
+            const lastIndex = index + newElements.length
+            focusAndSetSelection(lastIndex, inputRefs.current[lastIndex]?.value.length ?? 0)
+          })
+          return
+        }
+
+        // Single paragraph - insert inline at cursor
         const before = target.content.slice(0, start)
         const after = target.content.slice(end)
         const nextContent = formatContent(`${before}${normalized}${after}`, target.type)
@@ -196,6 +240,7 @@ export function ScreenplayEditor({
         return
       }
 
+      // No cursor position - append to end
       const segments = normalized
         .split(/\n{2,}/)
         .map((segment) => segment.trim())
@@ -222,6 +267,15 @@ export function ScreenplayEditor({
     },
     [focusAndSetSelection, formatContent, generateElementId, updateElements]
   )
+
+  const getSelectedText = useCallback(() => {
+    const { index, start, end } = selectionRef.current
+    if (index == null) return ''
+    const target = elementsRef.current[index]
+    if (!target) return ''
+    if (start === end) return ''
+    return target.content.slice(start, end)
+  }, [])
 
   const getNextElementType = (currentType: ElementType): ElementType => {
     switch (currentType) {
@@ -291,11 +345,12 @@ export function ScreenplayEditor({
     if (!onReady) return
     onReady({
       insertTextAtCursor,
+      getSelectedText,
     })
     return () => {
       onReady(null)
     }
-  }, [insertTextAtCursor, onReady])
+  }, [getSelectedText, insertTextAtCursor, onReady])
 
   return (
     <Card className="bg-white p-8 min-h-[800px]">

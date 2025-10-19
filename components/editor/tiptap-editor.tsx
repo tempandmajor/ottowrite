@@ -261,13 +261,27 @@ export function TiptapEditor({
 
     const api: TiptapEditorApi = {
       insertHtmlAtCursor: (html) => {
-        if (!html) return
-        editor.chain().focus().deleteSelection().insertContent(html).run()
+        try {
+          if (!html || !editor) return
+          if (editor.isDestroyed) {
+            console.warn('TiptapEditor: Cannot insert, editor is destroyed')
+            return
+          }
+          editor.chain().focus().deleteSelection().insertContent(html).run()
+        } catch (error) {
+          console.error('TiptapEditor: insertHtmlAtCursor error:', error)
+        }
       },
       getSelectedText: () => {
-        const { state } = editor
-        const { from, to } = state.selection
-        return state.doc.textBetween(from, to, ' ')
+        try {
+          if (!editor || editor.isDestroyed) return ''
+          const { state } = editor
+          const { from, to } = state.selection
+          return state.doc.textBetween(from, to, ' ')
+        } catch (error) {
+          console.error('TiptapEditor: getSelectedText error:', error)
+          return ''
+        }
       },
     }
 

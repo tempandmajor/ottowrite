@@ -15,16 +15,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Sparkles, Copy, Check } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { AIModel } from '@/lib/ai/service'
+import type { AICommand } from '@/lib/ai/intent'
+
+type CommandOption = 'auto' | AICommand
 
 interface AIAssistantProps {
   documentId: string
   currentContent: string
   onInsertText: (content: string) => void
+  getSelection?: () => string
 }
 
-export function AIAssistant({ documentId, currentContent, onInsertText }: AIAssistantProps) {
+export function AIAssistant({ documentId, currentContent, onInsertText, getSelection }: AIAssistantProps) {
   const [prompt, setPrompt] = useState('')
   const [selectedModel, setSelectedModel] = useState<AIModel>('claude-sonnet-4.5')
+  const [command, setCommand] = useState<CommandOption>('auto')
   const [loading, setLoading] = useState(false)
   const [response, setResponse] = useState('')
   const [copied, setCopied] = useState(false)
@@ -44,6 +49,7 @@ export function AIAssistant({ documentId, currentContent, onInsertText }: AIAssi
     setResponse('')
 
     try {
+      const selection = getSelection?.() ?? ''
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: {
@@ -52,9 +58,11 @@ export function AIAssistant({ documentId, currentContent, onInsertText }: AIAssi
         body: JSON.stringify({
           model: selectedModel,
           prompt,
-          context: currentContent.substring(0, 5000), // Send last 5000 chars as context
+          context: currentContent.slice(-5000),
           maxTokens: 2000,
           documentId,
+          command: command === 'auto' ? undefined : command,
+          selection: selection.length > 0 ? selection : undefined,
         }),
       })
 
@@ -64,10 +72,16 @@ export function AIAssistant({ documentId, currentContent, onInsertText }: AIAssi
 
       const data = await res.json()
       setResponse(data.content)
+      if (typeof data.model === 'string') {
+        setSelectedModel(data.model as AIModel)
+      }
+      if (typeof data.command === 'string') {
+        setCommand((data.command as AICommand) ?? 'auto')
+      }
 
       toast({
         title: 'Success',
-        description: `Generated with ${data.model} (Cost: $${data.usage.totalCost.toFixed(4)})`,
+        description: `Generated (${data.command ?? command}) with ${data.model} (Cost: $${data.usage.totalCost.toFixed(4)})`,
       })
     } catch (error) {
       console.error('AI generation error:', error)
@@ -99,13 +113,31 @@ export function AIAssistant({ documentId, currentContent, onInsertText }: AIAssi
     })
   }
 
-  const quickPrompts = [
-    { label: 'Continue this scene', value: 'Continue writing this scene in the same style and tone.' },
-    { label: 'Add dialogue', value: 'Add natural dialogue between the characters in this scene.' },
-    { label: 'Describe setting', value: 'Add vivid sensory details to describe the setting.' },
-    { label: 'Show emotion', value: 'Rewrite this to show the character\'s emotions through actions and body language instead of telling.' },
-    { label: 'Increase tension', value: 'Rewrite this scene to increase tension and suspense.' },
+  const quickPrompts: Array<{ label: string; value: string; command: CommandOption }> = [
+    { label: 'Continue this scene', value: 'Continue writing this scene in the same style and tone.', command: 'continue' },
+    { label: 'Add dialogue', value: 'Add natural dialogue between the characters in this scene.', command: 'brainstorm' },
+    { label: 'Describe setting', value: 'Add vivid sensory details to describe the setting.', command: 'expand' },
+    { label: 'Show emotion', value: "Rewrite this to show the character's emotions through actions and body language instead of telling.", command: 'rewrite' },
+    { label: 'Increase tension', value: 'Rewrite this scene to increase tension and suspense.', command: 'tone_shift' },
   ]
+
+  const availableCommands: Array<{ value: CommandOption; label: string }> = [
+    { value: 'auto', label: 'Auto detect' },
+    { value: 'continue', label: 'Continue' },
+    { value: 'rewrite', label: 'Rewrite / polish' },
+    { value: 'shorten', label: 'Shorten' },
+    { value: 'expand', label: 'Expand' },
+    { value: 'tone_shift', label: 'Tone shift' },
+    { value: 'summarize', label: 'Summarize' },
+    { value: 'brainstorm', label: 'Brainstorm ideas' },
+    { value: 'notes', label: 'Feedback / notes' },
+  ]
+
+  const handleQuickPromptSelect = (value: string) => {
+    const selected = quickPrompts.find((item) => item.value === value)
+    setPrompt(value)
+    setCommand(selected?.command ?? 'auto')
+  }
 
   return (
     <Card className="h-full flex flex-col">
@@ -138,7 +170,7 @@ export function AIAssistant({ documentId, currentContent, onInsertText }: AIAssi
 
         <div className="space-y-2">
           <Label htmlFor="quick-prompts">Quick Prompts</Label>
-          <Select onValueChange={(value) => setPrompt(value)}>
+          <Select onValueChange={handleQuickPromptSelect}>
             <SelectTrigger>
               <SelectValue placeholder="Choose a quick prompt..." />
             </SelectTrigger>
@@ -146,6 +178,22 @@ export function AIAssistant({ documentId, currentContent, onInsertText }: AIAssi
               {quickPrompts.map((p) => (
                 <SelectItem key={p.label} value={p.value}>
                   {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="command">Command</Label>
+          <Select value={command} onValueChange={(value) => setCommand(value as CommandOption)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableCommands.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -48,10 +48,18 @@ import {
   MapPin,
   Sparkles,
   Compass,
+  Loader2,
 } from 'lucide-react'
 import { WorldElementCard, type WorldElement } from '@/components/world/world-element-card'
-import { ConsistencyChecker } from '@/components/world/consistency-checker'
-import { SystemDesigner, type SystemDesign } from '@/components/world/system-designer'
+import type { SystemDesign } from '@/components/world/system-designer'
+
+// Lazy load heavy world-building components
+const ConsistencyChecker = lazy(() =>
+  import('@/components/world/consistency-checker').then(mod => ({ default: mod.ConsistencyChecker }))
+)
+const SystemDesigner = lazy(() =>
+  import('@/components/world/system-designer').then(mod => ({ default: mod.SystemDesigner }))
+)
 
 type Project = {
   id: string
@@ -140,6 +148,13 @@ const DEFAULT_EVENT = {
 }
 
 type EventFormState = typeof DEFAULT_EVENT & { id?: string }
+
+// Loading fallback for world-building components
+const ComponentLoadingFallback = () => (
+  <div className="flex items-center justify-center p-8">
+    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+  </div>
+)
 
 export default function WorldBuildingPage() {
   const params = useParams()
@@ -662,14 +677,18 @@ export default function WorldBuildingPage() {
           </div>
         </div>
 
-        <ConsistencyChecker elements={worldElements} />
+        <Suspense fallback={<ComponentLoadingFallback />}>
+          <ConsistencyChecker elements={worldElements} />
+        </Suspense>
 
-        <SystemDesigner
-          open={systemDesignerOpen}
-          onOpenChange={setSystemDesignerOpen}
-          projectId={projectId}
-          onSave={(design) => setSystemDesign(design)}
-        />
+        <Suspense fallback={<ComponentLoadingFallback />}>
+          <SystemDesigner
+            open={systemDesignerOpen}
+            onOpenChange={setSystemDesignerOpen}
+            projectId={projectId}
+            onSave={(design) => setSystemDesign(design)}
+          />
+        </Suspense>
 
         {systemDesign && (
           <Card className="border border-muted/70 bg-card/60">

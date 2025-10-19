@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, lazy, Suspense } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -30,9 +30,25 @@ import { ImageUpload } from '@/components/ui/image-upload'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SectionNav } from '@/components/dashboard/section-nav'
 import { useToast } from '@/hooks/use-toast'
-import { DialogueAnalyzer } from '@/components/characters/dialogue-analyzer'
-import { ArcTimeline, type CharacterArcStage } from '@/components/characters/arc-timeline'
-import { ArcGraph } from '@/components/characters/arc-graph'
+import type { CharacterArcStage } from '@/components/characters/arc-timeline'
+
+// Lazy load heavy character analysis components
+const DialogueAnalyzer = lazy(() =>
+  import('@/components/characters/dialogue-analyzer').then(mod => ({ default: mod.DialogueAnalyzer }))
+)
+const ArcTimeline = lazy(() =>
+  import('@/components/characters/arc-timeline').then(mod => ({ default: mod.ArcTimeline }))
+)
+const ArcGraph = lazy(() =>
+  import('@/components/characters/arc-graph').then(mod => ({ default: mod.ArcGraph }))
+)
+
+// Loading fallback for character components
+const ComponentLoadingFallback = () => (
+  <div className="flex items-center justify-center p-8">
+    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+  </div>
+)
 
 type Character = {
   id?: string
@@ -639,14 +655,18 @@ export default function CharacterEditorPage() {
           </TabsContent>
 
           <TabsContent value="story" className="space-y-6">
-            <ArcGraph arcs={arcStages} />
-            <ArcTimeline
-              arcs={arcStages}
-              loading={arcLoading}
-              onCreate={handleCreateArcStage}
-              onUpdate={handleUpdateArcStage}
-              onDelete={handleDeleteArcStage}
-            />
+            <Suspense fallback={<ComponentLoadingFallback />}>
+              <ArcGraph arcs={arcStages} />
+            </Suspense>
+            <Suspense fallback={<ComponentLoadingFallback />}>
+              <ArcTimeline
+                arcs={arcStages}
+                loading={arcLoading}
+                onCreate={handleCreateArcStage}
+                onUpdate={handleUpdateArcStage}
+                onDelete={handleDeleteArcStage}
+              />
+            </Suspense>
 
             <Card>
               <CardHeader>
@@ -765,12 +785,14 @@ export default function CharacterEditorPage() {
           </TabsContent>
 
           <TabsContent value="voice" className="space-y-6">
-            <DialogueAnalyzer
-              projectId={projectId}
-              characterId={characterId}
-              characterName={character.name || 'Character'}
-              voiceDescription={character.voice_description}
-            />
+            <Suspense fallback={<ComponentLoadingFallback />}>
+              <DialogueAnalyzer
+                projectId={projectId}
+                characterId={characterId}
+                characterName={character.name || 'Character'}
+                voiceDescription={character.voice_description}
+              />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="notes" className="space-y-6">

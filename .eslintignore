@@ -1,0 +1,15 @@
+# Supabase edge functions (Deno runtime)
+supabase/functions/
+**/supabase/functions/**
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Test coverage
+coverage/

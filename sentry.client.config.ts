@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
+import { replayIntegration, browserTracingIntegration } from '@sentry/browser'
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -57,10 +58,10 @@ Sentry.init({
 
   // Integration configuration
   integrations: [
-    Sentry.replayIntegration({
+    replayIntegration({
       maskAllText: true, // Privacy: mask all text by default
       blockAllMedia: true, // Privacy: don't capture images/videos
     }),
-    Sentry.browserTracingIntegration(),
+    browserTracingIntegration(),
   ],
 })

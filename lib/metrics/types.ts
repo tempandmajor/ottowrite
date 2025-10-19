@@ -235,6 +235,13 @@ export type GetMetricsForPeriodParams = {
   metricTypes?: MetricType[]
 }
 
+export type GetMetricHistoryParams = {
+  documentId: string
+  metricType: MetricType
+  limit?: number
+  offset?: number
+}
+
 export type StoreMetricFromJobParams = {
   jobId: string
   metricType: MetricType

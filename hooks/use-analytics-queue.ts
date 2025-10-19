@@ -175,34 +175,3 @@ export function useAnalyticsQueue(): UseAnalyticsQueueReturn {
     waitForJobCompletion,
   }
 }
-
-/**
- * Convenience function to analyze a snapshot and wait for results
- */
-export async function analyzeSnapshotAndWait(
-  documentId: string,
-  snapshotId: string,
-  priority: JobPriority = 1
-): Promise<AnalyticsJobOutput | null> {
-  const queue = useAnalyticsQueue()
-
-  const jobId = await queue.enqueueJob({
-    jobType: 'snapshot_analysis',
-    documentId,
-    userId: '', // Will be set by API
-    snapshotId,
-    priority,
-  })
-
-  if (!jobId) {
-    return null
-  }
-
-  const result = await queue.waitForJobCompletion(jobId)
-
-  if (!result || result.status !== 'completed') {
-    return null
-  }
-
-  return result.output
-}

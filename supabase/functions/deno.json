@@ -1,0 +1,12 @@
+{
+  "imports": {
+    "supabase": "jsr:@supabase/supabase-js@2"
+  },
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env --watch index.ts"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "strict": true
+  }
+}

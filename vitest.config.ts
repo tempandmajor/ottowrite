@@ -39,7 +39,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'unit',
-          environment: 'node',
+          environment: 'jsdom',
           globals: true,
         },
       },

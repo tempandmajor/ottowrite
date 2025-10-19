@@ -1,25 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { TiptapEditor, type TiptapEditorApi } from '@/components/editor/tiptap-editor'
-import {
-  ScreenplayEditor,
-  type ScreenplayEditorApi,
-  type ScreenplayElement,
-} from '@/components/editor/screenplay-editor'
-import { AIAssistant } from '@/components/editor/ai-assistant'
-import { EnsembleGenerator } from '@/components/ai/ensemble-generator'
-import { BackgroundTaskMonitor } from '@/components/ai/background-task-monitor'
-import { ResearchPanel } from '@/components/research/research-panel'
-import { ReadabilityPanel } from '@/components/analysis/readability'
-import { ReadingPacingPanel } from '@/components/analysis/reading-pacing-panel'
-import { ExportModal } from '@/components/editor/export-modal'
-import { VersionHistory } from '@/components/editor/version-history'
-import { ChapterSidebar, Chapter } from '@/components/editor/chapter-sidebar'
-import { AutosaveConflictDialog } from '@/components/editor/autosave-conflict-dialog'
-import { AutosaveErrorAlert } from '@/components/editor/autosave-error-alert'
+import { type TiptapEditorApi } from '@/components/editor/tiptap-editor'
+import { type ScreenplayEditorApi, type ScreenplayElement } from '@/components/editor/screenplay-editor'
+import type { Chapter } from '@/components/editor/chapter-sidebar'
 import { computeClientContentHash } from '@/lib/client-content-hash'
 import { Button } from '@/components/ui/button'
 import {
@@ -45,7 +31,42 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 import Link from 'next/link'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
+
+// Lazy load heavy editor components - they're only needed when user starts editing
+const TiptapEditor = lazy(() =>
+  import('@/components/editor/tiptap-editor').then((mod) => ({ default: mod.TiptapEditor }))
+)
+const ScreenplayEditor = lazy(() =>
+  import('@/components/editor/screenplay-editor').then((mod) => ({ default: mod.ScreenplayEditor }))
+)
+
+// Lazy load panels that are hidden by default
+const AIAssistant = lazy(() => import('@/components/editor/ai-assistant').then((mod) => ({ default: mod.AIAssistant })))
+const EnsembleGenerator = lazy(() => import('@/components/ai/ensemble-generator').then((mod) => ({ default: mod.EnsembleGenerator })))
+const BackgroundTaskMonitor = lazy(() => import('@/components/ai/background-task-monitor').then((mod) => ({ default: mod.BackgroundTaskMonitor })))
+const ResearchPanel = lazy(() => import('@/components/research/research-panel').then((mod) => ({ default: mod.ResearchPanel })))
+const ReadabilityPanel = lazy(() => import('@/components/analysis/readability').then((mod) => ({ default: mod.ReadabilityPanel })))
+const ReadingPacingPanel = lazy(() => import('@/components/analysis/reading-pacing-panel').then((mod) => ({ default: mod.ReadingPacingPanel })))
+
+// Lazy load modals that are only shown on demand
+const ExportModal = lazy(() => import('@/components/editor/export-modal').then((mod) => ({ default: mod.ExportModal })))
+const VersionHistory = lazy(() => import('@/components/editor/version-history').then((mod) => ({ default: mod.VersionHistory })))
+
+// Eagerly load critical components that are always visible
+import { ChapterSidebar } from '@/components/editor/chapter-sidebar'
+import { AutosaveConflictDialog } from '@/components/editor/autosave-conflict-dialog'
+import { AutosaveErrorAlert } from '@/components/editor/autosave-error-alert'
+
+// Loading fallback component
+const EditorLoadingFallback = () => (
+  <div className="flex items-center justify-center h-full">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4" />
+      <p className="text-sm text-muted-foreground">Loading editor...</p>
+    </div>
+  </div>
+)
 
 const cloneStructure = (chapters: Chapter[]): Chapter[] =>
   chapters.map((chapter) => ({
@@ -888,66 +909,68 @@ export default function EditorPage() {
 
           <div className="overflow-hidden rounded-3xl border bg-card shadow-card">
             <div className="p-6">
-              {isScriptType(document.type) ? (
-                <ScreenplayEditor
-                  content={screenplayContent}
-                  onUpdate={(newContent) => setContent(JSON.stringify(newContent))}
-                  onReady={(api) => {
-                    screenplayApiRef.current = api
-                  }}
-                />
-              ) : (
-                <TiptapEditor
-                  content={content}
-                  onUpdate={setContent}
-                  placeholder="Start writing your story..."
-                  focusScene={activeSceneInfo}
-                  onAnchorsChange={handleAnchorsChange}
-                  onSceneFocusResult={handleSceneFocusResult}
-                  remoteContent={serverContent}
-                  conflictVisible={autosaveStatus === 'conflict'}
-                  onReplaceWithServer={async () => {
-                    if (!serverContent) return
-                    const nextStructure = Array.isArray(serverContent.structure)
-                      ? cloneStructure(serverContent.structure)
-                      : cloneStructure(structure)
-                    setContent(serverContent.html)
-                    setStructure(nextStructure)
-                    const anchorIds = extractSceneAnchors(serverContent.html)
-                    setSceneAnchors(anchorIds)
-                    const newHash = await computeClientContentHash({
-                      html: serverContent.html,
-                      structure: nextStructure,
-                      anchorIds,
-                    })
-                    setBaseHash(newHash)
-                    setLastSavedAt(new Date())
-                    setDocument((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            content: {
-                              ...(prev.content ?? {}),
-                              html: serverContent.html,
-                              structure: nextStructure,
-                            },
-                            word_count: serverContent.wordCount ?? prev.word_count,
-                          }
-                        : prev
-                    )
-                    setIsDirty(false)
-                    setServerContent(null)
-                    flushAutosave()
-                  }}
-                  onCloseConflict={() => {
-                    setServerContent(null)
-                    flushAutosave()
-                  }}
-                  onReady={(api) => {
-                    tiptapApiRef.current = api
-                  }}
-                />
-              )}
+              <Suspense fallback={<EditorLoadingFallback />}>
+                {isScriptType(document.type) ? (
+                  <ScreenplayEditor
+                    content={screenplayContent}
+                    onUpdate={(newContent) => setContent(JSON.stringify(newContent))}
+                    onReady={(api) => {
+                      screenplayApiRef.current = api
+                    }}
+                  />
+                ) : (
+                  <TiptapEditor
+                    content={content}
+                    onUpdate={setContent}
+                    placeholder="Start writing your story..."
+                    focusScene={activeSceneInfo}
+                    onAnchorsChange={handleAnchorsChange}
+                    onSceneFocusResult={handleSceneFocusResult}
+                    remoteContent={serverContent}
+                    conflictVisible={autosaveStatus === 'conflict'}
+                    onReplaceWithServer={async () => {
+                      if (!serverContent) return
+                      const nextStructure = Array.isArray(serverContent.structure)
+                        ? cloneStructure(serverContent.structure)
+                        : cloneStructure(structure)
+                      setContent(serverContent.html)
+                      setStructure(nextStructure)
+                      const anchorIds = extractSceneAnchors(serverContent.html)
+                      setSceneAnchors(anchorIds)
+                      const newHash = await computeClientContentHash({
+                        html: serverContent.html,
+                        structure: nextStructure,
+                        anchorIds,
+                      })
+                      setBaseHash(newHash)
+                      setLastSavedAt(new Date())
+                      setDocument((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              content: {
+                                ...(prev.content ?? {}),
+                                html: serverContent.html,
+                                structure: nextStructure,
+                              },
+                              word_count: serverContent.wordCount ?? prev.word_count,
+                            }
+                          : prev
+                      )
+                      setIsDirty(false)
+                      setServerContent(null)
+                      flushAutosave()
+                    }}
+                    onCloseConflict={() => {
+                      setServerContent(null)
+                      flushAutosave()
+                    }}
+                    onReady={(api) => {
+                      tiptapApiRef.current = api
+                    }}
+                  />
+                )}
+              </Suspense>
             </div>
           </div>
         </div>
@@ -963,12 +986,14 @@ export default function EditorPage() {
             <CardContent>
               {showAI ? (
                 <div className="max-h-[70vh] overflow-y-auto pr-1">
-                  <AIAssistant
-                    documentId={document.id}
-                    currentContent={content}
-                    onInsertText={insertAIText}
-                    getSelection={resolveActiveSelection}
-                  />
+                  <Suspense fallback={<div className="text-sm text-muted-foreground">Loading AI assistant...</div>}>
+                    <AIAssistant
+                      documentId={document.id}
+                      currentContent={content}
+                      onInsertText={insertAIText}
+                      getSelection={resolveActiveSelection}
+                    />
+                  </Suspense>
                 </div>
               ) : (
                 <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
@@ -982,31 +1007,41 @@ export default function EditorPage() {
             </CardContent>
           </Card>
 
-          <EnsembleGenerator
-            currentContext={content}
-            onInsert={insertAIText}
-            projectId={document.project_id}
-            documentId={document.id}
-          />
+          <Suspense fallback={null}>
+            <EnsembleGenerator
+              currentContext={content}
+              onInsert={insertAIText}
+              projectId={document.project_id}
+              documentId={document.id}
+            />
+          </Suspense>
 
-          <BackgroundTaskMonitor
-            documentId={document.id}
-            projectId={document.project_id}
-            documentTitle={document.title}
-            documentContent={content}
-          />
+          <Suspense fallback={null}>
+            <BackgroundTaskMonitor
+              documentId={document.id}
+              projectId={document.project_id}
+              documentTitle={document.title}
+              documentContent={content}
+            />
+          </Suspense>
 
-          <ResearchPanel
-            documentId={document.id}
-            projectId={document.project_id}
-            context={content}
-          />
+          <Suspense fallback={null}>
+            <ResearchPanel
+              documentId={document.id}
+              projectId={document.project_id}
+              context={content}
+            />
+          </Suspense>
 
           {!isScriptType(document.type) && (
-            <ReadingPacingPanel contentHtml={content} structure={structure} wordCount={wordCount} />
+            <Suspense fallback={null}>
+              <ReadingPacingPanel contentHtml={content} structure={structure} wordCount={wordCount} />
+            </Suspense>
           )}
 
-          <ReadabilityPanel initialText={content} />
+          <Suspense fallback={null}>
+            <ReadabilityPanel initialText={content} />
+          </Suspense>
 
           <Card className="border-none bg-card/80 shadow-card">
             <CardHeader>
@@ -1027,25 +1062,33 @@ export default function EditorPage() {
         </div>
       </main>
 
-      <ExportModal
-        open={showExportModal}
-        onOpenChange={setShowExportModal}
-        title={title}
-        content={
-          document.type === 'screenplay' || document.type === 'play'
-            ? JSON.parse(content || '[]')
-            : content
-        }
-        isScreenplay={document.type === 'screenplay' || document.type === 'play'}
-        userTier={userTier}
-      />
+      {showExportModal && (
+        <Suspense fallback={null}>
+          <ExportModal
+            open={showExportModal}
+            onOpenChange={setShowExportModal}
+            title={title}
+            content={
+              document.type === 'screenplay' || document.type === 'play'
+                ? JSON.parse(content || '[]')
+                : content
+            }
+            isScreenplay={document.type === 'screenplay' || document.type === 'play'}
+            userTier={userTier}
+          />
+        </Suspense>
+      )}
 
-      <VersionHistory
-        open={showVersionHistory}
-        onOpenChange={setShowVersionHistory}
-        documentId={document.id}
-        onRestoreVersion={handleRestoreVersion}
-      />
+      {showVersionHistory && (
+        <Suspense fallback={null}>
+          <VersionHistory
+            open={showVersionHistory}
+            onOpenChange={setShowVersionHistory}
+            documentId={document.id}
+            onRestoreVersion={handleRestoreVersion}
+          />
+        </Suspense>
+      )}
 
       {/* Autosave Conflict Dialog */}
       {serverContent && (

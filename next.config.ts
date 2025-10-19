@@ -32,7 +32,16 @@ const sentryWebpackPluginOptions = {
   },
 }
 
-// Export with Sentry wrapper - only wrap if DSN is configured
-export default process.env.NEXT_PUBLIC_SENTRY_DSN
-  ? withSentryConfig(nextConfig, sentryWebpackPluginOptions)
-  : nextConfig
+// Bundle analyzer configuration
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
+// Export with wrappers - bundle analyzer wraps Sentry which wraps nextConfig
+let config = nextConfig
+if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+  config = withSentryConfig(config, sentryWebpackPluginOptions)
+}
+config = withBundleAnalyzer(config)
+
+export default config

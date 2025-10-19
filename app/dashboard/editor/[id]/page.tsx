@@ -19,6 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast'
 import { useAutosave } from '@/hooks/use-autosave'
 import { useDocumentSnapshots } from '@/hooks/use-document-snapshots'
+import { useUndoRedo } from '@/hooks/use-undo-redo'
 import { useEditorStore, type EditorDocumentRecord } from '@/stores/editor-store'
 import {
   ArrowLeft,
@@ -58,6 +59,7 @@ const VersionHistory = lazy(() => import('@/components/editor/version-history').
 import { ChapterSidebar } from '@/components/editor/chapter-sidebar'
 import { ConflictResolutionPanel } from '@/components/editor/conflict-resolution-panel'
 import { AutosaveErrorAlert } from '@/components/editor/autosave-error-alert'
+import { UndoRedoControls } from '@/components/editor/undo-redo-controls'
 
 // Loading fallback component
 const EditorLoadingFallback = () => (
@@ -145,15 +147,28 @@ export default function EditorPage() {
   const [showAI, setShowAI] = useState(true)
   const [showExportModal, setShowExportModal] = useState(false)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
   const lastSceneFocusMissRef = useRef<string | null>(null)
   const tiptapApiRef = useRef<TiptapEditorApi | null>(null)
   const screenplayApiRef = useRef<ScreenplayEditorApi | null>(null)
+  const previousWordCountRef = useRef<number>(0)
 
   // Initialize snapshot manager
   const snapshotAPI = useDocumentSnapshots({
     enabled: Boolean(document?.id),
     maxSnapshots: 50,
     autoSnapshotOnSave: true,
+  })
+
+  // Initialize undo/redo with persistence
+  const undoRedoAPI = useUndoRedo({
+    documentId: document?.id ?? null,
+    userId,
+    snapshotManager: snapshotAPI.hasSnapshots ? (snapshotAPI as any) : null,
+    enabled: Boolean(document?.id && userId),
+    maxStackSize: 100,
+    autoPersist: true,
+    persistInterval: 5000,
   })
 
   useEffect(() => {
@@ -207,6 +222,9 @@ export default function EditorPage() {
         router.push('/auth/login')
         return
       }
+
+      // Set user ID for undo/redo
+      setUserId(user.id)
 
       // Get user profile for tier info
       const { data: profile } = await supabase
@@ -671,6 +689,36 @@ export default function EditorPage() {
     setShowExportModal(true)
   }, [snapshotAPI, autosaveSnapshot, sceneAnchors, wordCount])
 
+  const handleUndo = useCallback(async () => {
+    const snapshot = await undoRedoAPI.undo()
+    if (snapshot && snapshot.content.html) {
+      setContent(snapshot.content.html)
+      if (snapshot.content.structure && Array.isArray(snapshot.content.structure)) {
+        setStructure(snapshot.content.structure as Chapter[])
+      }
+      previousWordCountRef.current = snapshot.metadata.wordCount
+      toast({
+        title: 'Undo successful',
+        description: `Restored to ${snapshot.metadata.label || 'previous version'}`,
+      })
+    }
+  }, [undoRedoAPI, setContent, setStructure, toast])
+
+  const handleRedo = useCallback(async () => {
+    const snapshot = await undoRedoAPI.redo()
+    if (snapshot && snapshot.content.html) {
+      setContent(snapshot.content.html)
+      if (snapshot.content.structure && Array.isArray(snapshot.content.structure)) {
+        setStructure(snapshot.content.structure as Chapter[])
+      }
+      previousWordCountRef.current = snapshot.metadata.wordCount
+      toast({
+        title: 'Redo successful',
+        description: `Restored to ${snapshot.metadata.label || 'next version'}`,
+      })
+    }
+  }, [undoRedoAPI, setContent, setStructure, toast])
+
   const { status: autosaveStatus, error: autosaveError, flush: flushAutosave } = useAutosave({
     documentId: document?.id ?? null,
     enabled: Boolean(isProseDocument && document && !serverContent),
@@ -705,10 +753,15 @@ export default function EditorPage() {
     // Create autosave snapshot before saving
     onBeforeSave: async (snapshot, wordCount) => {
       try {
-        await snapshotAPI.createSnapshot(snapshot, Array.from(sceneAnchors), {
+        const createdSnapshot = await snapshotAPI.createSnapshot(snapshot, Array.from(sceneAnchors), {
           source: 'autosave',
           wordCount,
         })
+
+        // Push to undo stack
+        const previousCount = previousWordCountRef.current
+        await undoRedoAPI.push(createdSnapshot, previousCount, 'Auto save')
+        previousWordCountRef.current = wordCount
       } catch (err) {
         console.warn('Failed to create autosave snapshot:', err)
       }
@@ -805,6 +858,17 @@ export default function EditorPage() {
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3 md:ml-auto md:w-auto md:flex-row md:gap-2">
             <div className="hidden items-center gap-2 md:flex">
+              {/* Undo/Redo Controls */}
+              <UndoRedoControls
+                canUndo={undoRedoAPI.canUndo}
+                canRedo={undoRedoAPI.canRedo}
+                undoStackSize={undoRedoAPI.undoStackSize}
+                redoStackSize={undoRedoAPI.redoStackSize}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                getUndoHistory={undoRedoAPI.getUndoHistory}
+                getRedoHistory={undoRedoAPI.getRedoHistory}
+              />
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
                   <Search className="mr-2 h-4 w-4" />

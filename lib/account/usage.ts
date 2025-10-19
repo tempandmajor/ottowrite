@@ -52,15 +52,11 @@ export async function getUsageSummary(
   supabase: SupabaseClient,
   userId: string
 ): Promise<UsageSummary> {
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile } = await supabase
     .from('user_profiles')
     .select('subscription_tier, ai_words_used_this_month, ai_words_reset_date')
     .eq('id', userId)
-    .single()
-
-  if (profileError) {
-    throw profileError
-  }
+    .maybeSingle()
 
   const plan = profile?.subscription_tier ?? 'free'
   const now = new Date()

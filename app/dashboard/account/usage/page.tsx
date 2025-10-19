@@ -13,15 +13,11 @@ export default async function AccountUsagePage() {
     redirect('/auth/login')
   }
 
-  const { data: profile, error } = await supabase
+  const { data: profile } = await supabase
     .from('user_profiles')
     .select('id, full_name')
     .eq('id', user.id)
-    .single()
-
-  if (error) {
-    throw error
-  }
+    .maybeSingle()
 
   const usageSummary = await getUsageSummary(supabase, user.id)
 

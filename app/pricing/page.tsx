@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Check, CreditCard, Loader2 } from 'lucide-react'
+import { Check } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
+import { ManageSubscriptionButton } from '@/components/account/manage-subscription-button'
 
 const plans = [
   {
@@ -85,7 +86,6 @@ const plans = [
 export default function PricingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
-  const [portalLoading, setPortalLoading] = useState(false)
   const [currentPlan, setCurrentPlan] = useState<string | null>(null)
   const { toast } = useToast()
 
@@ -160,37 +160,6 @@ export default function PricingPage() {
     }
   }
 
-  const openCustomerPortal = async () => {
-    try {
-      setPortalLoading(true)
-      const response = await fetch('/api/checkout/customer-portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-
-      if (response.status === 401) {
-        router.push('/auth/login?redirect=/pricing')
-        return
-      }
-
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok || typeof payload.url !== 'string') {
-        throw new Error(payload.error ?? 'Could not open Stripe portal')
-      }
-
-      window.location.href = payload.url
-    } catch (error) {
-      console.error('Customer portal error:', error)
-      toast({
-        title: 'Unable to manage subscription',
-        description: error instanceof Error ? error.message : 'Please try again shortly.',
-        variant: 'destructive',
-      })
-    } finally {
-      setPortalLoading(false)
-    }
-  }
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -206,20 +175,7 @@ export default function PricingPage() {
             <Link href="/auth/signup">
               <Button>Sign Up</Button>
             </Link>
-            {currentPlan && currentPlan !== 'free' && (
-              <Button
-                variant="outline"
-                onClick={openCustomerPortal}
-                disabled={portalLoading}
-              >
-                {portalLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <CreditCard className="mr-2 h-4 w-4" />
-                )}
-                Manage subscription
-              </Button>
-            )}
+            {currentPlan && currentPlan !== 'free' && <ManageSubscriptionButton />}
           </div>
         </div>
       </header>

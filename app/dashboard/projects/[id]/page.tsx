@@ -212,6 +212,11 @@ export default function ProjectDetailPage() {
       toast({ title: 'Document created', description: 'Draft added to your project.' })
       setDialogOpen(false)
       setFormData({ title: '', type: 'novel' })
+      try {
+        await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
+      } catch (refreshError) {
+        console.warn('refresh_user_plan_usage failed after document insert', refreshError)
+      }
       loadProjectBundle()
     } catch (error) {
       console.error('Error creating document:', error)

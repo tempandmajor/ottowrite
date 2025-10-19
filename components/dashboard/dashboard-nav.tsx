@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { Menu, X, LayoutPanelLeft, Pen, Settings, BookOpenText, BarChart3 } from 'lucide-react'
+import { Menu, X, LayoutPanelLeft, Pen, Settings, BookOpenText, BarChart3, PieChart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -27,6 +27,11 @@ const routes = [
     label: 'Analytics',
     href: '/dashboard/analytics',
     icon: BarChart3,
+  },
+  {
+    label: 'Usage',
+    href: '/dashboard/account/usage',
+    icon: PieChart,
   },
   {
     label: 'Settings',

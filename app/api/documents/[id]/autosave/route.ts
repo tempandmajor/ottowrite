@@ -161,7 +161,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (snapshotError) {
       console.error('Failed to create document snapshot', snapshotError)
-      return NextResponse.json({ error: 'Failed to create snapshot' }, { status: 500 })
+      return NextResponse.json(
+        { error: snapshotError.message ?? 'Failed to create snapshot' },
+        { status: 400 }
+      )
+    }
+
+    try {
+      await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
+    } catch (refreshError) {
+      console.warn('refresh_user_plan_usage failed after snapshot insert', refreshError)
     }
 
     const { data: profile } = await supabase

@@ -287,6 +287,11 @@ export default function ProjectsPage() {
       setDialogOpen(false)
       setFormData({ name: '', type: 'novel', genre: '', description: '', folderId: selectedFolderId === '__none' ? '' : selectedFolderId })
       setSelectedCreateTagIds([])
+      try {
+        await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
+      } catch (refreshError) {
+        console.warn('refresh_user_plan_usage failed after project insert', refreshError)
+      }
       await fetchProjects()
     } catch (error) {
       console.error('Error creating project:', error)

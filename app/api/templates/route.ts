@@ -97,7 +97,19 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('Template creation error:', error)
+      return NextResponse.json(
+        { error: error.message ?? 'Failed to create template' },
+        { status: 400 }
+      )
+    }
+
+    try {
+      await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
+    } catch (refreshError) {
+      console.warn('refresh_user_plan_usage failed after template insert', refreshError)
+    }
 
     return NextResponse.json({ template })
   } catch (error) {

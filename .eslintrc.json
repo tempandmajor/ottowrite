@@ -1,0 +1,26 @@
+{
+  "extends": "next/core-web-vitals",
+  "globals": {
+    "NodeJS": "readonly"
+  },
+  "ignorePatterns": [
+    "supabase/functions/**/*"
+  ],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"],
+      "rules": {
+        "@typescript-eslint/no-unused-vars": "off"
+      }
+    }
+  ]
+}

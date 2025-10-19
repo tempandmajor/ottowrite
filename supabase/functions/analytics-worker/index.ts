@@ -1,3 +1,4 @@
+/* eslint-disable import/no-unresolved, no-undef */
 /**
  * Analytics Worker Edge Function
  *

@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { UndoRedoManager, type UndoRedoEntry, type UndoRedoState } from '@/lib/undo-redo/undo-redo-manager'

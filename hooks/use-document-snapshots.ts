@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SnapshotManager, type DocumentSnapshot, type SnapshotMetadata } from '@/lib/snapshots/snapshot-manager'
 import type { ClientContentSnapshot } from '@/lib/client-content-hash'

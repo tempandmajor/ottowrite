@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import { useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useConnectivityStore } from '@/stores/connectivity-store'

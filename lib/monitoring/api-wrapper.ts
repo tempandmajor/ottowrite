@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { reportAPIError, reportError, addBreadcrumb } from './error-reporter'
+import { rateLimit, getClientIdentifier, type RateLimitConfig } from '../security/rate-limiter'
 
 export type APIHandler = (request: NextRequest, context?: any) => Promise<NextResponse>
 
 export interface APIWrapperOptions {
   requireAuth?: boolean
   operation?: string
-  rateLimit?: {
-    max: number
-    windowMs: number
-  }
+  rateLimit?: RateLimitConfig
+  getUserId?: (request: NextRequest) => Promise<string | undefined>
 }
 
 /**
@@ -43,6 +42,56 @@ export function withAPIErrorHandling(
         method: request.method,
         url: request.url,
       })
+
+      // Apply rate limiting if configured
+      if (options.rateLimit) {
+        const userId = options.getUserId ? await options.getUserId(request) : undefined
+        const identifier = getClientIdentifier(request, userId)
+        const result = rateLimit(identifier, options.rateLimit)
+
+        if (!result.allowed) {
+          addBreadcrumb(
+            `Rate limit exceeded: ${identifier}`,
+            'http',
+            'warning',
+            {
+              requestId,
+              operation,
+              identifier,
+              retryAfter: result.retryAfter,
+            }
+          )
+
+          return NextResponse.json(
+            {
+              error: options.rateLimit.message || 'Rate limit exceeded',
+              retryAfter: result.retryAfter,
+              requestId,
+            },
+            {
+              status: 429,
+              headers: {
+                'Retry-After': String(result.retryAfter || 60),
+                'X-RateLimit-Limit': String(options.rateLimit.max),
+                'X-RateLimit-Remaining': String(result.remaining),
+                'X-RateLimit-Reset': new Date(result.resetAt).toISOString(),
+              },
+            }
+          )
+        }
+
+        // Add rate limit info to breadcrumb
+        addBreadcrumb(
+          `Rate limit check passed`,
+          'http',
+          'debug',
+          {
+            requestId,
+            identifier,
+            remaining: result.remaining,
+          }
+        )
+      }
 
       // Execute the handler
       const response = await handler(request, context)

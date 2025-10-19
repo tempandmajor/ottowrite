@@ -3,11 +3,21 @@ import { createClient } from '@/lib/supabase/server'
 import { generateEnsembleSuggestions } from '@/lib/ai/ensemble-service'
 import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
 import { checkAIRequestQuota } from '@/lib/account/quota'
+import { checkAIRateLimit, createAIRateLimitResponse } from '@/lib/security/ai-rate-limit'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
+  // Apply strict rate limiting for expensive ensemble operation
+  const rateLimitCheck = await checkAIRateLimit(request, true)
+  if (!rateLimitCheck.allowed) {
+    return createAIRateLimitResponse(
+      rateLimitCheck.retryAfter,
+      'Rate limit exceeded for ensemble generation. This is an expensive AI operation. Please wait before trying again.'
+    )
+  }
+
   try {
     const supabase = await createClient()
     const {

@@ -6,6 +6,7 @@ import { checkAIRequestQuota } from '@/lib/account/quota'
 import { classifyIntent, type AICommand } from '@/lib/ai/intent'
 import { logger } from '@/lib/monitoring/structured-logger'
 import { PerformanceTimer } from '@/lib/monitoring/performance'
+import { checkAIRateLimit, createAIRateLimitResponse } from '@/lib/security/ai-rate-limit'
 
 const MAX_PROMPT_LENGTH = 5000
 const MAX_COMPLETION_TOKENS = 3000
@@ -20,6 +21,12 @@ const ALLOWED_MODELS: AIModel[] = [
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting first (before any expensive operations)
+  const rateLimitCheck = await checkAIRateLimit(request)
+  if (!rateLimitCheck.allowed) {
+    return createAIRateLimitResponse(rateLimitCheck.retryAfter)
+  }
+
   const supabase = await createClient()
   let classification: ReturnType<typeof classifyIntent> | null = null
   let selectedModel: AIModel | null = null

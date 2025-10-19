@@ -1,7 +1,26 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { checkAuthThrottle } from './lib/security/auth-throttle'
 
 export async function middleware(request: NextRequest) {
+  // Apply authentication throttling to auth routes
+  if (request.nextUrl.pathname.startsWith('/auth/')) {
+    const throttle = checkAuthThrottle(request)
+    if (!throttle.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Too many authentication attempts. Please try again later.',
+          retryAfter: throttle.retryAfter || 60,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(throttle.retryAfter || 60),
+          },
+        }
+      )
+    }
+  }
   let supabaseResponse = NextResponse.next({
     request,
   })

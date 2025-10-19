@@ -2,6 +2,33 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { computeClientContentHash, type ClientContentSnapshot } from '@/lib/client-content-hash'
 
+async function logAutosaveFailure(params: {
+  documentId: string
+  failureType: 'conflict' | 'error' | 'network'
+  errorMessage?: string
+  clientHash?: string
+  serverHash?: string
+  retryCount?: number
+}) {
+  try {
+    await fetch('/api/telemetry/autosave-failure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        document_id: params.documentId,
+        failure_type: params.failureType,
+        error_message: params.errorMessage,
+        client_hash: params.clientHash,
+        server_hash: params.serverHash,
+        retry_count: params.retryCount ?? 0,
+        user_agent: navigator.userAgent,
+      }),
+    })
+  } catch (err) {
+    console.error('Failed to log autosave failure:', err)
+  }
+}
+
 export type AutosaveStatus =
   | 'idle'
   | 'pending'
@@ -112,6 +139,16 @@ export function useAutosave({
 
       if (response.status === 409) {
         const data = await response.json()
+
+        // Log conflict to telemetry
+        void logAutosaveFailure({
+          documentId,
+          failureType: 'conflict',
+          errorMessage: 'Autosave conflict: document modified in another session',
+          clientHash: hash,
+          serverHash: data?.hash,
+        })
+
         onConflict({
           html: data?.document?.html ?? payloadSnapshot.html ?? '',
           structure: data?.document?.structure,
@@ -135,8 +172,18 @@ export function useAutosave({
       }
     } catch (err) {
       console.error('Autosave error:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Autosave failed'
+
+      // Log error to telemetry
+      void logAutosaveFailure({
+        documentId,
+        failureType: !navigator.onLine ? 'network' : 'error',
+        errorMessage,
+        clientHash: hash,
+      })
+
       setStatus('error')
-      setError(err instanceof Error ? err.message : 'Autosave failed')
+      setError(errorMessage)
     } finally {
       savingRef.current = false
       if (queuedRef.current) {

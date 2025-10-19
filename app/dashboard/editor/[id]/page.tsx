@@ -18,6 +18,8 @@ import { ReadingPacingPanel } from '@/components/analysis/reading-pacing-panel'
 import { ExportModal } from '@/components/editor/export-modal'
 import { VersionHistory } from '@/components/editor/version-history'
 import { ChapterSidebar, Chapter } from '@/components/editor/chapter-sidebar'
+import { AutosaveConflictDialog } from '@/components/editor/autosave-conflict-dialog'
+import { AutosaveErrorAlert } from '@/components/editor/autosave-error-alert'
 import { computeClientContentHash } from '@/lib/client-content-hash'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,6 +32,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { useAutosave } from '@/hooks/use-autosave'
+import { useEditorStore, type EditorDocumentRecord } from '@/stores/editor-store'
 import {
   ArrowLeft,
   Save,
@@ -43,22 +46,6 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-
-type DocumentContent = {
-  html?: string
-  screenplay?: any
-  structure?: Chapter[]
-}
-
-type DocumentRecord = {
-  id: string
-  title: string
-  content?: DocumentContent
-  type: string
-  word_count: number
-  project_id: string
-  updated_at?: string
-}
 
 const cloneStructure = (chapters: Chapter[]): Chapter[] =>
   chapters.map((chapter) => ({
@@ -102,27 +89,40 @@ export default function EditorPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
-  const [document, setDocument] = useState<DocumentRecord | null>(null)
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [structure, setStructure] = useState<Chapter[]>([])
-  const [activeSceneId, setActiveSceneId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const {
+    document,
+    title,
+    content,
+    structure,
+    activeSceneId,
+    loading,
+    saving,
+    userTier,
+    projectTitle,
+    lastSavedAt,
+    isDirty,
+    sceneAnchors,
+    baseHash,
+    serverContent,
+    setDocument,
+    setTitle,
+    setContent,
+    setStructure,
+    setSceneAnchors,
+    setActiveSceneId,
+    setLoading,
+    setSaving,
+    setUserTier,
+    setProjectTitle,
+    setLastSavedAt,
+    setIsDirty,
+    setBaseHash,
+    setServerContent,
+    reset: resetEditorState,
+  } = useEditorStore()
   const [showAI, setShowAI] = useState(true)
   const [showExportModal, setShowExportModal] = useState(false)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
-  const [userTier, setUserTier] = useState('free')
-  const [projectTitle, setProjectTitle] = useState<string | null>(null)
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
-  const [isDirty, setIsDirty] = useState(false)
-  const [sceneAnchors, setSceneAnchors] = useState<Set<string>>(new Set())
-  const [baseHash, setBaseHash] = useState<string | null>(null)
-  const [serverContent, setServerContent] = useState<{
-    html: string
-    structure?: Chapter[] | null
-    wordCount?: number
-  } | null>(null)
   const lastSceneFocusMissRef = useRef<string | null>(null)
   const tiptapApiRef = useRef<TiptapEditorApi | null>(null)
   const screenplayApiRef = useRef<ScreenplayEditorApi | null>(null)
@@ -132,6 +132,12 @@ export default function EditorPage() {
       setShowAI(false)
     }
   }, [])
+
+  useEffect(() => {
+    return () => {
+      resetEditorState()
+    }
+  }, [resetEditorState])
 
   const activeSceneInfo = useMemo(() => {
     if (!activeSceneId) return null
@@ -161,6 +167,7 @@ export default function EditorPage() {
   }, [structure, sceneAnchors])
 
   const loadDocument = useCallback(async () => {
+    setLoading(true)
     try {
       const supabase = createClient()
       const {
@@ -202,16 +209,18 @@ export default function EditorPage() {
         return
       }
 
-      const typedData = data as DocumentRecord
+      const typedData = data as EditorDocumentRecord
       setDocument(typedData)
       setTitle(typedData.title)
       setLastSavedAt(typedData.updated_at ? new Date(typedData.updated_at) : new Date())
+      setIsDirty(false)
+      setServerContent(null)
 
       if (isScriptType(typedData.type)) {
         setContent(JSON.stringify(typedData.content?.screenplay || []))
         setStructure([])
         setActiveSceneId(null)
-        setSceneAnchors(new Set())
+        setSceneAnchors([])
         setBaseHash(null)
       } else {
         const initialHtml = typedData.content?.html || ''
@@ -223,7 +232,7 @@ export default function EditorPage() {
         setContent(initialHtml)
         setStructure(cloneStructure(initialStructure))
         setActiveSceneId(null)
-        setSceneAnchors(new Set(initialAnchors))
+        setSceneAnchors(initialAnchors)
 
         const initialHash = await computeClientContentHash({
           html: initialHtml,
@@ -256,7 +265,24 @@ export default function EditorPage() {
     } finally {
       setLoading(false)
     }
-  }, [params.id, router, toast])
+  }, [
+    params.id,
+    router,
+    toast,
+    setActiveSceneId,
+    setBaseHash,
+    setContent,
+    setDocument,
+    setIsDirty,
+    setLastSavedAt,
+    setLoading,
+    setProjectTitle,
+    setSceneAnchors,
+    setServerContent,
+    setStructure,
+    setTitle,
+    setUserTier,
+  ])
 
   useEffect(() => {
     loadDocument()
@@ -272,7 +298,7 @@ export default function EditorPage() {
     if (!exists) {
       setActiveSceneId(null)
     }
-  }, [activeSceneId, structure])
+  }, [activeSceneId, setActiveSceneId, structure])
 
   const saveDocument = useCallback(async () => {
     if (!document) return
@@ -364,19 +390,40 @@ export default function EditorPage() {
     } finally {
       setSaving(false)
     }
-  }, [content, document, title, toast, structure, sceneAnchors])
+  }, [
+    content,
+    document,
+    sceneAnchors,
+    setBaseHash,
+    setDocument,
+    setIsDirty,
+    setLastSavedAt,
+    setSaving,
+    structure,
+    title,
+    toast,
+  ])
 
-  const handleStructureChange = useCallback((nextChapters: Chapter[]) => {
-    setStructure(nextChapters)
-  }, [])
+  const handleStructureChange = useCallback(
+    (nextChapters: Chapter[]) => {
+      setStructure(nextChapters)
+    },
+    [setStructure]
+  )
 
-  const handleSceneSelect = useCallback((sceneId: string | null) => {
-    setActiveSceneId(sceneId)
-  }, [])
+  const handleSceneSelect = useCallback(
+    (sceneId: string | null) => {
+      setActiveSceneId(sceneId)
+    },
+    [setActiveSceneId]
+  )
 
-  const handleSceneCreated = useCallback((_chapterId: string, sceneId: string) => {
-    setActiveSceneId(sceneId)
-  }, [])
+  const handleSceneCreated = useCallback(
+    (_chapterId: string, sceneId: string) => {
+      setActiveSceneId(sceneId)
+    },
+    [setActiveSceneId]
+  )
 
   const handleInsertAnchor = useCallback(
     (sceneId: string) => {
@@ -392,12 +439,15 @@ export default function EditorPage() {
         })
       )
     },
-    [document]
+    [document, setActiveSceneId]
   )
 
-  const handleAnchorsChange = useCallback((anchors: Set<string>) => {
-    setSceneAnchors(new Set(anchors))
-  }, [])
+  const handleAnchorsChange = useCallback(
+    (anchors: Set<string>) => {
+      setSceneAnchors(anchors)
+    },
+    [setSceneAnchors]
+  )
 
   const handleSceneFocusResult = useCallback(
     ({ id, found }: { id: string; found: boolean }) => {
@@ -513,7 +563,7 @@ export default function EditorPage() {
       : JSON.stringify({ html: content, structure })
 
     setIsDirty(currentSignature !== originalSignature || title !== originalTitle)
-  }, [content, title, document, structure])
+  }, [content, document, setIsDirty, structure, title])
 
   const screenplayContent = useMemo<ScreenplayElement[]>(() => {
     if (!isScriptType(document?.type)) return []
@@ -575,7 +625,7 @@ export default function EditorPage() {
         wordCount: typeof wordCount === 'number' ? wordCount : undefined,
       })
     },
-    [toast]
+    [setServerContent, toast]
   )
 
   const { status: autosaveStatus, error: autosaveError, flush: flushAutosave } = useAutosave({
@@ -864,7 +914,7 @@ export default function EditorPage() {
                     setContent(serverContent.html)
                     setStructure(nextStructure)
                     const anchorIds = extractSceneAnchors(serverContent.html)
-                    setSceneAnchors(new Set(anchorIds))
+                    setSceneAnchors(anchorIds)
                     const newHash = await computeClientContentHash({
                       html: serverContent.html,
                       structure: nextStructure,
@@ -996,6 +1046,78 @@ export default function EditorPage() {
         documentId={document.id}
         onRestoreVersion={handleRestoreVersion}
       />
+
+      {/* Autosave Conflict Dialog */}
+      {serverContent && (
+        <AutosaveConflictDialog
+          open={true}
+          localContent={content}
+          serverContent={serverContent.html}
+          localWordCount={wordCount}
+          serverWordCount={serverContent.wordCount}
+          onKeepLocal={async () => {
+            if (!serverContent) return
+            const anchorIds = extractSceneAnchors(content)
+            const newHash = await computeClientContentHash({
+              html: content,
+              structure,
+              anchorIds,
+            })
+            setBaseHash(newHash)
+            setServerContent(null)
+            flushAutosave()
+          }}
+          onUseServer={async () => {
+            if (!serverContent) return
+            const nextStructure = Array.isArray(serverContent.structure)
+              ? cloneStructure(serverContent.structure)
+              : cloneStructure(structure)
+            setContent(serverContent.html)
+            setStructure(nextStructure)
+            const anchorIds = extractSceneAnchors(serverContent.html)
+            setSceneAnchors(new Set(anchorIds))
+            const newHash = await computeClientContentHash({
+              html: serverContent.html,
+              structure: nextStructure,
+              anchorIds,
+            })
+            setBaseHash(newHash)
+            setLastSavedAt(new Date())
+            setDocument((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    content: {
+                      ...(prev.content ?? {}),
+                      html: serverContent.html,
+                      structure: nextStructure,
+                    },
+                    word_count: serverContent.wordCount ?? prev.word_count,
+                  }
+                : prev
+            )
+            setIsDirty(false)
+            setServerContent(null)
+            flushAutosave()
+          }}
+          onCancel={() => {
+            setServerContent(null)
+            flushAutosave()
+          }}
+        />
+      )}
+
+      {/* Autosave Error Alert */}
+      {(autosaveError || autosaveStatus === 'offline' || autosaveStatus === 'error') && !serverContent && (
+        <AutosaveErrorAlert
+          error={autosaveError}
+          status={autosaveStatus === 'offline' ? 'offline' : 'error'}
+          onRetry={() => flushAutosave()}
+          onDismiss={() => {
+            /* Error will clear on next successful save */
+          }}
+        />
+      )}
     </div>
   )
 }

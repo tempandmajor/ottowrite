@@ -1,20 +1,33 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { withAPIErrorHandling, APIErrors } from '@/lib/monitoring/api-wrapper'
+import { reportAutosaveError } from '@/lib/monitoring/error-reporter'
 
-export async function POST(request: Request) {
-  const supabase = await createClient()
+export const POST = withAPIErrorHandling(
+  async (request) => {
+    const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+    if (!user) {
+      throw APIErrors.unauthorized()
+    }
 
-  try {
     const body = await request.json()
 
+    // Report to Sentry for real-time alerting
+    reportAutosaveError(body.error_message || 'Autosave failed', {
+      userId: user.id,
+      documentId: body.document_id,
+      failureType: body.failure_type,
+      retryCount: body.retry_count ?? 0,
+      clientHash: body.client_hash,
+      serverHash: body.server_hash,
+    })
+
+    // Also store in database for historical analysis
     const { error } = await supabase.from('autosave_failures').insert({
       user_id: user.id,
       document_id: body.document_id,
@@ -28,13 +41,10 @@ export async function POST(request: Request) {
     })
 
     if (error) {
-      console.error('Failed to log autosave failure:', error)
-      return NextResponse.json({ error: 'Failed to log failure' }, { status: 500 })
+      throw new Error(`Failed to log autosave failure: ${error.message}`)
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error processing autosave failure log:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
+  },
+  { operation: 'log_autosave_failure' }
+)

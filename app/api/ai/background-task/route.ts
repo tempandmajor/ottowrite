@@ -7,6 +7,7 @@ import {
 } from '@/lib/ai/responses-api-service'
 import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
 import { checkAIRequestQuota } from '@/lib/account/quota'
+import { reportBackgroundTaskError, addBreadcrumb } from '@/lib/monitoring/error-reporter'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -154,6 +155,14 @@ export async function POST(request: NextRequest) {
     let updatedRecord = inserted
 
     try {
+      // Add breadcrumb for task start
+      addBreadcrumb(`Background task started: ${task_type}`, 'background_task', 'info', {
+        taskId: inserted.id,
+        taskType: task_type,
+        userId: user.id,
+        promptLength: prompt.length,
+      })
+
       const metadata = {
         task_type,
         project_id: project_id ?? undefined,
@@ -221,10 +230,23 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ task: updatedRecord })
     } catch (error) {
-      console.error('Background task execution failed:', error)
+      // Report background task failure to Sentry
+      reportBackgroundTaskError(task_type, error instanceof Error ? error : new Error(String(error)), {
+        userId: user.id,
+        projectId: project_id ?? undefined,
+        documentId: document_id ?? undefined,
+        metadata: {
+          taskId: inserted.id,
+          promptLength: prompt.length,
+        },
+      })
+
       const { data: failed } = await supabase
         .from('ai_background_tasks')
-        .update({ status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' })
+        .update({
+          status: 'failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        })
         .eq('id', inserted.id)
         .select()
         .single()
@@ -234,7 +256,10 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json(
-        { error: error instanceof Error ? error.message : 'Failed to execute background task', task: updatedRecord },
+        {
+          error: error instanceof Error ? error.message : 'Failed to execute background task',
+          task: updatedRecord,
+        },
         { status: 500 }
       )
     }

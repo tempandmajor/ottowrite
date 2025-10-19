@@ -253,16 +253,16 @@ export function ConflictResolutionPanel({
           {mode === 'overview' && (
             <OverviewMode
               diff={diff}
-              localText={localText}
-              serverText={serverText}
-              stats={stats}
+              _localText={localText}
+              _serverText={serverText}
+              _stats={stats}
               onSwitchToSideBySide={() => setMode('side-by-side')}
               onSwitchToSelectiveMerge={enterSelectiveMergeMode}
             />
           )}
 
           {mode === 'side-by-side' && (
-            <SideBySideMode localText={localText} serverText={serverText} diff={diff} />
+            <SideBySideMode _localText={localText} _serverText={serverText} diff={diff} />
           )}
 
           {mode === 'selective-merge' && (
@@ -271,7 +271,7 @@ export function ConflictResolutionPanel({
               currentChunkIndex={currentChunkIndex}
               onToggleSelection={toggleChunkSelection}
               onNavigate={navigateToChunk}
-              diff={diff}
+              _diff={diff}
             />
           )}
         </div>

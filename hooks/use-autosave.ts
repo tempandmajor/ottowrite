@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { computeClientContentHash, type ClientContentSnapshot } from '@/lib/client-content-hash'
+import { useConnectivityStore } from '@/stores/connectivity-store'
 
 async function logAutosaveFailure(params: {
   documentId: string
@@ -70,6 +71,10 @@ export function useAutosave({
   const [status, setStatus] = useState<AutosaveStatus>('idle')
   const [error, setError] = useState<string | null>(null)
 
+  // Get connectivity state from store
+  const isOnline = useConnectivityStore((state) => state.isOnline)
+  const setConnectivityError = useConnectivityStore((state) => state.setError)
+
   const timerRef = useRef<number | null>(null)
   const savingRef = useRef(false)
   const queuedRef = useRef(false)
@@ -92,6 +97,18 @@ export function useAutosave({
 
   const runAutosave = useCallback(async () => {
     if (!enabled || !documentId) {
+      return
+    }
+
+    // Check connectivity before attempting save
+    if (!isOnline) {
+      setStatus('offline')
+      setConnectivityError({
+        message: 'Cannot save - you are offline',
+        timestamp: new Date(),
+        type: 'network',
+        retryable: true,
+      })
       return
     }
 
@@ -174,15 +191,26 @@ export function useAutosave({
       console.error('Autosave error:', err)
       const errorMessage = err instanceof Error ? err.message : 'Autosave failed'
 
+      // Determine error type based on connectivity
+      const isNetworkError = !navigator.onLine || !isOnline
+
       // Log error to telemetry
       void logAutosaveFailure({
         documentId,
-        failureType: !navigator.onLine ? 'network' : 'error',
+        failureType: isNetworkError ? 'network' : 'error',
         errorMessage,
         clientHash: hash,
       })
 
-      setStatus('error')
+      // Update connectivity store with error
+      setConnectivityError({
+        message: errorMessage,
+        timestamp: new Date(),
+        type: isNetworkError ? 'network' : 'api',
+        retryable: isNetworkError,
+      })
+
+      setStatus(isNetworkError ? 'offline' : 'error')
       setError(errorMessage)
     } finally {
       savingRef.current = false

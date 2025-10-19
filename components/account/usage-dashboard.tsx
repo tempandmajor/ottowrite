@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { formatNumber } from '@/lib/number-format'
 import type { UsageSummary } from '@/lib/account/usage'
 import { Badge } from '@/components/ui/badge'
-import { CalendarIcon, TrendingUp } from 'lucide-react'
+import { CalendarIcon, TrendingUp, Activity } from 'lucide-react'
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
@@ -81,6 +81,15 @@ export function UsageDashboard({ userEmail, fullName, usageSummary }: UsageDashb
           </div>
         </div>
       </header>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/dashboard/account/ai-telemetry">
+            <Activity className="mr-2 h-4 w-4" />
+            AI Telemetry
+          </Link>
+        </Button>
+      </div>
 
       <Card className="border-none bg-card/80 shadow-card">
         <CardHeader>

@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { useAutosave } from '@/hooks/use-autosave'
+import { useDocumentSnapshots } from '@/hooks/use-document-snapshots'
 import { useEditorStore, type EditorDocumentRecord } from '@/stores/editor-store'
 import {
   ArrowLeft,
@@ -147,6 +148,13 @@ export default function EditorPage() {
   const lastSceneFocusMissRef = useRef<string | null>(null)
   const tiptapApiRef = useRef<TiptapEditorApi | null>(null)
   const screenplayApiRef = useRef<ScreenplayEditorApi | null>(null)
+
+  // Initialize snapshot manager
+  const snapshotAPI = useDocumentSnapshots({
+    enabled: Boolean(document?.id),
+    maxSnapshots: 50,
+    autoSnapshotOnSave: true,
+  })
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -649,6 +657,20 @@ export default function EditorPage() {
     [setServerContent, toast]
   )
 
+  const handleExportClick = useCallback(async () => {
+    // Create a preview snapshot before export
+    try {
+      await snapshotAPI.createPreviewSnapshot(
+        autosaveSnapshot,
+        Array.from(sceneAnchors),
+        wordCount
+      )
+    } catch (err) {
+      console.warn('Failed to create preview snapshot:', err)
+    }
+    setShowExportModal(true)
+  }, [snapshotAPI, autosaveSnapshot, sceneAnchors, wordCount])
+
   const { status: autosaveStatus, error: autosaveError, flush: flushAutosave } = useAutosave({
     documentId: document?.id ?? null,
     enabled: Boolean(isProseDocument && document && !serverContent),
@@ -679,6 +701,21 @@ export default function EditorPage() {
           : prev
       )
       setIsDirty(false)
+    },
+    // Create autosave snapshot before saving
+    onBeforeSave: async (snapshot, wordCount) => {
+      try {
+        await snapshotAPI.createSnapshot(snapshot, Array.from(sceneAnchors), {
+          source: 'autosave',
+          wordCount,
+        })
+      } catch (err) {
+        console.warn('Failed to create autosave snapshot:', err)
+      }
+    },
+    // Track successful save with snapshot hash
+    onSnapshotCreated: async (hash, wordCount) => {
+      console.log('Autosave snapshot created:', { hash, wordCount })
     },
   })
 
@@ -778,7 +815,7 @@ export default function EditorPage() {
                 <History className="mr-2 h-4 w-4" />
                 History
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowExportModal(true)}>
+              <Button variant="outline" size="sm" onClick={handleExportClick}>
                 <FileDown className="mr-2 h-4 w-4" />
                 Export
               </Button>
@@ -824,7 +861,7 @@ export default function EditorPage() {
                   <DropdownMenuItem
                     onSelect={(event) => {
                       event.preventDefault()
-                      setShowExportModal(true)
+                      handleExportClick()
                     }}
                     className="flex items-center gap-2"
                   >
@@ -1053,7 +1090,7 @@ export default function EditorPage() {
                 View version history
                 <History className="h-4 w-4" />
               </Button>
-              <Button variant="outline" className="w-full justify-between" onClick={() => setShowExportModal(true)}>
+              <Button variant="outline" className="w-full justify-between" onClick={handleExportClick}>
                 Export document
                 <FileDown className="h-4 w-4" />
               </Button>

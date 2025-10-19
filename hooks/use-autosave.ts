@@ -55,6 +55,8 @@ type UseAutosaveOptions = {
     hash: string
   }) => void
   onAfterSave?: () => void
+  onBeforeSave?: (snapshot: ClientContentSnapshot, wordCount: number) => void | Promise<void>
+  onSnapshotCreated?: (hash: string, wordCount: number) => void | Promise<void>
 }
 
 export function useAutosave({
@@ -67,6 +69,8 @@ export function useAutosave({
   onBaseHashChange,
   onConflict,
   onAfterSave,
+  onBeforeSave,
+  onSnapshotCreated,
 }: UseAutosaveOptions) {
   const [status, setStatus] = useState<AutosaveStatus>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -138,6 +142,16 @@ export function useAutosave({
     setStatus('saving')
     setError(null)
 
+    // Call onBeforeSave hook if provided (for snapshot creation)
+    if (onBeforeSave) {
+      try {
+        await onBeforeSave(payloadSnapshot, payloadWordCount)
+      } catch (err) {
+        console.warn('onBeforeSave hook failed:', err)
+        // Don't block the save if the hook fails
+      }
+    }
+
     try {
       const response = await fetch(`/api/documents/${documentId}/autosave`, {
         method: 'POST',
@@ -184,6 +198,17 @@ export function useAutosave({
 
       onBaseHashChange(hash)
       setStatus('saved')
+
+      // Call onSnapshotCreated hook if provided
+      if (onSnapshotCreated) {
+        try {
+          await onSnapshotCreated(hash, payloadWordCount)
+        } catch (err) {
+          console.warn('onSnapshotCreated hook failed:', err)
+          // Don't block the save success if the hook fails
+        }
+      }
+
       if (onAfterSave) {
         onAfterSave()
       }
@@ -269,10 +294,24 @@ export function useAutosave({
     void runAutosave()
   }, [clearTimer, runAutosave])
 
+  const flushWithSnapshot = useCallback(async (): Promise<string | null> => {
+    clearTimer()
+
+    // Run autosave and return the hash
+    try {
+      await runAutosave()
+      return latestBaseHashRef.current
+    } catch (err) {
+      console.error('Flush with snapshot failed:', err)
+      return null
+    }
+  }, [clearTimer, runAutosave])
+
   return {
     status,
     error,
     scheduleAutosave,
     flush,
+    flushWithSnapshot,
   }
 }

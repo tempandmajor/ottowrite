@@ -69,6 +69,15 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+### Storybook
+
+Storybook captures the UI states used for QA and design reviews.
+
+```bash
+npm run storybook            # launch interactive Storybook
+npm run build-storybook      # generate static bundle (CI equivalent)
+```
+
 ### Deployment to Vercel
 
 1. Push your code to GitHub
@@ -100,6 +109,7 @@ The application uses the following tables in Supabase:
 - `projects` - Writing projects (novels, screenplays, etc.)
 - `documents` - Individual documents within projects
 - `ai_usage` - AI model usage tracking
+- `ai_requests` - AI orchestration telemetry (intent, model choice, latency)
 
 Row Level Security (RLS) is enforced on every table with policies limiting access to the authenticated user. Background jobs and Stripe webhooks use the Supabase service role key to perform privileged updates.
 
@@ -118,6 +128,11 @@ ottowrite/
 ├── middleware.ts       # Auth middleware for route protection
 └── public/             # Static assets
 \`\`\`
+
+## Operational Scripts
+
+- `scripts/stripe-webhook-replay.sh` — replay key Stripe events locally (`stripe trigger checkout.session.completed`).
+- `scripts/supabase-smoke-test.sh` — dry-run Supabase migrations and lint SQL before deploying.
 
 ## License
 

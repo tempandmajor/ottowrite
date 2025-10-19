@@ -18,6 +18,7 @@ import { ReadingPacingPanel } from '@/components/analysis/reading-pacing-panel'
 import { ExportModal } from '@/components/editor/export-modal'
 import { VersionHistory } from '@/components/editor/version-history'
 import { ChapterSidebar, Chapter } from '@/components/editor/chapter-sidebar'
+import { computeClientContentHash } from '@/lib/client-content-hash'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
+import { useAutosave } from '@/hooks/use-autosave'
 import {
   ArrowLeft,
   Save,
@@ -96,25 +98,6 @@ function extractSceneAnchors(html?: string): string[] {
   return Array.from(ids)
 }
 
-async function computeClientContentHash(payload: {
-  html?: string
-  structure?: unknown
-  anchorIds?: string[]
-}): Promise<string> {
-  const normalized = {
-    html: payload.html ?? '',
-    structure: Array.isArray(payload.structure) ? payload.structure : [],
-    anchors: Array.from(new Set((payload.anchorIds ?? []).filter((id) => typeof id === 'string'))).sort(),
-  }
-
-  const encoder = new TextEncoder()
-  const data = encoder.encode(JSON.stringify(normalized))
-  const digest = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-}
-
 export default function EditorPage() {
   const params = useParams()
   const router = useRouter()
@@ -134,9 +117,6 @@ export default function EditorPage() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [sceneAnchors, setSceneAnchors] = useState<Set<string>>(new Set())
-  const [autosaveStatus, setAutosaveStatus] = useState<
-    'idle' | 'pending' | 'saving' | 'saved' | 'offline' | 'error' | 'conflict'
-  >('idle')
   const [baseHash, setBaseHash] = useState<string | null>(null)
   const [serverContent, setServerContent] = useState<{
     html: string
@@ -144,9 +124,6 @@ export default function EditorPage() {
     wordCount?: number
   } | null>(null)
   const lastSceneFocusMissRef = useRef<string | null>(null)
-  const autosaveTimerRef = useRef<number | null>(null)
-  const autosaveControllerRef = useRef<AbortController | null>(null)
-  const lastAutosaveSignatureRef = useRef<string | null>(null)
   const tiptapApiRef = useRef<TiptapEditorApi | null>(null)
   const screenplayApiRef = useRef<ScreenplayEditorApi | null>(null)
 
@@ -236,7 +213,6 @@ export default function EditorPage() {
         setActiveSceneId(null)
         setSceneAnchors(new Set())
         setBaseHash(null)
-        setAutosaveStatus('idle')
       } else {
         const initialHtml = typedData.content?.html || ''
         const initialStructure = Array.isArray(typedData.content?.structure)
@@ -255,7 +231,6 @@ export default function EditorPage() {
           anchorIds: initialAnchors,
         })
         setBaseHash(initialHash)
-        setAutosaveStatus('idle')
       }
 
       let resolvedProjectTitle: string | null = null
@@ -373,7 +348,6 @@ export default function EditorPage() {
           anchorIds: Array.from(sceneAnchors),
         })
         setBaseHash(newHash)
-        setAutosaveStatus('saved')
       }
 
       toast({
@@ -571,101 +545,55 @@ export default function EditorPage() {
   }, [document, content, screenplayContent])
 
 
-  const autosaveLabelData = useMemo(() => {
-    switch (autosaveStatus) {
-      case 'saving':
-        return { label: 'Autosaving…', className: 'text-muted-foreground' }
-      case 'saved':
-        return { label: 'All changes saved', className: 'text-muted-foreground' }
-      case 'pending':
-        return { label: 'Autosave pending…', className: 'text-muted-foreground' }
-      case 'offline':
-        return { label: 'Offline – retrying…', className: 'text-amber-600' }
-      case 'error':
-        return { label: 'Autosave failed', className: 'text-destructive' }
-      case 'conflict':
-        return { label: 'Autosave conflict', className: 'text-amber-600' }
-      default:
-        return { label: 'Autosave idle', className: 'text-muted-foreground' }
+  const isProseDocument = Boolean(document && !isScriptType(document.type))
+
+  const autosaveSnapshot = useMemo(() => {
+    if (!isProseDocument) {
+      return { html: '', structure: [] }
     }
-  }, [autosaveStatus])
+    return {
+      html: content,
+      structure,
+    }
+  }, [content, isProseDocument, structure])
 
-const autosaveLabel = autosaveLabelData.label
-const autosaveClassName = autosaveLabelData.className
-
-  const performAutosave = useCallback(async () => {
-    if (!document || isScriptType(document.type)) return
-
-    try {
-      const anchorIds = Array.from(sceneAnchors)
-      const payloadHash = await computeClientContentHash({
-        html: content,
-        structure,
-        anchorIds,
+  const handleAutosaveConflict = useCallback(
+    ({ html, structure, wordCount }: { html: string; structure?: unknown; wordCount?: number }) => {
+      toast({
+        title: 'Autosave conflict',
+        description: 'Another session updated this document. Review changes before continuing.',
+        variant: 'destructive',
       })
 
-      if (payloadHash === baseHash) {
-        setAutosaveStatus((prev) => (prev === 'conflict' ? prev : 'saved'))
-        return
-      }
+      const conflictStructure = Array.isArray(structure)
+        ? cloneStructure(structure as Chapter[])
+        : null
 
-      if (autosaveControllerRef.current) {
-        autosaveControllerRef.current.abort()
-      }
-
-      const controller = new AbortController()
-      autosaveControllerRef.current = controller
-      setAutosaveStatus('saving')
-
-      const response = await fetch(`/api/documents/${document.id}/autosave`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          html: content,
-          structure,
-          anchorIds,
-          wordCount,
-          baseHash,
-          snapshotOnly: false,
-        }),
-        signal: controller.signal,
+      setServerContent({
+        html,
+        structure: conflictStructure,
+        wordCount: typeof wordCount === 'number' ? wordCount : undefined,
       })
+    },
+    [toast]
+  )
 
-      if (response.status === 409) {
-        setAutosaveStatus('conflict')
-        const data = await response.json()
-        toast({
-          title: 'Autosave conflict',
-          description: 'Another session updated this document. Review changes before continuing.',
-          variant: 'destructive',
-        })
-        if (data?.hash) {
-          setBaseHash(data.hash)
-        }
-        const conflictStructure = Array.isArray(data?.document?.structure)
-          ? (data.document.structure as Chapter[])
-          : null
-        if (data?.document?.html) {
-          setServerContent({
-            html: data.document.html as string,
-            structure: conflictStructure,
-            wordCount: typeof data?.document?.wordCount === 'number' ? data.document.wordCount : undefined,
-          })
-        }
-        autosaveControllerRef.current = null
-        return
+  const { status: autosaveStatus, error: autosaveError, flush: flushAutosave } = useAutosave({
+    documentId: document?.id ?? null,
+    enabled: Boolean(isProseDocument && document && !serverContent),
+    snapshot: autosaveSnapshot,
+    sceneAnchors,
+    wordCount,
+    baseHash,
+    onBaseHashChange: (hash) => {
+      setBaseHash(hash)
+      if (hash) {
+        setLastSavedAt(new Date())
       }
-
-      if (!response.ok) {
-        throw new Error(`Autosave failed with status ${response.status}`)
-      }
-
-      const data = await response.json()
-      setBaseHash(data?.hash ?? payloadHash)
-      setAutosaveStatus('saved')
-      setLastSavedAt(new Date())
+    },
+    onConflict: handleAutosaveConflict,
+    onAfterSave: () => {
+      if (!isProseDocument) return
       setDocument((prev) =>
         prev
           ? {
@@ -680,97 +608,30 @@ const autosaveClassName = autosaveLabelData.className
           : prev
       )
       setIsDirty(false)
-      autosaveControllerRef.current = null
-    } catch (error) {
-      if ((error as any)?.name === 'AbortError') {
-        return
-      }
+    },
+  })
 
-      if (!navigator.onLine) {
-        setAutosaveStatus('offline')
-      } else {
-        setAutosaveStatus('error')
-      }
-      console.error('Autosave error:', error)
-      autosaveControllerRef.current = null
+  const autosaveLabelData = useMemo(() => {
+    switch (autosaveStatus) {
+      case 'saving':
+        return { label: 'Autosaving…', className: 'text-muted-foreground' }
+      case 'saved':
+        return { label: 'All changes saved', className: 'text-muted-foreground' }
+      case 'pending':
+        return { label: 'Autosave pending…', className: 'text-muted-foreground' }
+      case 'offline':
+        return { label: 'Offline – retrying…', className: 'text-amber-600' }
+      case 'error':
+        return { label: autosaveError ? autosaveError : 'Autosave failed', className: 'text-destructive' }
+      case 'conflict':
+        return { label: 'Autosave conflict', className: 'text-amber-600' }
+      default:
+        return { label: 'Autosave idle', className: 'text-muted-foreground' }
     }
-  }, [document, sceneAnchors, content, structure, baseHash, wordCount, toast])
+  }, [autosaveError, autosaveStatus])
 
-  useEffect(() => {
-    if (!document || isScriptType(document.type)) {
-      lastAutosaveSignatureRef.current = null
-      return
-    }
-
-    const signature = JSON.stringify({
-      html: content,
-      structure,
-      anchors: Array.from(sceneAnchors).sort(),
-    })
-
-    if (signature === lastAutosaveSignatureRef.current) {
-      return
-    }
-
-    lastAutosaveSignatureRef.current = signature
-
-    if (!['saving', 'conflict', 'offline'].includes(autosaveStatus)) {
-      setAutosaveStatus('pending')
-    }
-
-    if (autosaveTimerRef.current) {
-      window.clearTimeout(autosaveTimerRef.current)
-    }
-
-    autosaveTimerRef.current = window.setTimeout(() => {
-      void performAutosave()
-    }, 1000)
-
-    return () => {
-      if (autosaveTimerRef.current) {
-        window.clearTimeout(autosaveTimerRef.current)
-        autosaveTimerRef.current = null
-      }
-    }
-  }, [document, content, structure, sceneAnchors, performAutosave, autosaveStatus])
-
-  useEffect(() => {
-    return () => {
-      if (autosaveTimerRef.current) {
-        window.clearTimeout(autosaveTimerRef.current)
-      }
-      if (autosaveControllerRef.current) {
-        autosaveControllerRef.current.abort()
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!document || isScriptType(document.type)) {
-      return
-    }
-
-    if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
-      setAutosaveStatus((prev) => (prev === 'conflict' ? prev : 'offline'))
-    }
-
-    const handleOffline = () => {
-      setAutosaveStatus((prev) => (prev === 'conflict' ? prev : 'offline'))
-    }
-
-    const handleOnline = () => {
-      setAutosaveStatus((prev) => (prev === 'offline' || prev === 'error' ? 'pending' : prev))
-      void performAutosave()
-    }
-
-    window.addEventListener('offline', handleOffline)
-    window.addEventListener('online', handleOnline)
-
-    return () => {
-      window.removeEventListener('offline', handleOffline)
-      window.removeEventListener('online', handleOnline)
-    }
-  }, [document, performAutosave])
+  const autosaveLabel = autosaveLabelData.label
+  const autosaveClassName = autosaveLabelData.className
 
   const savedMessage = isDirty
     ? 'Unsaved changes'
@@ -1002,7 +863,6 @@ const autosaveClassName = autosaveLabelData.className
                       : cloneStructure(structure)
                     setContent(serverContent.html)
                     setStructure(nextStructure)
-                    setAutosaveStatus('pending')
                     const anchorIds = extractSceneAnchors(serverContent.html)
                     setSceneAnchors(new Set(anchorIds))
                     const newHash = await computeClientContentHash({
@@ -1011,7 +871,6 @@ const autosaveClassName = autosaveLabelData.className
                       anchorIds,
                     })
                     setBaseHash(newHash)
-                    setAutosaveStatus('saved')
                     setLastSavedAt(new Date())
                     setDocument((prev) =>
                       prev
@@ -1028,11 +887,11 @@ const autosaveClassName = autosaveLabelData.className
                     )
                     setIsDirty(false)
                     setServerContent(null)
+                    flushAutosave()
                   }}
                   onCloseConflict={() => {
                     setServerContent(null)
-                    setAutosaveStatus('pending')
-                    void performAutosave()
+                    flushAutosave()
                   }}
                   onReady={(api) => {
                     tiptapApiRef.current = api

@@ -35,7 +35,7 @@ This document captures the current Supabase schema and operational posture ahead
 
 | Roadmap Area | Current Coverage | Gaps to Address |
 | --- | --- | --- |
-| **AI Logs & Routing** | `ai_usage` captures per-call counts + cost. Prompt preview stored, but no response cache/latency/error tracking. | Create `ai_requests` (store prompt, response hash, latency, model, status), `ai_context_snapshots` for story bible reference, and nightly aggregation tables for dashboards. |
+| **AI Logs & Routing** | `ai_usage` captures per-call counts + cost. Prompt preview stored. | ✅ `ai_requests` table landed (intent/model/latency). Next: `ai_context_snapshots` + nightly aggregation tables. |
 | **Collaboration** | Per-user ownership enforced via RLS; no shared access tables. | Introduce `project_members` (role-based), `document_collaborators`, `comments`, and Realtime presence tables. Review RLS to allow shared access without service-role leaks. |
 | **Pricing & Quotas** | `user_profiles.subscription_tier` + price IDs in code. No usage ledger beyond AI words. | Add `subscription_events`, `usage_ledgers` (documents created, exports, collaborators), and enforce limits via database checks or edge functions. |
 | **Exports & Background Jobs** | Export handled in-app (`lib/export/utils.ts`), no persistence. | Create `export_jobs` table (status, format, storage_url), plus a job runner (Supabase Queue or external worker). Track failures for support. |
@@ -71,7 +71,7 @@ This document captures the current Supabase schema and operational posture ahead
 
 1. Share ERD artifacts (`docs/erd/phase0-schema.{mmd,svg,png}`) with stakeholders; embed PNG in the ops deck.
 2. Draft schema proposals for collaboration & export jobs; review with Platform squad before Phase 3 kickoff.
-3. Implement ops automation: CI Storybook build, Stripe webhook replay script, Supabase migration smoke test.
+3. ✅ Implement ops automation: CI Storybook build, Stripe webhook replay script, Supabase migration smoke test.
 4. Update `SECURITY_AUDIT.md` with any secrets rotations or policy changes performed during Phase 0.
 
 Once these tasks land, Phase 0 success criteria (stable builds, env hygiene, schema map, ops checklist) are met and we can transition into the editor/AI feature workstreams.

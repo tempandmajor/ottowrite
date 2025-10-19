@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateWithAI, AIModel } from '@/lib/ai/service'
 import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
+import { checkAIRequestQuota } from '@/lib/account/quota'
 
 const MAX_PROMPT_LENGTH = 5000
 const MAX_COMPLETION_TOKENS = 3000
@@ -37,8 +38,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    // Check if usage limit exceeded
-    const monthlyLimit = getMonthlyAIWordLimit(profile.subscription_tier || 'free')
+    const plan = profile.subscription_tier || 'free'
+
+    const requestQuota = await checkAIRequestQuota(supabase, user.id, plan, 1)
+    if (!requestQuota.allowed) {
+      const formattedPlan = plan.charAt(0).toUpperCase() + plan.slice(1)
+      return NextResponse.json(
+        {
+          error: `You have reached the ${formattedPlan} plan limit of ${requestQuota.limit} AI requests this month.`,
+          limit: requestQuota.limit,
+          used: requestQuota.used,
+          upgradeRequired: true,
+        },
+        { status: 429 }
+      )
+    }
+
+    const monthlyLimit = getMonthlyAIWordLimit(plan)
     const currentUsage = profile.ai_words_used_this_month || 0
 
     if (currentUsage >= monthlyLimit) {
@@ -140,6 +156,12 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)
+
+    try {
+      await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
+    } catch (refreshError) {
+      console.warn('refresh_user_plan_usage failed after AI generation', refreshError)
+    }
 
     return NextResponse.json({
       content: response.content,

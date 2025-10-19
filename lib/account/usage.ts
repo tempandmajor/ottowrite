@@ -9,6 +9,7 @@ export type UsageSummary = {
     max_templates: number | null
     ai_words_per_month: number | null
     ai_requests_per_month: number | null
+    collaborator_slots: number | null
   } | null
   usage: {
     projects: number
@@ -20,6 +21,7 @@ export type UsageSummary = {
     ai_prompt_tokens: number
     ai_completion_tokens: number
     ai_cost_month: number
+    collaborators: number
   }
   currentPeriod: { start: string; end: string }
   latestSnapshot: {
@@ -29,6 +31,7 @@ export type UsageSummary = {
     templates_created: number
     ai_words_used: number
     ai_requests_count: number
+    collaborators_count: number
     period_start: string
     period_end: string
     created_at: string
@@ -40,6 +43,7 @@ export type UsageSummary = {
     aiRequests: number
     projectsCount: number
     documentsCount: number
+    collaboratorsCount: number
     createdAt: string
   }>
 }
@@ -74,6 +78,7 @@ export async function getUsageSummary(
     aiUsageResult,
     aiRequestsResult,
     usageHistoryResult,
+    collaboratorsResult,
   ] = await Promise.all([
     supabase
       .from('subscription_plan_limits')
@@ -104,11 +109,17 @@ export async function getUsageSummary(
     supabase
       .from('user_plan_usage')
       .select(
-        'projects_count, documents_count, document_snapshots_count, templates_created, ai_words_used, ai_requests_count, period_start, period_end, created_at'
+        'projects_count, documents_count, document_snapshots_count, templates_created, ai_words_used, ai_requests_count, collaborators_count, period_start, period_end, created_at'
       )
       .eq('user_id', userId)
       .order('period_start', { ascending: false })
       .limit(12),
+    supabase
+      .from('project_members')
+      .select('id, projects!inner(user_id)', { count: 'exact', head: true })
+      .eq('projects.user_id', userId)
+      .in('status', ['invited', 'accepted'])
+      .neq('role', 'owner'),
   ])
 
   if (planLimitsResult.error) throw planLimitsResult.error
@@ -119,6 +130,7 @@ export async function getUsageSummary(
   if (aiUsageResult.error) throw aiUsageResult.error
   if (aiRequestsResult.error) throw aiRequestsResult.error
   if (usageHistoryResult.error) throw usageHistoryResult.error
+  if (collaboratorsResult.error) throw collaboratorsResult.error
 
   const aiUsage = aiUsageResult.data?.[0] ?? {
     words_generated: 0,
@@ -134,8 +146,11 @@ export async function getUsageSummary(
     aiRequests: row.ai_requests_count ?? 0,
     projectsCount: row.projects_count ?? 0,
     documentsCount: row.documents_count ?? 0,
+    collaboratorsCount: row.collaborators_count ?? 0,
     createdAt: row.created_at,
   }))
+
+  const collaboratorsActive = collaboratorsResult.count ?? 0
 
   return {
     plan,
@@ -150,6 +165,7 @@ export async function getUsageSummary(
       ai_prompt_tokens: aiUsage.prompt_tokens ?? 0,
       ai_completion_tokens: aiUsage.completion_tokens ?? 0,
       ai_cost_month: aiUsage.total_cost ?? 0,
+      collaborators: collaboratorsActive,
     },
     currentPeriod: {
       start: periodStartISO,
@@ -163,6 +179,7 @@ export async function getUsageSummary(
           templates_created: usageHistoryResult.data[0].templates_created ?? 0,
           ai_words_used: usageHistoryResult.data[0].ai_words_used ?? 0,
           ai_requests_count: usageHistoryResult.data[0].ai_requests_count ?? 0,
+          collaborators_count: usageHistoryResult.data[0].collaborators_count ?? 0,
           period_start: usageHistoryResult.data[0].period_start,
           period_end: usageHistoryResult.data[0].period_end,
           created_at: usageHistoryResult.data[0].created_at,

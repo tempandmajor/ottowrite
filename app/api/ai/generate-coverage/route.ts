@@ -4,6 +4,8 @@ import {
   generateCoverageReport,
   type GenerateCoverageParams,
 } from '@/lib/ai/coverage-service'
+import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
+import { checkAIRequestQuota } from '@/lib/account/quota'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -42,6 +44,46 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile) {
+      return NextResponse.json({ error: 'Profile not found.' }, { status: 404 })
+    }
+
+    const plan = profile.subscription_tier ?? 'free'
+
+    const requestQuota = await checkAIRequestQuota(supabase, user.id, plan, 1)
+    if (!requestQuota.allowed) {
+      const formattedPlan = plan.charAt(0).toUpperCase() + plan.slice(1)
+      return NextResponse.json(
+        {
+          error: `You have reached the ${formattedPlan} plan limit of ${requestQuota.limit} AI requests this month.`,
+          limit: requestQuota.limit,
+          used: requestQuota.used,
+          upgradeRequired: true,
+        },
+        { status: 429 }
+      )
+    }
+
+    const monthlyLimit = getMonthlyAIWordLimit(plan)
+    const currentUsage = profile.ai_words_used_this_month ?? 0
+    if (currentUsage >= monthlyLimit) {
+      return NextResponse.json(
+        {
+          error: 'Monthly AI word limit exceeded',
+          limit: monthlyLimit,
+          used: currentUsage,
+          upgradeRequired: true,
+        },
+        { status: 429 }
+      )
     }
 
     const body = await request.json()
@@ -109,6 +151,57 @@ export async function POST(request: NextRequest) {
       existingLogline: existingLogline?.trim() || undefined,
       developmentNotes: developmentNotes?.trim() || undefined,
     })
+
+    const combinedText = [
+      report.logline,
+      report.synopsis.onePage,
+      report.synopsis.twoPage,
+      report.coverageNotes.summary,
+      ...report.coverageNotes.strengths,
+      ...report.coverageNotes.weaknesses,
+      ...report.coverageNotes.characterNotes,
+      ...report.coverageNotes.plotNotes,
+      ...report.coverageNotes.dialogueNotes,
+      ...report.coverageNotes.pacingNotes,
+      ...report.coverageNotes.additionalNotes,
+      report.marketability.assessment,
+      ...report.marketability.audienceSegments,
+      ...report.marketability.comparableTitles,
+      ...report.marketability.distributionNotes,
+      ...report.marketability.riskFactors,
+      report.verdict.explanation,
+    ]
+      .filter(Boolean)
+      .join(' ')
+
+    const wordsGenerated = combinedText.trim().length === 0 ? 0 : combinedText.trim().split(/\s+/).length
+
+    await supabase.from('ai_usage').insert([
+      {
+        user_id: user.id,
+        document_id: null,
+        model,
+        words_generated: wordsGenerated,
+        prompt_tokens: usage?.inputTokens ?? 0,
+        completion_tokens: usage?.outputTokens ?? 0,
+        total_cost: usage?.totalCost ?? 0,
+        prompt_preview: truncatedScript.substring(0, 200),
+      },
+    ])
+
+    await supabase
+      .from('user_profiles')
+      .update({
+        ai_words_used_this_month: currentUsage + wordsGenerated,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id)
+
+    try {
+      await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
+    } catch (refreshError) {
+      console.warn('refresh_user_plan_usage failed after coverage generation', refreshError)
+    }
 
     return NextResponse.json({
       report,

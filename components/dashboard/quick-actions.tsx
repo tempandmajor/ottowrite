@@ -24,9 +24,9 @@ const actions = [
     icon: LayoutPanelLeft,
   },
   {
-    title: 'Invite Collaborator',
-    description: 'Share your workspace with co-writers and editors.',
-    href: '/dashboard/settings/team',
+    title: 'Manage Plan & Seats',
+    description: 'Review usage, upgrade, and manage collaborators.',
+    href: '/dashboard/account/usage',
     icon: Users,
   },
 ]

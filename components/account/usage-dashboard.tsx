@@ -32,12 +32,14 @@ export function UsageDashboard({ userEmail, fullName, usageSummary }: UsageDashb
     max_templates: null,
     ai_words_per_month: null,
     ai_requests_per_month: null,
+    collaborator_slots: null,
   }
 
   const projectsLimit = planLimits.max_projects
   const documentsLimit = planLimits.max_documents
   const aiWordsLimit = planLimits.ai_words_per_month
   const aiRequestsLimit = planLimits.ai_requests_per_month
+  const collaboratorLimit = planLimits.collaborator_slots
 
   const metrics = {
     projectsPercent: projectsLimit
@@ -51,6 +53,9 @@ export function UsageDashboard({ userEmail, fullName, usageSummary }: UsageDashb
       : 0,
     aiRequestsPercent: aiRequestsLimit
       ? Math.min(100, Math.round((usageSummary.usage.ai_requests_month / aiRequestsLimit) * 100))
+      : 0,
+    collaboratorsPercent: collaboratorLimit
+      ? Math.min(100, Math.round((usageSummary.usage.collaborators / collaboratorLimit) * 100))
       : 0,
   }
 
@@ -114,6 +119,14 @@ export function UsageDashboard({ userEmail, fullName, usageSummary }: UsageDashb
               warningThreshold={0.8}
               warningMessage="Consider upgrading to unlock more document slots."
             />
+            <UsageMeter
+              label="Collaborator seats"
+              value={usageSummary.usage.collaborators}
+              limit={collaboratorLimit}
+              percent={metrics.collaboratorsPercent}
+              warningThreshold={0.8}
+              warningMessage="Your team seats are almost full. Upgrade to add more collaborators."
+            />
           </div>
 
           <div className="space-y-4">
@@ -169,6 +182,7 @@ export function UsageDashboard({ userEmail, fullName, usageSummary }: UsageDashb
                     <th className="px-4 py-3 text-left">AI requests</th>
                     <th className="px-4 py-3 text-left">Projects</th>
                     <th className="px-4 py-3 text-left">Documents</th>
+                    <th className="px-4 py-3 text-left">Collaborators</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
@@ -186,6 +200,7 @@ export function UsageDashboard({ userEmail, fullName, usageSummary }: UsageDashb
                       <td className="px-4 py-3">{formatNumber(entry.aiRequests)}</td>
                       <td className="px-4 py-3">{formatNumber(entry.projectsCount)}</td>
                       <td className="px-4 py-3">{formatNumber(entry.documentsCount)}</td>
+                      <td className="px-4 py-3">{formatNumber(entry.collaboratorsCount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -255,6 +270,11 @@ function buildTrendItems(history: UsageSummary['history']) {
       label: 'Documents',
       value: formatNumber(current.documentsCount),
       delta: calcDelta(current.documentsCount, previous.documentsCount),
+    },
+    {
+      label: 'Collaborators',
+      value: formatNumber(current.collaboratorsCount),
+      delta: calcDelta(current.collaboratorsCount, previous.collaboratorsCount),
     },
   ]
 }

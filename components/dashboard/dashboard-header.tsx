@@ -10,7 +10,7 @@ import { SignOutButton } from '@/components/auth/sign-out-button'
 const quickLinks = [
   { label: 'Create Project', href: '/dashboard/projects?new=true' },
   { label: 'New Document', href: '/dashboard/documents?new=true' },
-  { label: 'Invite Collaborator', href: '/dashboard/settings/team' },
+  { label: 'Manage plan', href: '/dashboard/account/usage' },
 ]
 
 export function DashboardHeader({ email }: { email: string }) {

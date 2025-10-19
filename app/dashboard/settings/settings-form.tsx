@@ -43,6 +43,7 @@ type SettingsFormProps = {
       max_templates: number | null
       ai_words_per_month: number | null
       ai_requests_per_month: number | null
+      collaborator_slots: number | null
     } | null
     usage: {
       projects: number
@@ -54,6 +55,7 @@ type SettingsFormProps = {
       ai_prompt_tokens: number
       ai_completion_tokens: number
       ai_cost_month: number
+      collaborators: number
     }
     currentPeriod: { start: string; end: string }
     latestSnapshot: {
@@ -63,6 +65,7 @@ type SettingsFormProps = {
       templates_created: number
       ai_words_used: number
       ai_requests_count: number
+      collaborators_count: number
       period_start: string
       period_end: string
       created_at: string
@@ -90,6 +93,7 @@ export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps
   const documentsLimit = usageSummary.limits?.max_documents ?? null
   const aiWordsLimit = usageSummary.limits?.ai_words_per_month ?? null
   const aiRequestsLimit = usageSummary.limits?.ai_requests_per_month ?? null
+  const collaboratorLimit = usageSummary.limits?.collaborator_slots ?? null
 
   const projectUsagePercent = projectsLimit
     ? Math.min(100, Math.round((usageSummary.usage.projects / projectsLimit) * 100))
@@ -102,6 +106,9 @@ export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps
     : 0
   const aiRequestPercent = aiRequestsLimit
     ? Math.min(100, Math.round((usageSummary.usage.ai_requests_month / aiRequestsLimit) * 100))
+    : 0
+  const collaboratorPercent = collaboratorLimit
+    ? Math.min(100, Math.round((usageSummary.usage.collaborators / collaboratorLimit) * 100))
     : 0
 
   const preferredGenres = genresInput
@@ -226,6 +233,14 @@ export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps
               percent={documentUsagePercent}
               warningThreshold={0.8}
               warningMessage="Document quota is nearly full. Upgrade to keep adding drafts."
+            />
+            <UsageMeter
+              label="Collaborator seats"
+              value={usageSummary.usage.collaborators}
+              limit={collaboratorLimit}
+              percent={collaboratorPercent}
+              warningThreshold={0.8}
+              warningMessage="Your team seats are almost full. Upgrade to add more collaborators."
             />
           </div>
 

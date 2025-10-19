@@ -5,6 +5,8 @@ import {
   retrieveBackgroundResponse,
   extractResponseText,
 } from '@/lib/ai/responses-api-service'
+import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
+import { checkAIRequestQuota } from '@/lib/account/quota'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -92,6 +94,46 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile) {
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    }
+
+    const plan = profile.subscription_tier ?? 'free'
+    const currentUsage = profile.ai_words_used_this_month ?? 0
+
+    const requestQuota = await checkAIRequestQuota(supabase, user.id, plan, 1)
+    if (!requestQuota.allowed) {
+      const formattedPlan = plan.charAt(0).toUpperCase() + plan.slice(1)
+      return NextResponse.json(
+        {
+          error: `You have reached the ${formattedPlan} plan limit of ${requestQuota.limit} AI requests this month.`,
+          limit: requestQuota.limit,
+          used: requestQuota.used,
+          upgradeRequired: true,
+        },
+        { status: 429 }
+      )
+    }
+
+    const monthlyLimit = getMonthlyAIWordLimit(plan)
+    if (currentUsage >= monthlyLimit) {
+      return NextResponse.json(
+        {
+          error: 'Monthly AI word limit exceeded',
+          limit: monthlyLimit,
+          used: currentUsage,
+          upgradeRequired: true,
+        },
+        { status: 429 }
+      )
+    }
+
     const { data: inserted, error: insertError } = await supabase
       .from('ai_background_tasks')
       .insert({
@@ -132,6 +174,34 @@ export async function POST(request: NextRequest) {
       let result = null
       if (response.status === 'completed') {
         result = extractResponseText(response)
+        const wordsGenerated = result.text.trim().length === 0 ? 0 : result.text.trim().split(/\s+/).length
+
+        await supabase.from('ai_usage').insert([
+          {
+            user_id: user.id,
+            document_id: document_id ?? null,
+            model: 'openai-responses',
+            words_generated: wordsGenerated,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_cost: 0,
+            prompt_preview: prompt.trim().substring(0, 200),
+          },
+        ])
+
+        await supabase
+          .from('user_profiles')
+          .update({
+            ai_words_used_this_month: currentUsage + wordsGenerated,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id)
+
+        try {
+          await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
+        } catch (refreshError) {
+          console.warn('refresh_user_plan_usage failed after background task', refreshError)
+        }
       }
 
       const { data: updated } = await supabase

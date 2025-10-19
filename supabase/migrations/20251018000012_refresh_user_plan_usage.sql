@@ -1,3 +1,8 @@
+BEGIN;
+
+ALTER TABLE public.user_plan_usage
+    ADD COLUMN IF NOT EXISTS collaborators_count INTEGER DEFAULT 0;
+
 CREATE OR REPLACE FUNCTION public.refresh_user_plan_usage(p_user_id UUID)
 RETURNS void AS $$
 DECLARE
@@ -7,9 +12,9 @@ DECLARE
     documents_count INTEGER;
     snapshots_count INTEGER;
     templates_count INTEGER;
-    collaborators_count INTEGER;
     ai_words BIGINT;
     ai_requests INTEGER;
+    collaborators_count INTEGER;
 BEGIN
     SELECT COUNT(*) INTO projects_count FROM public.projects WHERE user_id = p_user_id;
     SELECT COUNT(*) INTO documents_count FROM public.documents WHERE user_id = p_user_id;
@@ -74,3 +79,5 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION public.refresh_user_plan_usage(UUID) TO authenticated;
+
+COMMIT;

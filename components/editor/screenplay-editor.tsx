@@ -5,22 +5,28 @@ import { Card } from '@/components/ui/card'
 
 type ElementType = 'scene' | 'action' | 'character' | 'dialogue' | 'parenthetical' | 'transition'
 
-type ScreenplayElement = {
+export type ScreenplayElement = {
   id: string
   type: ElementType
   content: string
+}
+
+export type ScreenplayEditorApi = {
+  insertTextAtCursor: (text: string) => void
 }
 
 interface ScreenplayEditorProps {
   content: ScreenplayElement[]
   onUpdate: (content: ScreenplayElement[]) => void
   editable?: boolean
+  onReady?: (api: ScreenplayEditorApi | null) => void
 }
 
 export function ScreenplayEditor({
   content,
   onUpdate,
   editable = true,
+  onReady,
 }: ScreenplayEditorProps) {
   const generateElementId = useCallback(
     () =>
@@ -53,6 +59,23 @@ export function ScreenplayEditor({
 
   const [elements, setElements] = useState<ScreenplayElement[]>(normalizeElements(content))
   const inputRefs = useRef<(HTMLTextAreaElement | null)[]>([])
+  const elementsRef = useRef(elements)
+  const selectionRef = useRef<{ index: number | null; start: number; end: number }>({
+    index: null,
+    start: 0,
+    end: 0,
+  })
+
+  const updateElements = useCallback(
+    (updater: (current: ScreenplayElement[]) => ScreenplayElement[]) => {
+      setElements((prev) => {
+        const next = updater(prev)
+        onUpdate(next)
+        return next
+      })
+    },
+    [onUpdate]
+  )
 
   useEffect(() => {
     const incoming = normalizeElements(content)
@@ -64,6 +87,24 @@ export function ScreenplayEditor({
     }
   }, [content, elements, normalizeElements])
 
+  useEffect(() => {
+    elementsRef.current = elements
+  }, [elements])
+
+  const rememberSelection = useCallback((index: number, target: HTMLTextAreaElement) => {
+    const start = target.selectionStart ?? target.value.length
+    const end = target.selectionEnd ?? target.value.length
+    selectionRef.current = { index, start, end }
+  }, [])
+
+  const focusAndSetSelection = useCallback((index: number, position: number) => {
+    const target = inputRefs.current[index]
+    if (!target) return
+    target.focus()
+    target.setSelectionRange(position, position)
+    selectionRef.current = { index, start: position, end: position }
+  }, [])
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>, index: number) => {
     const element = elements[index]
 
@@ -74,10 +115,11 @@ export function ScreenplayEditor({
       const currentIndex = types.indexOf(element.type)
       const nextType = types[(currentIndex + 1) % types.length]
 
-      const newElements = [...elements]
-      newElements[index] = { ...element, type: nextType }
-      setElements(newElements)
-      onUpdate(newElements)
+      updateElements((current) => {
+        const next = [...current]
+        next[index] = { ...next[index], type: nextType }
+        return next
+      })
     }
 
     // Enter - create new element
@@ -90,40 +132,89 @@ export function ScreenplayEditor({
         content: '',
       }
 
-      const newElements = [
-        ...elements.slice(0, index + 1),
+      updateElements((current) => [
+        ...current.slice(0, index + 1),
         newElement,
-        ...elements.slice(index + 1),
-      ]
-
-      setElements(newElements)
-      onUpdate(newElements)
+        ...current.slice(index + 1),
+      ])
 
       setTimeout(() => {
-        inputRefs.current[index + 1]?.focus()
+        focusAndSetSelection(index + 1, 0)
       }, 0)
     }
 
     // Backspace on empty element - delete it
     if (e.key === 'Backspace' && element.content === '' && elements.length > 1) {
       e.preventDefault()
-
-      const newElements = elements.filter((_, i) => i !== index)
-      setElements(newElements)
-      onUpdate(newElements)
-
+      const nextIndex = Math.max(0, index - 1)
+      updateElements((current) => current.filter((_, i) => i !== index))
       setTimeout(() => {
-        inputRefs.current[Math.max(0, index - 1)]?.focus()
+        focusAndSetSelection(nextIndex, inputRefs.current[nextIndex]?.value.length ?? 0)
       }, 0)
     }
   }
 
   const handleChange = (index: number, value: string) => {
-    const newElements = [...elements]
-    newElements[index] = { ...newElements[index], content: value }
-    setElements(newElements)
-    onUpdate(newElements)
+    updateElements((current) => {
+      const next = [...current]
+      next[index] = { ...next[index], content: value }
+      return next
+    })
   }
+
+  const insertTextAtCursor = useCallback(
+    (rawText: string) => {
+      const normalized = rawText.replace(/\r\n/g, '\n')
+      if (!normalized.trim()) return
+
+      const { index, start, end } = selectionRef.current
+      const currentElements = elementsRef.current
+
+      if (index != null && currentElements[index]) {
+        const target = currentElements[index]
+        const before = target.content.slice(0, start)
+        const after = target.content.slice(end)
+        const nextContent = formatContent(`${before}${normalized}${after}`, target.type)
+
+        updateElements((current) => {
+          const next = [...current]
+          next[index] = { ...next[index], content: nextContent }
+          return next
+        })
+
+        requestAnimationFrame(() => {
+          const caret = start + normalized.length
+          focusAndSetSelection(index, caret)
+        })
+        return
+      }
+
+      const segments = normalized
+        .split(/\n{2,}/)
+        .map((segment) => segment.trim())
+        .filter(Boolean)
+
+      if (segments.length === 0) {
+        return
+      }
+
+      const insertionStartIndex = elementsRef.current.length
+
+      updateElements((current) => [
+        ...current,
+        ...segments.map((segment) => ({
+          id: generateElementId(),
+          type: 'action' as ElementType,
+          content: formatContent(segment, 'action'),
+        })),
+      ])
+
+      requestAnimationFrame(() => {
+        focusAndSetSelection(insertionStartIndex, inputRefs.current[insertionStartIndex]?.value.length ?? 0)
+      })
+    },
+    [focusAndSetSelection, formatContent, generateElementId, updateElements]
+  )
 
   const getNextElementType = (currentType: ElementType): ElementType => {
     switch (currentType) {
@@ -196,6 +287,16 @@ export function ScreenplayEditor({
   }, 0)
   const pageCount = Math.max(1, Math.ceil(totalLines / 55)) // ~55 lines per page
 
+  useEffect(() => {
+    if (!onReady) return
+    onReady({
+      insertTextAtCursor,
+    })
+    return () => {
+      onReady(null)
+    }
+  }, [insertTextAtCursor, onReady])
+
   return (
     <Card className="bg-white p-8 min-h-[800px]">
       {/* Screenplay Header */}
@@ -218,16 +319,20 @@ export function ScreenplayEditor({
             <div className={`flex items-start ${getElementStyle(element.type)}`}>
               <textarea
                 ref={(el) => {
-                  inputRefs.current[index] = el
-                }}
-                value={element.content}
-                onChange={(e) => handleChange(index, formatContent(e.target.value, element.type))}
-                onKeyDown={(e) => handleKeyDown(e, index)}
-                placeholder={getPlaceholder(element.type)}
-                disabled={!editable}
-                className="w-full bg-transparent border-none outline-none resize-none overflow-hidden placeholder-gray-400 focus:bg-gray-50 min-h-[1.5rem]"
-                rows={Math.max(1, Math.ceil(element.content.length / 60))}
-              />
+              inputRefs.current[index] = el
+            }}
+            value={element.content}
+            onChange={(e) => handleChange(index, formatContent(e.target.value, element.type))}
+            onKeyDown={(e) => handleKeyDown(e, index)}
+            onFocus={(e) => rememberSelection(index, e.currentTarget)}
+            onClick={(e) => rememberSelection(index, e.currentTarget)}
+            onKeyUp={(e) => rememberSelection(index, e.currentTarget)}
+            onSelect={(e) => rememberSelection(index, e.currentTarget)}
+            placeholder={getPlaceholder(element.type)}
+            disabled={!editable}
+            className="w-full bg-transparent border-none outline-none resize-none overflow-hidden placeholder-gray-400 focus:bg-gray-50 min-h-[1.5rem]"
+            rows={Math.max(1, Math.ceil(element.content.length / 60))}
+          />
             </div>
 
             {/* Element type indicator */}

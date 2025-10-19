@@ -29,6 +29,9 @@ type OutlineGeneratorDialogProps = {
   projectType: string
   genre: string[] | null
   onGenerated: () => void
+  defaultPremise?: string
+  defaultAdditionalContext?: string
+  defaultFormat?: OutlineFormat
 }
 
 type OutlineFormat = 'chapter_summary' | 'scene_by_scene' | 'treatment' | 'beat_outline' | 'custom'
@@ -48,11 +51,14 @@ export function OutlineGeneratorDialog({
   projectType,
   genre,
   onGenerated,
+  defaultPremise = '',
+  defaultAdditionalContext = '',
+  defaultFormat = 'chapter_summary',
 }: OutlineGeneratorDialogProps) {
   const { toast } = useToast()
-  const [premise, setPremise] = useState('')
-  const [format, setFormat] = useState<OutlineFormat>('chapter_summary')
-  const [additionalContext, setAdditionalContext] = useState('')
+  const [premise, setPremise] = useState(defaultPremise)
+  const [format, setFormat] = useState<OutlineFormat>(defaultFormat)
+  const [additionalContext, setAdditionalContext] = useState(defaultAdditionalContext)
   const [generating, setGenerating] = useState(false)
 
   const handleGenerate = async () => {
@@ -92,9 +98,9 @@ export function OutlineGeneratorDialog({
       })
 
       // Reset form
-      setPremise('')
-      setAdditionalContext('')
-      setFormat('chapter_summary')
+      setPremise(defaultPremise)
+      setAdditionalContext(defaultAdditionalContext)
+      setFormat(defaultFormat)
 
       onGenerated()
     } catch (error) {

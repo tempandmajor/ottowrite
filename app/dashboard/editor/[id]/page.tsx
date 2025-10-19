@@ -3,13 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { TiptapEditor } from '@/components/editor/tiptap-editor'
-import { ScreenplayEditor } from '@/components/editor/screenplay-editor'
+import { TiptapEditor, type TiptapEditorApi } from '@/components/editor/tiptap-editor'
+import {
+  ScreenplayEditor,
+  type ScreenplayEditorApi,
+  type ScreenplayElement,
+} from '@/components/editor/screenplay-editor'
 import { AIAssistant } from '@/components/editor/ai-assistant'
 import { EnsembleGenerator } from '@/components/ai/ensemble-generator'
 import { BackgroundTaskMonitor } from '@/components/ai/background-task-monitor'
 import { ResearchPanel } from '@/components/research/research-panel'
 import { ReadabilityPanel } from '@/components/analysis/readability'
+import { ReadingPacingPanel } from '@/components/analysis/reading-pacing-panel'
 import { ExportModal } from '@/components/editor/export-modal'
 import { VersionHistory } from '@/components/editor/version-history'
 import { ChapterSidebar, Chapter } from '@/components/editor/chapter-sidebar'
@@ -142,6 +147,8 @@ export default function EditorPage() {
   const autosaveTimerRef = useRef<number | null>(null)
   const autosaveControllerRef = useRef<AbortController | null>(null)
   const lastAutosaveSignatureRef = useRef<string | null>(null)
+  const tiptapApiRef = useRef<TiptapEditorApi | null>(null)
+  const screenplayApiRef = useRef<ScreenplayEditorApi | null>(null)
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -435,11 +442,17 @@ export default function EditorPage() {
     [toast]
   )
 
-  const insertAIText = (text: string) => {
-    if (!text.trim()) return
+  const insertAIText = (rawText: string) => {
+    const normalized = rawText.replace(/\r\n/g, '\n')
+    if (!normalized.trim()) return
 
     if (isScriptType(document?.type)) {
-      const segments = text
+      if (screenplayApiRef.current) {
+        screenplayApiRef.current.insertTextAtCursor(normalized)
+        return
+      }
+
+      const segments = normalized
         .split(/\n{2,}/)
         .map((segment) => segment.trim())
         .filter((segment) => segment.length > 0)
@@ -458,7 +471,7 @@ export default function EditorPage() {
         const additions = segments.map((segment) => ({
           id: generateClientId(),
           type: 'action',
-          content: segment.replace(/\s+/g, ' ').trim(),
+          content: segment.trim(),
         }))
 
         return JSON.stringify([...screenplay, ...additions])
@@ -466,7 +479,7 @@ export default function EditorPage() {
       return
     }
 
-    const paragraphs = text
+    const paragraphs = normalized
       .split(/\n{2,}/)
       .map((paragraph) => paragraph.trim())
       .filter((paragraph) => paragraph.length > 0)
@@ -476,6 +489,11 @@ export default function EditorPage() {
     const htmlSnippet = paragraphs
       .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br />')}</p>`)
       .join('')
+
+    if (tiptapApiRef.current) {
+      tiptapApiRef.current.insertHtmlAtCursor(htmlSnippet)
+      return
+    }
 
     setContent((prev) => {
       const base = prev || ''
@@ -516,21 +534,27 @@ export default function EditorPage() {
     setIsDirty(currentSignature !== originalSignature || title !== originalTitle)
   }, [content, title, document, structure])
 
+  const screenplayContent = useMemo<ScreenplayElement[]>(() => {
+    if (!isScriptType(document?.type)) return []
+    try {
+      const parsed = JSON.parse(content || '[]')
+      return Array.isArray(parsed) ? (parsed as ScreenplayElement[]) : []
+    } catch (error) {
+      console.error('Failed to parse screenplay content', error)
+      return []
+    }
+  }, [content, document?.type])
+
   const wordCount = useMemo(() => {
     if (!document) return 0
     if (isScriptType(document.type)) {
-      try {
-        const screenplay = JSON.parse(content || '[]') as Array<{ content?: string; text?: string }>
-        const text = screenplay
-          .map((el) => (el?.content ?? el?.text ?? ''))
-          .join(' ')
-        return text
-          .trim()
-          .split(/\s+/)
-          .filter((w) => w.length > 0).length
-      } catch {
-        return 0
-      }
+      const text = screenplayContent
+        .map((el) => el?.content ?? (el as unknown as { text?: string })?.text ?? '')
+        .join(' ')
+      return text
+        .trim()
+        .split(/\s+/)
+        .filter((w) => w.length > 0).length
     }
     const text = content.replace(/<[^>]*>/g, ' ')
     return text
@@ -538,6 +562,7 @@ export default function EditorPage() {
       .split(/\s+/)
       .filter((w) => w.length > 0).length
   }, [document, content])
+
 
   const autosaveLabelData = useMemo(() => {
     switch (autosaveStatus) {
@@ -947,8 +972,11 @@ const autosaveClassName = autosaveLabelData.className
             <div className="p-6">
               {isScriptType(document.type) ? (
                 <ScreenplayEditor
-                  content={JSON.parse(content || '[]')}
+                  content={screenplayContent}
                   onUpdate={(newContent) => setContent(JSON.stringify(newContent))}
+                  onReady={(api) => {
+                    screenplayApiRef.current = api
+                  }}
                 />
               ) : (
                 <TiptapEditor
@@ -998,6 +1026,9 @@ const autosaveClassName = autosaveLabelData.className
                     setServerContent(null)
                     setAutosaveStatus('pending')
                     void performAutosave()
+                  }}
+                  onReady={(api) => {
+                    tiptapApiRef.current = api
                   }}
                 />
               )}
@@ -1053,6 +1084,10 @@ const autosaveClassName = autosaveLabelData.className
             projectId={document.project_id}
             context={content}
           />
+
+          {!isScriptType(document.type) && (
+            <ReadingPacingPanel contentHtml={content} structure={structure} wordCount={wordCount} />
+          )}
 
           <ReadabilityPanel initialText={content} />
 

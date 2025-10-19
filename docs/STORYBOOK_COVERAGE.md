@@ -10,16 +10,16 @@ Provide a Storybook-equivalent reference for dashboard/editor components going i
 
 | Component | Location | Required Stories |
 |-----------|----------|------------------|
-| `OutlineCard` | `components/outlines/outline-card.tsx` | Default, long premise, expanded sections, deletion confirmation (mocked). |
-| `OutlineGeneratorDialog` | `components/outlines/outline-generator-dialog.tsx` | Closed, open (idle), generating (loading state), success. |
+| `OutlineCard` | `components/outlines/outline-card.tsx` | ✅ Default, long premise, expanded sections, deletion confirmation (mocked). |
+| `OutlineGeneratorDialog` | `components/outlines/outline-generator-dialog.tsx` | ✅ Closed, open (idle), generating (loading state), success. |
 | `app/dashboard/projects/[id]/outlines/page` filter card | Page-level pattern | Snapshot stories: empty dataset, filtered results, loading skeletons. |
 | Outline detail notes card | Page-level section | Notes clean, dirty (unsaved badge), over character limit. |
 | Sticky outline summary aside | Page-level section | Desktop sticky, mobile collapsed snapshot. |
 | `PlotAnalysisPage` summary tab | Page-level section | Pending analysis, completed with issues, completed zero issues. |
 | `PlotAnalysisPage` history tab | Page-level section | Multiple runs (active + inactive), empty history. |
-| `PlotIssueList` | `components/plot-analysis/plot-issue-list.tsx` | Critical issue, resolved issue, empty state. |
-| `Badge` variants | `components/ui/badge.tsx` | Default, secondary, destructive (dirty state), outline (metadata tags). |
-| `Skeleton` usage | `components/ui/skeleton.tsx` | Card grid placeholder (outline list), tab content loading. |
+| `PlotIssueList` | `components/plot-analysis/plot-issue-list.tsx` | ✅ Critical issue, resolved issue, empty state. |
+| `Badge` variants | `components/ui/badge.tsx` | ✅ Default, secondary, destructive (dirty state), outline (metadata tags). |
+| `Skeleton` usage | `components/ui/skeleton.tsx` | ✅ Card grid placeholder (outline list), tab content loading. |
 
 ## 3. Technical Notes
 - **Framework**: Use Storybook 8 with the Next.js framework builder (`@storybook/nextjs`). Add stories under `stories/` with co-located mock data in `stories/mocks/`.

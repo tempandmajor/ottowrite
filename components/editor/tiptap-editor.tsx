@@ -43,6 +43,11 @@ const collectAnchorsFromEditor = (editor: Editor): Set<string> => {
   return anchors
 }
 
+export type TiptapEditorApi = {
+  insertHtmlAtCursor: (html: string) => void
+  getSelectedText: () => string
+}
+
 interface TiptapEditorProps {
   content: string
   onUpdate: (content: string) => void
@@ -61,6 +66,7 @@ interface TiptapEditorProps {
   conflictVisible?: boolean
   onReplaceWithServer?: () => void
   onCloseConflict?: () => void
+  onReady?: (api: TiptapEditorApi | null) => void
 }
 
 export function TiptapEditor({
@@ -75,6 +81,7 @@ export function TiptapEditor({
   conflictVisible = false,
   onReplaceWithServer,
   onCloseConflict,
+  onReady,
 }: TiptapEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -246,6 +253,29 @@ export function TiptapEditor({
   useEffect(() => {
     emitAnchors()
   }, [emitAnchors])
+
+  useEffect(() => {
+    if (!editor || !onReady) {
+      return
+    }
+
+    const api: TiptapEditorApi = {
+      insertHtmlAtCursor: (html) => {
+        if (!html) return
+        editor.chain().focus().deleteSelection().insertContent(html).run()
+      },
+      getSelectedText: () => {
+        const { state } = editor
+        const { from, to } = state.selection
+        return state.doc.textBetween(from, to, ' ')
+      },
+    }
+
+    onReady(api)
+    return () => {
+      onReady(null)
+    }
+  }, [editor, onReady])
 
   if (!editor) {
     return null

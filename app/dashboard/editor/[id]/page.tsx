@@ -55,7 +55,7 @@ const VersionHistory = lazy(() => import('@/components/editor/version-history').
 
 // Eagerly load critical components that are always visible
 import { ChapterSidebar } from '@/components/editor/chapter-sidebar'
-import { AutosaveConflictDialog } from '@/components/editor/autosave-conflict-dialog'
+import { ConflictResolutionPanel } from '@/components/editor/conflict-resolution-panel'
 import { AutosaveErrorAlert } from '@/components/editor/autosave-error-alert'
 
 // Loading fallback component
@@ -1090,28 +1090,75 @@ export default function EditorPage() {
         </Suspense>
       )}
 
-      {/* Autosave Conflict Dialog */}
+      {/* Conflict Resolution Panel */}
       {serverContent && (
-        <AutosaveConflictDialog
+        <ConflictResolutionPanel
           open={true}
           localContent={content}
           serverContent={serverContent.html}
           localWordCount={wordCount}
           serverWordCount={serverContent.wordCount}
-          onKeepLocal={async () => {
+          onResolve={async (resolvedContent, resolution) => {
             if (!serverContent) return
-            const anchorIds = extractSceneAnchors(content)
+
+            // Update content with resolved version
+            if (resolution === 'merged') {
+              setContent(resolvedContent)
+            } else if (resolution === 'local') {
+              // Keep local - no content update needed
+            } else if (resolution === 'server') {
+              const nextStructure = Array.isArray(serverContent.structure)
+                ? cloneStructure(serverContent.structure)
+                : cloneStructure(structure)
+              setContent(serverContent.html)
+              setStructure(nextStructure)
+            }
+
+            // Compute new hash for whichever content we're keeping
+            const finalContent =
+              resolution === 'server' ? serverContent.html :
+              resolution === 'merged' ? resolvedContent :
+              content
+
+            const finalStructure =
+              resolution === 'server' && Array.isArray(serverContent.structure)
+                ? cloneStructure(serverContent.structure)
+                : structure
+
+            const anchorIds = extractSceneAnchors(finalContent)
+            setSceneAnchors(resolution === 'local' ? sceneAnchors : new Set(anchorIds))
+
             const newHash = await computeClientContentHash({
-              html: content,
-              structure,
+              html: finalContent,
+              structure: finalStructure,
               anchorIds,
             })
+
             setBaseHash(newHash)
+            setLastSavedAt(new Date())
+
+            setDocument((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    content: {
+                      ...(prev.content ?? {}),
+                      html: finalContent,
+                      structure: finalStructure,
+                    },
+                    word_count: serverContent.wordCount ?? prev.word_count,
+                  }
+                : prev
+            )
+
+            setIsDirty(false)
             setServerContent(null)
             flushAutosave()
           }}
-          onUseServer={async () => {
+          onRetryWithServer={async () => {
             if (!serverContent) return
+
+            // Force reload from server and retry autosave
             const nextStructure = Array.isArray(serverContent.structure)
               ? cloneStructure(serverContent.structure)
               : cloneStructure(structure)
@@ -1141,7 +1188,14 @@ export default function EditorPage() {
             )
             setIsDirty(false)
             setServerContent(null)
+
+            // Retry autosave with fresh server state
             flushAutosave()
+
+            toast({
+              title: 'Retrying with server version',
+              description: 'Your local changes will be applied on top of the latest server version.',
+            })
           }}
           onCancel={() => {
             setServerContent(null)

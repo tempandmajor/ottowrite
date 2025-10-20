@@ -157,7 +157,6 @@ export default function EditorPage() {
   const snapshotAPI = useDocumentSnapshots({
     enabled: Boolean(document?.id),
     maxSnapshots: 50,
-    autoSnapshotOnSave: true,
   })
 
   // Initialize undo/redo with persistence

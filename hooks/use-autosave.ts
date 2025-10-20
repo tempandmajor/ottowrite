@@ -244,7 +244,17 @@ export function useAutosave({
         runAutosave()
       }
     }
-  }, [documentId, enabled, onAfterSave, onBaseHashChange, onConflict])
+  }, [
+    documentId,
+    enabled,
+    isOnline,
+    onAfterSave,
+    onBaseHashChange,
+    onBeforeSave,
+    onConflict,
+    onSnapshotCreated,
+    setConnectivityError,
+  ])
 
   const scheduleAutosave = useCallback(
     (delay = 1000) => {

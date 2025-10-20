@@ -89,7 +89,7 @@ describe('Conflict Resolution Logic', () => {
 
   describe('Merge Strategies', () => {
     it('should handle "keep local" strategy', () => {
-      const serverText = 'Server version'
+      const _serverText = 'Server version'
       const localText = 'Local version with changes'
 
       // Keep local means we use localText entirely
@@ -99,7 +99,7 @@ describe('Conflict Resolution Logic', () => {
 
     it('should handle "keep server" strategy', () => {
       const serverText = 'Server version with updates'
-      const localText = 'Local version'
+      const _localText = 'Local version'
 
       // Keep server means we use serverText entirely
       const result = serverText
@@ -303,7 +303,7 @@ describe('Conflict Resolution Logic', () => {
     it('should allow retry after conflict resolution', () => {
       // This tests the workflow: detect conflict -> retry with server version
       const serverText = 'Server content at version 2'
-      const localText = 'Local edits from version 1'
+      const _localText = 'Local edits from version 1'
 
       // User chooses to retry with server version
       const retryContent = serverText
@@ -356,14 +356,17 @@ describe('Conflict Resolution Logic', () => {
       // Navigate prev
       currentIndex = Math.max(currentIndex - 1, 0)
       expect(currentIndex).toBe(1)
+      expect(chunks[currentIndex].id).toBe('chunk-2')
 
       // Navigate prev again
       currentIndex = Math.max(currentIndex - 1, 0)
       expect(currentIndex).toBe(0)
+      expect(chunks[currentIndex].id).toBe('chunk-1')
 
       // Can't go before first
       currentIndex = Math.max(currentIndex - 1, 0)
       expect(currentIndex).toBe(0)
+      expect(chunks[currentIndex].id).toBe('chunk-1')
     })
   })
 
@@ -395,7 +398,6 @@ describe('Conflict Resolution Logic', () => {
 
     it('should handle concurrent edit conflict', () => {
       // Simulates two users editing the same paragraph simultaneously
-      const original = 'The dragon roared.'
       const userA = 'The fierce dragon roared loudly.'
       const userB = 'The ancient dragon roared menacingly.'
 

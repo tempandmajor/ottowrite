@@ -179,7 +179,7 @@ test.describe('Document CRUD', () => {
 
       // Create project and document
       await docHelper.createProject(`Project ${Date.now()}`, 'novel')
-      const documentId = await docHelper.createDocument(`Document ${Date.now()}`, 'novel')
+      const _documentId = await docHelper.createDocument(`Document ${Date.now()}`, 'novel')
 
       // Type content
       const testContent = 'This content should persist after reload.'

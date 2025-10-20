@@ -90,7 +90,7 @@ export class AuthHelper {
   /**
    * Restore auth state from file
    */
-  static async restoreAuthState(page: Page, path: string) {
+  static async restoreAuthState(page: Page, _path: string) {
     // Auth state is restored when creating the context
     // This is a helper for documentation
     return new AuthHelper(page)

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { generateWithAI, type AIModel } from '@/lib/ai/service'
 import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
@@ -7,6 +8,21 @@ import { classifyIntent, type AICommand } from '@/lib/ai/intent'
 import { logger } from '@/lib/monitoring/structured-logger'
 import { PerformanceTimer } from '@/lib/monitoring/performance'
 import { checkAIRateLimit, createAIRateLimitResponse } from '@/lib/security/ai-rate-limit'
+import { routeAIRequest } from '@/lib/ai/router'
+import {
+  buildContextBundle,
+  generateContextPrompt,
+  buildContextPreview,
+  estimateTokens,
+  type ContextBundle,
+  type ContextPreview,
+  type StoryBibleEntry,
+  type StoryBibleImportance,
+  type TimelineEvent,
+  type ContextExcerpt,
+  type ProjectMetadata,
+} from '@/lib/ai/context-manager'
+import { stripHtml } from '@/lib/utils/text-diff'
 
 const MAX_PROMPT_LENGTH = 5000
 const MAX_COMPLETION_TOKENS = 3000
@@ -16,6 +32,8 @@ const ALLOWED_MODELS: AIModel[] = [
   'gpt-5',
   'deepseek-v3',
 ]
+const CONTEXT_TOKEN_BUDGET = 2200
+const CONTEXT_RESERVE_RATIO = 0.1
 
 // Force dynamic rendering - don't try to statically analyze this route
 export const dynamic = 'force-dynamic'
@@ -35,9 +53,17 @@ export async function POST(request: NextRequest) {
   let documentProjectId: string | null = null
   let documentIdValue: string | null = null
   let explicitModel: AIModel | null = null
+  let routingDecision: ReturnType<typeof routeAIRequest> | null = null
   let sanitizedPrompt = ''
   let selectionValue: string | undefined
   let sanitizedContext: string | undefined
+  let generatedContext = ''
+  let generatedContextTokens = 0
+  let contextWarnings: string[] = []
+  let contextPreview: ContextPreview | null = null
+  let contextBundle: ContextBundle | null = null
+  let explicitContextTokens = 0
+  let selectionTokensEstimate = 0
   let userId: string | null = null
   const startedAt = Date.now()
   const timer = new PerformanceTimer('ai_generation', 'ai_generation')
@@ -164,25 +190,126 @@ export async function POST(request: NextRequest) {
     documentIdValue =
       typeof documentId === 'string' && documentId.length > 0 ? documentId : null
 
-    selectedModel = explicitModel ?? classification.recommendedModel
-
+    let documentTokenEstimate = 0
     if (documentIdValue) {
       const { data: documentRow } = await supabase
         .from('documents')
-        .select('project_id')
+        .select('project_id, word_count')
         .eq('id', documentIdValue)
         .eq('user_id', user.id)
         .single()
       if (documentRow && documentRow.project_id) {
         documentProjectId = documentRow.project_id
       }
+      if (documentRow && typeof documentRow.word_count === 'number' && documentRow.word_count > 0) {
+        documentTokenEstimate = Math.ceil(documentRow.word_count * 1.3)
+      }
     }
+
+    explicitContextTokens = sanitizedContext ? estimateTokens(sanitizedContext) : 0
+    const promptTokensEstimate = estimateTokens(sanitizedPrompt)
+    selectionTokensEstimate = selectionValue ? estimateTokens(selectionValue) : 0
+
+    const selectionContextSegment = selectionValue
+      ? `ACTIVE SELECTION:\n${selectionValue}`
+      : undefined
+
+    const contextData = documentProjectId
+      ? await fetchProjectContext(supabase, user.id, documentProjectId)
+      : null
+
+    if (contextData) {
+      const recentExcerpts: ContextExcerpt[] = [...contextData.excerpts]
+      if (selectionValue) {
+        recentExcerpts.unshift({
+          id: `selection-${Date.now()}`,
+          label: 'Active selection',
+          content: selectionValue,
+          source: 'scene',
+          createdAt: new Date().toISOString(),
+        })
+      }
+
+      contextBundle = buildContextBundle({
+        project: contextData.project,
+        storyBible: contextData.storyBible,
+        timeline: contextData.timeline,
+        recentExcerpts,
+        tokenBudget: CONTEXT_TOKEN_BUDGET,
+      })
+      contextWarnings = contextBundle.warnings
+      contextPreview = buildContextPreview(contextBundle)
+
+      const availableGeneratedContextTokens = Math.max(
+        0,
+        CONTEXT_TOKEN_BUDGET - explicitContextTokens
+      )
+
+      if (availableGeneratedContextTokens > 0) {
+        const generated = generateContextPrompt(contextBundle, {
+          maxTokens: availableGeneratedContextTokens,
+          reserveTokens: Math.floor(availableGeneratedContextTokens * CONTEXT_RESERVE_RATIO),
+          includeTimeline: contextBundle.timeline.length > 0,
+          includeExcerpts: contextBundle.recentExcerpts.length > 0,
+        })
+        generatedContext = generated.prompt
+        generatedContextTokens = generated.usedTokens
+        if (generated.omittedEntries.length > 0) {
+          contextWarnings.push('Some context entries were omitted to stay within token limits.')
+        }
+      }
+    }
+
+    if (contextWarnings.length > 0) {
+      contextWarnings = Array.from(new Set(contextWarnings))
+    }
+
+    const combinedContextSegments = [
+      sanitizedContext,
+      selectionContextSegment,
+      generatedContext,
+    ].filter((segment): segment is string => Boolean(segment && segment.trim().length))
+
+    const combinedContext =
+      combinedContextSegments.length > 0 ? combinedContextSegments.join('\n\n') : undefined
+
+    const aggregateContextTokens =
+      promptTokensEstimate +
+      explicitContextTokens +
+      selectionTokensEstimate +
+      generatedContextTokens
+
+    routingDecision = routeAIRequest({
+      classification,
+      selectionLength: selectionTokensEstimate,
+      documentLength:
+        documentTokenEstimate || Math.max(promptTokensEstimate, selectionTokensEstimate, 1),
+      estimatedContextTokens: aggregateContextTokens,
+      userTier: normalizeSubscriptionTier(plan),
+      override: explicitModel
+        ? {
+            forcedModel: explicitModel,
+            rationale: 'User selected model',
+          }
+        : undefined,
+    })
+
+    selectedModel = routingDecision.model
+
+    logger.debug('AI routing decision', {
+      userId: user.id,
+      operation: command || classification.command,
+      model: selectedModel,
+      confidence: routingDecision.confidence,
+      rationale: routingDecision.rationale,
+      alternatives: routingDecision.alternatives,
+    })
 
     // Generate AI response
     const response = await generateWithAI({
       model: selectedModel,
       prompt: sanitizedPrompt,
-      context: sanitizedContext,
+      context: combinedContext,
       maxTokens: safeMaxTokens,
     })
 
@@ -222,6 +349,21 @@ export async function POST(request: NextRequest) {
         status: 'succeeded',
         prompt_preview: sanitizedPrompt.substring(0, 200),
         selection_preview: selectionValue ? selectionValue.substring(0, 200) : null,
+        routing_metadata: routingDecision
+          ? {
+              model: routingDecision.model,
+              confidence: routingDecision.confidence,
+              intent: routingDecision.intent.intent,
+              manualOverride: Boolean(explicitModel),
+              rationale: routingDecision.rationale,
+            }
+          : null,
+        context_tokens: {
+          explicit: explicitContextTokens,
+          generated: generatedContextTokens,
+          selection: selectionTokensEstimate,
+        },
+        context_warnings: contextWarnings.length > 0 ? contextWarnings : null,
       })
       .select('id')
       .single()
@@ -257,6 +399,20 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       documentId: documentIdValue || undefined,
       success: true,
+      routing: routingDecision
+        ? {
+            model: routingDecision.model,
+            confidence: routingDecision.confidence,
+            intent: routingDecision.intent.intent,
+            manualOverride: Boolean(explicitModel),
+            rationale: routingDecision.rationale,
+          }
+        : undefined,
+      contextTokens: {
+        explicit: explicitContextTokens,
+        generated: generatedContextTokens,
+        selection: selectionTokensEstimate,
+      },
     })
 
     timer.end(true, {
@@ -265,7 +421,7 @@ export async function POST(request: NextRequest) {
       tokensUsed: response.usage.inputTokens + response.usage.outputTokens,
     })
 
-    return NextResponse.json({
+    const responsePayload = {
       content: response.content,
       usage: {
         ...response.usage,
@@ -278,7 +434,17 @@ export async function POST(request: NextRequest) {
       command,
       requestId,
       intent: classification.intent,
-    })
+      routing: routingDecision,
+      contextPreview: contextPreview ? sanitizeContextPreview(contextPreview) : null,
+      contextWarnings: contextWarnings.slice(0, 5),
+      contextTokens: {
+        explicit: explicitContextTokens,
+        generated: generatedContextTokens,
+        selection: selectionTokensEstimate,
+      },
+    }
+
+    return NextResponse.json(responsePayload)
   } catch (error) {
     // Log AI generation failure with structured logging
     logger.aiRequest({
@@ -289,6 +455,20 @@ export async function POST(request: NextRequest) {
       userId: userId || undefined,
       documentId: documentIdValue || undefined,
       success: false,
+      routing: routingDecision
+        ? {
+            model: routingDecision.model,
+            confidence: routingDecision.confidence,
+            intent: routingDecision.intent.intent,
+            manualOverride: Boolean(explicitModel),
+            rationale: routingDecision.rationale,
+          }
+        : undefined,
+      contextTokens: {
+        explicit: explicitContextTokens,
+        generated: generatedContextTokens,
+        selection: selectionTokensEstimate,
+      },
       error: error instanceof Error ? error : new Error(String(error)),
     })
 
@@ -314,6 +494,21 @@ export async function POST(request: NextRequest) {
           error: error instanceof Error ? error.message : 'Unknown error',
           prompt_preview: sanitizedPrompt.substring(0, 200) || null,
           selection_preview: selectionValue ? selectionValue.substring(0, 200) : null,
+          routing_metadata: routingDecision
+            ? {
+                model: routingDecision.model,
+                confidence: routingDecision.confidence,
+                intent: routingDecision.intent.intent,
+                manualOverride: Boolean(explicitModel),
+                rationale: routingDecision.rationale,
+              }
+            : null,
+          context_tokens: {
+            explicit: explicitContextTokens,
+            generated: generatedContextTokens,
+            selection: selectionTokensEstimate,
+          },
+          context_warnings: contextWarnings.length > 0 ? contextWarnings : null,
         })
       } catch (logError) {
         logger.error('Failed to log AI request failure', {
@@ -326,5 +521,462 @@ export async function POST(request: NextRequest) {
       { error: 'Failed to generate AI response' },
       { status: 500 }
     )
+  }
+}
+
+function normalizeSubscriptionTier(
+  tier: string | null | undefined
+): 'free' | 'hobbyist' | 'professional' | 'studio' {
+  const normalized = (tier ?? 'free').toLowerCase()
+  switch (normalized) {
+    case 'free':
+    case 'starter':
+      return 'free'
+    case 'hobbyist':
+    case 'creator':
+      return 'hobbyist'
+    case 'professional':
+    case 'pro':
+      return 'professional'
+    case 'studio':
+    case 'enterprise':
+      return 'studio'
+    default:
+      return 'free'
+  }
+}
+
+type ProjectContextData = {
+  project: ProjectMetadata | null
+  storyBible: StoryBibleEntry[]
+  timeline: TimelineEvent[]
+  excerpts: ContextExcerpt[]
+}
+
+async function fetchProjectContext(
+  supabase: SupabaseClient,
+  userId: string,
+  projectId: string
+): Promise<ProjectContextData | null> {
+  const [projectRes, charactersRes, locationsRes, eventsRes, worldElementsRes, documentsRes] =
+    await Promise.all([
+    supabase
+      .from('projects')
+      .select('id, name, type, genre, description')
+      .eq('id', projectId)
+      .eq('user_id', userId)
+      .single(),
+    supabase
+      .from('characters')
+      .select(
+        'id, name, role, importance, personality_traits, backstory, story_function, character_arc, tags, last_appearance, updated_at'
+      )
+      .eq('user_id', userId)
+      .eq('project_id', projectId)
+      .order('importance', { ascending: false })
+      .limit(25),
+    supabase
+      .from('locations')
+      .select(
+        'id, name, category, summary, history, culture, climate, key_features, tags, updated_at'
+      )
+      .eq('user_id', userId)
+      .eq('project_id', projectId)
+      .order('updated_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('location_events')
+      .select('id, title, description, occurs_at, importance, location_id, created_at')
+      .eq('user_id', userId)
+      .eq('project_id', projectId)
+      .order('importance', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(40),
+    supabase
+      .from('world_elements')
+      .select('id, name, type, summary, description, tags, properties, updated_at')
+      .eq('user_id', userId)
+      .eq('project_id', projectId)
+      .order('updated_at', { ascending: false })
+      .limit(30),
+    supabase
+      .from('documents')
+      .select('id, title, type, updated_at')
+      .eq('user_id', userId)
+      .eq('project_id', projectId)
+      .order('updated_at', { ascending: false })
+      .limit(25),
+  ])
+
+  if (projectRes.error && projectRes.status !== 406) {
+    logger.warn('Failed to load project metadata for context', {
+      operation: 'fetch_project_context',
+      projectId,
+      userId,
+    }, projectRes.error)
+  }
+
+  if (charactersRes.error && charactersRes.status !== 406) {
+    logger.warn('Failed to load characters for context', {
+      operation: 'fetch_project_context',
+      projectId,
+      userId,
+    }, charactersRes.error)
+  }
+
+  if (locationsRes.error && locationsRes.status !== 406) {
+    logger.warn('Failed to load locations for context', {
+      operation: 'fetch_project_context',
+      projectId,
+      userId,
+    }, locationsRes.error)
+  }
+
+  if (eventsRes.error && eventsRes.status !== 406) {
+    logger.warn('Failed to load timeline events for context', {
+      operation: 'fetch_project_context',
+      projectId,
+      userId,
+    }, eventsRes.error)
+  }
+
+  if (worldElementsRes.error && worldElementsRes.status !== 406) {
+    logger.warn('Failed to load world elements for context', {
+      operation: 'fetch_project_context',
+      projectId,
+      userId,
+    }, worldElementsRes.error)
+  }
+
+  if (documentsRes.error && documentsRes.status !== 406) {
+    logger.warn('Failed to load project documents for context', {
+      operation: 'fetch_project_context',
+      projectId,
+      userId,
+    }, documentsRes.error)
+  }
+
+  const project: ProjectMetadata | null = projectRes.data
+    ? mapProjectToMetadata(projectRes.data)
+    : null
+
+  const characterEntries =
+    charactersRes.data?.map((record) => mapCharacterToStoryBibleEntry(record)) ?? []
+  const locationEntries =
+    locationsRes.data?.map((record) => mapLocationToStoryBibleEntry(record)) ?? []
+  const worldElementEntries =
+    worldElementsRes.data
+      ?.filter((record) => record.type !== 'location')
+      .map((record) => mapWorldElementToStoryBibleEntry(record)) ?? []
+
+  const documents = documentsRes.data ?? []
+  const documentLookup = new Map<string, { title: string; type?: string | null }>()
+  for (const doc of documents) {
+    if (doc.id) {
+      documentLookup.set(doc.id, { title: doc.title, type: doc.type })
+    }
+  }
+
+  let snapshotEntries: ContextExcerpt[] = []
+  if (documentLookup.size > 0) {
+    const documentIds = Array.from(documentLookup.keys())
+    const { data: snapshotsData, error: snapshotsError, status: snapshotsStatus } = await supabase
+      .from('document_snapshots')
+      .select('id, document_id, created_at, payload, metadata')
+      .in('document_id', documentIds)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(30)
+
+    if (snapshotsError && snapshotsStatus !== 406) {
+      logger.warn('Failed to load document snapshots for context', {
+        operation: 'fetch_project_context',
+        projectId,
+        userId,
+      }, snapshotsError)
+    }
+
+    snapshotEntries =
+      snapshotsData
+        ?.map((record) => mapSnapshotToContextExcerpt(record, documentLookup))
+        .filter((entry): entry is ContextExcerpt => Boolean(entry)) ?? []
+  }
+
+  const locationNameLookup = new Map<string, string>()
+  for (const location of locationsRes.data ?? []) {
+    if (location.id && location.name) {
+      locationNameLookup.set(location.id, location.name)
+    }
+  }
+
+  const timelineEntries =
+    eventsRes.data?.map((record) => mapEventToTimeline(record, locationNameLookup)) ?? []
+
+  return {
+    project,
+    storyBible: [...characterEntries, ...locationEntries, ...worldElementEntries],
+    timeline: timelineEntries,
+    excerpts: snapshotEntries,
+  }
+}
+
+function mapProjectToMetadata(record: {
+  id: string
+  name: string
+  type?: string | null
+  genre?: string[] | null
+  description?: string | null
+}): ProjectMetadata {
+  return {
+    projectId: record.id,
+    title: record.name,
+    genre: Array.isArray(record.genre) && record.genre.length > 0 ? record.genre.join(', ') : undefined,
+    pov: undefined,
+    tone: undefined,
+    setting: record.description ?? undefined,
+  }
+}
+
+function mapCharacterToStoryBibleEntry(record: any): StoryBibleEntry {
+  const summaryParts = [
+    record.backstory,
+    record.story_function ? `Function: ${record.story_function}` : null,
+    record.character_arc,
+  ].filter(Boolean)
+
+  return {
+    id: record.id,
+    name: record.name,
+    entityType: 'character',
+    summary: summaryParts.join('\n\n') || 'No character summary available yet.',
+    traits: Array.isArray(record.personality_traits) ? record.personality_traits : [],
+    lastKnownStatus: record.last_appearance ?? undefined,
+    importance: mapCharacterImportance(record.role, record.importance),
+    updatedAt: record.updated_at ?? undefined,
+    tags: Array.isArray(record.tags) ? record.tags : undefined,
+  }
+}
+
+function mapLocationToStoryBibleEntry(record: any): StoryBibleEntry {
+  const summaryParts = [
+    record.summary,
+    record.history,
+    record.culture ? `Culture: ${record.culture}` : null,
+  ].filter(Boolean)
+
+  const features =
+    Array.isArray(record.key_features) && record.key_features.length > 0
+      ? record.key_features
+      : undefined
+
+  return {
+    id: record.id,
+    name: record.name,
+    entityType: 'location',
+    summary: summaryParts.join('\n\n') || 'No location details recorded yet.',
+    traits: features,
+    lastKnownStatus: record.climate ?? undefined,
+    importance: mapLocationImportance(record.category),
+    updatedAt: record.updated_at ?? undefined,
+    tags: Array.isArray(record.tags) ? record.tags : undefined,
+  }
+}
+
+export function mapWorldElementToStoryBibleEntry(record: any): StoryBibleEntry {
+  const summary =
+    typeof record.summary === 'string' && record.summary.trim().length > 0
+      ? record.summary
+      : typeof record.description === 'string' && record.description.trim().length > 0
+      ? record.description
+      : 'No world element summary available yet.'
+
+  return {
+    id: record.id,
+    name: record.name,
+    entityType: mapWorldElementType(record.type),
+    summary,
+    importance: inferWorldElementImportance(record),
+    updatedAt: record.updated_at ?? undefined,
+    tags: Array.isArray(record.tags) ? record.tags : undefined,
+  }
+}
+
+function mapEventToTimeline(
+  record: any,
+  locationLookup: Map<string, string>
+): TimelineEvent {
+  const timestamp = record.occurs_at || record.created_at || new Date().toISOString()
+  const locationName = record.location_id ? locationLookup.get(record.location_id) : undefined
+  return {
+    id: record.id,
+    title: record.title,
+    summary: record.description ?? '',
+    timestamp,
+    importance: record.importance >= 7 ? 'major' : 'minor',
+    location: locationName,
+  }
+}
+
+function mapCharacterImportance(
+  role?: string | null,
+  score?: number | null
+): 'main' | 'supporting' | 'minor' {
+  if (!role && !score) return 'minor'
+  if (role === 'protagonist' || role === 'antagonist' || (score ?? 0) >= 8) {
+    return 'main'
+  }
+  if ((score ?? 0) >= 4) {
+    return 'supporting'
+  }
+  return 'minor'
+}
+
+function mapLocationImportance(category?: string | null): 'main' | 'supporting' | 'minor' {
+  switch (category) {
+    case 'settlement':
+    case 'realm':
+      return 'main'
+    case 'region':
+    case 'landmark':
+      return 'supporting'
+    default:
+      return 'minor'
+  }
+}
+
+export function mapWorldElementType(type?: string | null): StoryBibleEntry['entityType'] {
+  switch ((type ?? '').toLowerCase()) {
+    case 'location':
+      return 'location'
+    case 'faction':
+      return 'faction'
+    case 'artifact':
+    case 'technology':
+      return 'object'
+    default:
+      return 'concept'
+  }
+}
+
+export function inferWorldElementImportance(record: any): StoryBibleImportance {
+  const tags: string[] = Array.isArray(record?.tags) ? record.tags : []
+  if (tags.some((tag) => typeof tag === 'string' && tag.toLowerCase().includes('primary'))) {
+    return 'main'
+  }
+  if (tags.some((tag) => typeof tag === 'string' && tag.toLowerCase().includes('major'))) {
+    return 'supporting'
+  }
+  return 'minor'
+}
+
+export function mapSnapshotToContextExcerpt(
+  record: any,
+  documentLookup: Map<string, { title: string; type?: string | null }>
+): ContextExcerpt | null {
+  if (!record || typeof record !== 'object') {
+    return null
+  }
+
+  const payload = record.payload ?? {}
+  const rawHtml = typeof payload?.html === 'string' ? payload.html : ''
+  const plainText = rawHtml ? stripHtml(rawHtml) : ''
+  if (!plainText) {
+    return null
+  }
+
+  const docMeta = documentLookup.get(record.document_id ?? '')
+  const metadata = (record.metadata ?? {}) as Record<string, unknown>
+  const metadataLabel =
+    typeof metadata['label'] === 'string' ? (metadata['label'] as string).trim() : ''
+  const metadataSource = metadata['source']
+
+  const labelParts: string[] = []
+  if (metadataLabel) {
+    labelParts.push(metadataLabel)
+  }
+  if (docMeta?.title) {
+    labelParts.push(docMeta.title)
+  }
+
+  const uniqueLabelParts = Array.from(new Set(labelParts))
+  const label = metadataLabel && docMeta?.title
+    ? uniqueLabelParts.join(' - ')
+    : metadataLabel
+    ? metadataLabel
+    : docMeta?.title
+    ? `${docMeta.title} excerpt`
+    : 'Document excerpt'
+
+  return {
+    id: record.id,
+    label,
+    content: truncateSnapshotContent(plainText),
+    source: normalizeExcerptSource(metadataSource, docMeta?.type),
+    createdAt: record.created_at ?? new Date().toISOString(),
+  }
+}
+
+export function normalizeExcerptSource(
+  source: unknown,
+  docType?: string | null
+): ContextExcerpt['source'] {
+  if (typeof source === 'string') {
+    const normalized = source.toLowerCase()
+    if (normalized === 'scene' || normalized === 'chapter' || normalized === 'note' || normalized === 'analysis') {
+      return normalized
+    }
+  }
+
+  switch ((docType ?? '').toLowerCase()) {
+    case 'screenplay':
+      return 'scene'
+    case 'novel':
+    case 'short_story':
+      return 'chapter'
+    default:
+      return 'note'
+  }
+}
+
+export function truncateSnapshotContent(text: string, maxLength = 1200): string {
+  if (text.length <= maxLength) {
+    return text
+  }
+  return `${text.slice(0, maxLength).trimEnd()}...`
+}
+
+function sanitizeContextPreview(preview: ContextPreview): ContextPreview {
+  const truncate = (text: string | undefined, max = 220) =>
+    text && text.length > max ? `${text.slice(0, max)}…` : text
+
+  return {
+    project: preview.project
+      ? {
+          ...preview.project,
+          title: truncate(preview.project.title, 120) ?? '',
+          genre: truncate(preview.project.genre, 160),
+          setting: truncate(preview.project.setting, 220),
+        }
+      : null,
+    topCharacters: preview.topCharacters.map((entry) => ({
+      ...entry,
+      summary: truncate(entry.summary) ?? '',
+      traits: entry.traits ? entry.traits.slice(0, 6) : undefined,
+      tags: entry.tags ? entry.tags.slice(0, 6) : undefined,
+    })),
+    topLocations: preview.topLocations.map((entry) => ({
+      ...entry,
+      summary: truncate(entry.summary) ?? '',
+      traits: entry.traits ? entry.traits.slice(0, 6) : undefined,
+      tags: entry.tags ? entry.tags.slice(0, 6) : undefined,
+    })),
+    upcomingEvents: preview.upcomingEvents.slice(0, 5).map((event) => ({
+      ...event,
+      summary: truncate(event.summary) ?? '',
+    })),
+    recentExcerpts: preview.recentExcerpts.slice(0, 3).map((excerpt) => ({
+      ...excerpt,
+      content: truncate(excerpt.content, 280) ?? '',
+    })),
   }
 }

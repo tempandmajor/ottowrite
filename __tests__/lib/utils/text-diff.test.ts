@@ -9,7 +9,6 @@ import {
   compareHtmlDocuments,
   hasSignificantChanges,
   renderDiffForTerminal,
-  type DiffStats,
 } from '@/lib/utils/text-diff'
 
 describe('stripHtml', () => {

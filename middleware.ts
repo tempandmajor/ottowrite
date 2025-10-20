@@ -36,21 +36,40 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
+    const isProduction = process.env.NODE_ENV === 'production'
+    const cookieDomain = process.env.SUPABASE_COOKIE_DOMAIN?.trim() || undefined
+    const baseCookieOptions = {
+      path: '/',
+      sameSite: 'lax' as const,
+      secure: isProduction,
+      maxAge: 60 * 60 * 24 * 14,
+      domain: cookieDomain,
+    }
+
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value, options }) =>
+            request.cookies.set(name, value, {
+              ...baseCookieOptions,
+              ...options,
+            })
+          )
           supabaseResponse = NextResponse.next({
             request,
           })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              ...baseCookieOptions,
+              ...options,
+            })
           )
         },
       },
+      cookieOptions: baseCookieOptions,
     })
 
     // Just refresh the session, don't do auth checks

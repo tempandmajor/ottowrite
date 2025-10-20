@@ -134,7 +134,7 @@ test.describe('Billing Happy-Path', () => {
       }
     })
 
-    test('should return to app after successful payment', async ({ page }) => {
+    test('should return to app after successful payment', async ({ page: _page }) => {
       // This test requires completing a Stripe payment
       // For smoke test, we skip the actual payment
       // In production, you'd use Stripe test mode with test cards
@@ -173,7 +173,7 @@ test.describe('Billing Happy-Path', () => {
       }
     })
 
-    test.skip('should allow subscription cancellation in customer portal', async ({ page }) => {
+    test.skip('should allow subscription cancellation in customer portal', async ({ page: _page }) => {
       // This requires actual Stripe customer portal interaction
       // Skip for smoke test
 
@@ -186,11 +186,11 @@ test.describe('Billing Happy-Path', () => {
   })
 
   test.describe('Plan Limits Enforcement', () => {
-    test('should show upgrade prompt when approaching free tier limits', async ({ page }) => {
-      const auth = new AuthHelper(page)
+    test('should show upgrade prompt when approaching free tier limits', async ({ page: _page }) => {
+      const auth = new AuthHelper(_page)
       await auth.login(TEST_USERS.free)
 
-      await page.goto('/dashboard')
+      await _page.goto('/dashboard')
 
       // Check for limit warnings (if user is close to limits)
       // This would typically require setting up test data
@@ -264,7 +264,7 @@ test.describe('Billing Happy-Path', () => {
   })
 
   test.describe('Trial Period (if applicable)', () => {
-    test.skip('should show trial status for trial users', async ({ page }) => {
+    test.skip('should show trial status for trial users', async ({ page: _page }) => {
       // If app has trial periods
 
       // Would verify:
@@ -288,7 +288,7 @@ test.describe('Billing Happy-Path', () => {
   })
 
   test.describe('Webhook Testing', () => {
-    test.skip('should update user tier after successful payment webhook', async ({ page }) => {
+    test.skip('should update user tier after successful payment webhook', async ({ page: _page }) => {
       // This test would verify that after Stripe sends a webhook:
       // - User tier is updated in database
       // - User sees updated tier in UI

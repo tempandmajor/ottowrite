@@ -12,7 +12,7 @@ describe('Analytics Metrics Calculator', () => {
     id: string,
     wordCount: number,
     html: string = '',
-    timestamp: string = new Date().toISOString()
+    timestamp: Date = new Date()
   ): DocumentSnapshot => ({
     metadata: {
       id,
@@ -28,12 +28,8 @@ describe('Analytics Metrics Calculator', () => {
         { id: 'ch1', title: 'Chapter 1', scenes: [], wordCount: Math.floor(wordCount / 2) },
         { id: 'ch2', title: 'Chapter 2', scenes: [], wordCount: Math.floor(wordCount / 2) },
       ],
-      sceneAnchors: [
-        { id: 'scene1', chapterId: 'ch1' },
-        { id: 'scene2', chapterId: 'ch1' },
-        { id: 'scene3', chapterId: 'ch2' },
-      ],
     },
+    sceneAnchors: ['scene1', 'scene2', 'scene3'],
   })
 
   describe('analyzeSnapshot', () => {
@@ -127,8 +123,8 @@ describe('Analytics Metrics Calculator', () => {
       const now = new Date()
       const earlier = new Date(now.getTime() - 60 * 60 * 1000) // 1 hour ago
 
-      const from = createTestSnapshot('snap1', 100, '', earlier.toISOString())
-      const to = createTestSnapshot('snap2', 150, '', now.toISOString())
+      const from = createTestSnapshot('snap1', 100, '', earlier)
+      const to = createTestSnapshot('snap2', 150, '', now)
 
       const metrics = compareSnapshots(from, to)
 
@@ -159,9 +155,9 @@ describe('Analytics Metrics Calculator', () => {
   describe('calculateWritingVelocity', () => {
     it('should calculate total words written', () => {
       const snapshots = [
-        createTestSnapshot('snap1', 100, '', new Date('2025-01-01T10:00:00Z').toISOString()),
-        createTestSnapshot('snap2', 150, '', new Date('2025-01-01T11:00:00Z').toISOString()),
-        createTestSnapshot('snap3', 200, '', new Date('2025-01-01T12:00:00Z').toISOString()),
+        createTestSnapshot('snap1', 100, '', new Date('2025-01-01T10:00:00Z')),
+        createTestSnapshot('snap2', 150, '', new Date('2025-01-01T11:00:00Z')),
+        createTestSnapshot('snap3', 200, '', new Date('2025-01-01T12:00:00Z')),
       ]
 
       const metrics = calculateWritingVelocity(
@@ -176,8 +172,8 @@ describe('Analytics Metrics Calculator', () => {
 
     it('should calculate average words per hour', () => {
       const snapshots = [
-        createTestSnapshot('snap1', 100, '', new Date('2025-01-01T10:00:00Z').toISOString()),
-        createTestSnapshot('snap2', 200, '', new Date('2025-01-01T11:00:00Z').toISOString()),
+        createTestSnapshot('snap1', 100, '', new Date('2025-01-01T10:00:00Z')),
+        createTestSnapshot('snap2', 200, '', new Date('2025-01-01T11:00:00Z')),
       ]
 
       const metrics = calculateWritingVelocity(
@@ -192,8 +188,8 @@ describe('Analytics Metrics Calculator', () => {
 
     it('should identify most/least productive hours', () => {
       const snapshots = [
-        createTestSnapshot('snap1', 100, '', new Date('2025-01-01T10:00:00Z').toISOString()),
-        createTestSnapshot('snap2', 150, '', new Date('2025-01-01T11:00:00Z').toISOString()),
+        createTestSnapshot('snap1', 100, '', new Date('2025-01-01T10:00:00Z')),
+        createTestSnapshot('snap2', 150, '', new Date('2025-01-01T11:00:00Z')),
       ]
 
       const metrics = calculateWritingVelocity(

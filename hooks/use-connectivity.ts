@@ -35,7 +35,7 @@ export function useConnectivity(options: ConnectivityCheckOptions = {}) {
       const supabase = createClient()
 
       // Try to fetch auth session as a connectivity check
-      const { data, error } = await supabase.auth.getSession()
+      const { error } = await supabase.auth.getSession()
 
       if (error) {
         console.warn('[Connectivity] Supabase check failed:', error.message)
@@ -227,7 +227,7 @@ export function useConnectivity(options: ConnectivityCheckOptions = {}) {
    */
   useEffect(() => {
     checkConnectivity()
-  }, []) // Only run once on mount
+  }, [checkConnectivity]) // Only run once on mount
 
   return {
     // Status

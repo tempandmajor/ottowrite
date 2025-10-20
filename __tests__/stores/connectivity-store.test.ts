@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { useConnectivityStore } from '@/stores/connectivity-store'
 
 describe('ConnectivityStore', () => {
@@ -32,7 +32,7 @@ describe('ConnectivityStore', () => {
 
   describe('Status Management', () => {
     it('should update status', () => {
-      const { setStatus, status } = useConnectivityStore.getState()
+      const { setStatus } = useConnectivityStore.getState()
 
       setStatus('online')
       expect(useConnectivityStore.getState().status).toBe('online')

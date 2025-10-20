@@ -24,7 +24,7 @@ test.describe('Autosave Conflict Resolution', () => {
 
       // Create project and document
       await docHelper.createProject(`Project ${Date.now()}`, 'novel')
-      const documentId = await docHelper.createDocument(`Document ${Date.now()}`, 'novel')
+      const createdDocumentId = await docHelper.createDocument(`Document ${Date.now()}`, 'novel')
 
       // Type initial content
       await docHelper.typeInEditor('Initial content from first session.')
@@ -36,7 +36,7 @@ test.describe('Autosave Conflict Resolution', () => {
       await auth2.login(TEST_USERS.free)
 
       const docHelper2 = new DocumentHelper(page2)
-      await docHelper2.navigateToDocument(documentId!)
+      await docHelper2.navigateToDocument(createdDocumentId)
 
       // Wait for content to load in second session
       await page2.waitForTimeout(1000)
@@ -71,7 +71,7 @@ test.describe('Autosave Conflict Resolution', () => {
   })
 
   test.describe('Conflict Resolution - Use Local Changes', () => {
-    test('should resolve conflict by keeping local changes', async ({ page, context }) => {
+    test('should resolve conflict by keeping local changes', async ({ page, context: _context }) => {
       const auth = new AuthHelper(page)
       await auth.login(TEST_USERS.free)
 
@@ -79,7 +79,7 @@ test.describe('Autosave Conflict Resolution', () => {
 
       // Create project and document
       await docHelper.createProject(`Project ${Date.now()}`, 'novel')
-      const documentId = await docHelper.createDocument(`Document ${Date.now()}`, 'novel')
+      const _documentId = await docHelper.createDocument(`Document ${Date.now()}`, 'novel')
 
       // Setup: Create a conflict (simplified version)
       // In real test, you'd use the helper to simulate conflict
@@ -128,9 +128,7 @@ test.describe('Autosave Conflict Resolution', () => {
       // Assuming conflict dialog appeared with server content:
       await docHelper.resolveConflict('use-server')
 
-      // Verify server content is used
-      const editor = page.locator('[contenteditable="true"]').first()
-      // Would verify server content here
+      // Verify server content would be asserted here once conflict simulation is implemented
 
       // Verify conflict dialog is gone
       const conflictDialog = page.getByRole('dialog', { name: /conflict/i })
@@ -182,7 +180,7 @@ test.describe('Autosave Conflict Resolution', () => {
 
       // Create project and document
       await docHelper.createProject(`Project ${Date.now()}`, 'novel')
-      const documentId = await docHelper.createDocument(`Document ${Date.now()}`, 'novel')
+      const _documentId = await docHelper.createDocument(`Document ${Date.now()}`, 'novel')
 
       // Skip for smoke test
       test.skip()
@@ -210,7 +208,7 @@ test.describe('Autosave Conflict Resolution', () => {
 
       // Create project and document
       await docHelper.createProject(`Project ${Date.now()}`, 'novel')
-      const documentId = await docHelper.createDocument(`Document ${Date.now()}`, 'novel')
+      const createdDocumentId = await docHelper.createDocument(`Document ${Date.now()}`, 'novel')
 
       // Open same document in new tab
       const page2 = await context.newPage()
@@ -218,7 +216,7 @@ test.describe('Autosave Conflict Resolution', () => {
       await auth2.login(TEST_USERS.free)
 
       const docHelper2 = new DocumentHelper(page2)
-      await docHelper2.navigateToDocument(documentId!)
+      await docHelper2.navigateToDocument(createdDocumentId)
 
       // Check for warning message
       const warning = page2.getByText(/already open|multiple tabs/i)

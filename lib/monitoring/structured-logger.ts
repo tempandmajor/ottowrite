@@ -183,6 +183,18 @@ class StructuredLogger {
     documentId?: string
     success: boolean
     error?: Error
+    routing?: {
+      model: string
+      confidence?: number
+      intent?: string
+      manualOverride?: boolean
+      rationale?: string[]
+    }
+    contextTokens?: {
+      explicit?: number
+      generated?: number
+      selection?: number
+    }
   }) {
     const {
       operation,
@@ -196,6 +208,8 @@ class StructuredLogger {
       documentId,
       success,
       error,
+      routing,
+      contextTokens,
     } = params
 
     const level: LogLevel = success ? 'info' : 'error'
@@ -203,25 +217,40 @@ class StructuredLogger {
       ? `AI request completed: ${operation}`
       : `AI request failed: ${operation}`
 
-    this.output(
-      this.createLog(
-        level,
-        message,
-        {
-          operation: `ai:${operation}`,
-          component: 'ai_service',
-          model,
-          promptLength,
-          completionLength,
-          duration,
-          tokensUsed,
-          cost,
-          userId,
-          documentId,
-        },
-        error
-      )
-    )
+    const context: LogContext = {
+      operation: `ai:${operation}`,
+      component: 'ai_service',
+      model,
+      promptLength,
+      completionLength,
+      duration,
+      tokensUsed,
+      cost,
+      userId,
+      documentId,
+    }
+
+    if (routing) {
+      context.routingModel = routing.model
+      if (typeof routing.confidence === 'number') {
+        context.routingConfidence = routing.confidence
+      }
+      if (routing.intent) {
+        context.routingIntent = routing.intent
+      }
+      if (typeof routing.manualOverride === 'boolean') {
+        context.routingManualOverride = routing.manualOverride
+      }
+      if (routing.rationale && routing.rationale.length > 0) {
+        context.routingRationale = routing.rationale
+      }
+    }
+
+    if (contextTokens) {
+      context.contextTokens = contextTokens
+    }
+
+    this.output(this.createLog(level, message, context, error))
   }
 
   /**

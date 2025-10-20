@@ -48,7 +48,7 @@ async function runRLSTests() {
     console.log('📝 Executing RLS regression tests...\n')
 
     // Execute the test SQL
-    const { data, error } = await supabase.rpc('exec', { sql: testSQL })
+    const { error } = await supabase.rpc('exec', { sql: testSQL })
 
     if (error) {
       // If exec RPC doesn't exist, try direct query

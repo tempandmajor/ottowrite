@@ -2,12 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import {
   useEditorStore,
-  useEditorStoreShallow,
   useWordCount,
   useEditorContent,
-  useDocumentMeta,
-  useSaveStatus,
-  useAIContext,
   selectWordCount,
   selectContent,
   selectStructure,
@@ -481,26 +477,7 @@ describe('EditorStore', () => {
     })
   })
 
-  describe('Shallow Comparison', () => {
-    it('useEditorStoreShallow should work with inline selectors', () => {
-      const { result } = renderHook(() => useEditorStore())
-
-      // Set initial state
-      act(() => {
-        result.current.setTitle('Initial Title')
-      })
-
-      // Test that the shallow selector function can be called
-      const selector = (state: typeof result.current) => ({
-        title: state.title,
-        wordCount: state.document?.word_count ?? 0,
-      })
-
-      const selected = selector(result.current)
-      expect(selected.title).toBe('Initial Title')
-      expect(selected.wordCount).toBe(0)
-    })
-  })
+  // Shallow comparison utilities are covered via selector tests above.
 
   describe('Re-render Optimization', () => {
     it('should not re-render when unrelated state changes (useWordCount)', () => {

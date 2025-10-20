@@ -6,7 +6,6 @@ import type { ClientContentSnapshot } from '@/lib/client-content-hash'
 export type UseDocumentSnapshotsOptions = {
   enabled?: boolean
   maxSnapshots?: number
-  autoSnapshotOnSave?: boolean
   autoSnapshotInterval?: number | null // ms, null to disable
 }
 
@@ -71,7 +70,6 @@ export function useDocumentSnapshots(options: UseDocumentSnapshotsOptions = {}):
   const {
     enabled = true,
     maxSnapshots = 50,
-    autoSnapshotOnSave = false,
     autoSnapshotInterval = null,
   } = options
 
@@ -280,18 +278,21 @@ export function useDocumentSnapshots(options: UseDocumentSnapshotsOptions = {}):
     // This is just the interval setup - actual snapshot creation
     // would be triggered by parent component
 
+    const intervalId = intervalRef.current
+
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
+      if (intervalId) {
+        clearInterval(intervalId)
       }
     }
   }, [enabled, autoSnapshotInterval])
 
   // Cleanup on unmount
   useEffect(() => {
+    const intervalId = intervalRef.current
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
+      if (intervalId) {
+        clearInterval(intervalId)
       }
     }
   }, [])

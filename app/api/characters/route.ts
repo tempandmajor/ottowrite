@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
 import { validateQuery, validateBody, validationErrorResponse, commonValidators } from '@/lib/validation/middleware'
+import { createPaginatedResponse, paginationQuerySchema } from '@/lib/api/pagination'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -11,8 +12,7 @@ export const dynamic = 'force-dynamic'
 const characterListQuerySchema = z.object({
   project_id: commonValidators.uuid,
   role: z.enum(['protagonist', 'antagonist', 'supporting', 'minor', 'other']).optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional(),
-})
+}).merge(paginationQuerySchema)
 
 const characterCreateSchema = z.object({
   project_id: commonValidators.uuid,
@@ -94,23 +94,26 @@ export async function GET(request: NextRequest) {
       return validationErrorResponse(validation, user.id)
     }
 
-    const { project_id: projectId, role, limit } = validation.data!
+    const { project_id: projectId, role, limit, cursor } = validation.data!
 
     let query = supabase
       .from('characters')
       .select('*')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
-      .order('importance', { ascending: false })
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false }) // Secondary sort for cursor stability
 
     if (role) {
       query = query.eq('role', role)
     }
 
-    if (limit) {
-      query = query.limit(limit)
+    // Apply cursor pagination
+    // Fetch limit + 1 to determine if there are more results
+    if (cursor) {
+      query = query.lt('created_at', cursor)
     }
+    query = query.limit(limit + 1)
 
     const { data: characters, error } = await query
 
@@ -126,7 +129,14 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    return successResponse({ characters })
+    // Build paginated response
+    const { data, pagination } = createPaginatedResponse(
+      characters || [],
+      limit,
+      'created_at'
+    )
+
+    return successResponse({ characters: data, pagination })
   } catch (error) {
     logger.error('Error in GET /api/characters', {
       operation: 'characters:get',

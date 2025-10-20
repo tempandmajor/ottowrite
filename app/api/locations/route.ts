@@ -2,8 +2,18 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
+import { createPaginatedResponse, paginationQuerySchema } from '@/lib/api/pagination'
+import { validateQuery, validationErrorResponse, commonValidators } from '@/lib/validation/middleware'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
+
+// Validation schema for locations list
+const locationsListQuerySchema = z.object({
+  project_id: commonValidators.uuid,
+  category: z.string().optional(),
+  search: z.string().max(200).optional(),
+}).merge(paginationQuerySchema)
 
 // GET locations for a project
 export async function GET(request: NextRequest) {
@@ -17,14 +27,13 @@ export async function GET(request: NextRequest) {
       return errorResponses.unauthorized()
     }
 
-    const { searchParams } = new URL(request.url)
-    const projectId = searchParams.get('project_id')
-    const category = searchParams.get('category')
-    const search = searchParams.get('search')
-
-    if (!projectId) {
-      return errorResponses.badRequest('project_id is required', { userId: user.id })
+    // Validate query parameters
+    const validation = validateQuery(request, locationsListQuerySchema)
+    if (!validation.success) {
+      return validationErrorResponse(validation, user.id)
     }
+
+    const { project_id: projectId, category, search, limit, cursor } = validation.data!
 
     let query = supabase
       .from('locations')
@@ -47,6 +56,7 @@ export async function GET(request: NextRequest) {
       .eq('project_id', projectId)
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
+      .order('id', { ascending: false }) // Secondary sort for cursor stability
 
     if (category && category !== 'all') {
       query = query.eq('category', category)
@@ -55,6 +65,12 @@ export async function GET(request: NextRequest) {
     if (search) {
       query = query.ilike('name', `%${search}%`)
     }
+
+    // Apply cursor pagination
+    if (cursor) {
+      query = query.lt('updated_at', cursor)
+    }
+    query = query.limit(limit + 1)
 
     const { data, error } = await query
 
@@ -70,7 +86,14 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    return successResponse({ locations: data ?? [] })
+    // Build paginated response
+    const { data: locations, pagination } = createPaginatedResponse(
+      data || [],
+      limit,
+      'updated_at'
+    )
+
+    return successResponse({ locations, pagination })
   } catch (error) {
     logger.error('Error in GET /api/locations', {
       operation: 'locations:get',

@@ -21,22 +21,35 @@ export default async function SettingsPage() {
     .eq('id', user.id)
     .single()
 
-  if (error) {
+  if (error && error.code !== 'PGRST116') {
     throw error
   }
+
+  const safeProfile =
+    profile ?? {
+      id: user.id,
+      full_name: null,
+      preferred_genres: [],
+      writing_focus: null,
+      writing_preferences: null,
+      timezone: null,
+      subscription_tier: null,
+    }
 
   const usageSummary = await getUsageSummary(supabase, user.id)
 
   return (
     <SettingsForm
       profile={{
-        id: profile.id,
-        fullName: profile.full_name ?? '',
-        preferredGenres: profile.preferred_genres ?? [],
-        writingFocus: profile.writing_focus ?? 'prose',
+        id: safeProfile.id,
+        fullName: safeProfile.full_name ?? '',
+        preferredGenres: Array.isArray(safeProfile.preferred_genres)
+          ? safeProfile.preferred_genres
+          : [],
+        writingFocus: safeProfile.writing_focus ?? 'prose',
         writingPreferences:
-          (profile.writing_preferences as Record<string, string> | null) ?? {},
-        timezone: profile.timezone ?? '',
+          (safeProfile.writing_preferences as Record<string, string> | null) ?? {},
+        timezone: safeProfile.timezone ?? '',
       }}
       email={user.email ?? ''}
       usageSummary={usageSummary}

@@ -226,14 +226,16 @@ export default function EditorPage() {
       setUserId(user.id)
 
       // Get user profile for tier info
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
         .select('subscription_tier')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
 
-      if (profile) {
+      if (!profileError && profile) {
         setUserTier(profile.subscription_tier || 'free')
+      } else {
+        setUserTier('free')
       }
 
       const { data, error } = await supabase
@@ -290,13 +292,14 @@ export default function EditorPage() {
 
       let resolvedProjectTitle: string | null = null
       if (typedData.project_id) {
-        const { data: projectData } = await supabase
+        const { data: projectData, error: projectError } = await supabase
           .from('projects')
           .select('title')
           .eq('id', typedData.project_id)
-          .single()
+          .eq('user_id', user.id)
+          .maybeSingle()
 
-        if (projectData?.title) {
+        if (!projectError && projectData?.title) {
           resolvedProjectTitle = projectData.title
         }
       }

@@ -107,10 +107,9 @@ export function useUndoRedo(options: UseUndoRedoOptions): UndoRedoAPI {
         .select('*')
         .eq('document_id', documentId)
         .eq('user_id', userId)
-        .single()
+        .maybeSingle()
 
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = no rows returned (not an error for new documents)
+      if (error) {
         throw error
       }
 

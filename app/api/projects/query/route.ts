@@ -2,6 +2,9 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
+import { validateQuery, validationErrorResponse } from '@/lib/validation/middleware'
+import { projectQuerySchema } from '@/lib/validation/schemas'
+import { detectSQLInjection } from '@/lib/security/sanitize'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -17,25 +20,35 @@ export async function GET(request: NextRequest) {
       return errorResponses.unauthorized()
     }
 
-    const { searchParams } = new URL(request.url)
-    const searchTerm = searchParams.get('q')?.trim() ?? ''
-    const type = searchParams.get('type')?.trim() ?? ''
-    const folderParam = searchParams.get('folder')?.trim() ?? ''
-    const folderFilter = folderParam === '__none' ? '__none' : folderParam
-    const tagIdsParam = searchParams.get('tags')?.trim() ?? ''
-    const limitParam = Number.parseInt(searchParams.get('limit') ?? '20', 10)
-    const pageParam = Number.parseInt(searchParams.get('page') ?? '1', 10)
+    // Validate query parameters
+    const validation = validateQuery(request, projectQuerySchema)
+    if (!validation.success) {
+      return validationErrorResponse(validation, user.id)
+    }
 
-    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 20
-    const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
-    const offset = (page - 1) * limit
+    const validated = validation.data!
+    const {
+      search: searchTerm = '',
+      folderId,
+      tags,
+      type,
+      limit,
+      offset,
+    } = validated
 
-    const tagIds = tagIdsParam
-      ? tagIdsParam
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter((tag) => tag.length > 0)
-      : []
+    // Security: Detect SQL injection attempts in search term
+    if (searchTerm && detectSQLInjection(searchTerm)) {
+      logger.warn('SQL injection attempt detected in project search', {
+        operation: 'projects:query:sql_injection',
+        userId: user.id,
+        searchTerm: searchTerm.substring(0, 100),
+      })
+      // Still allow the request but use parameterized query (Supabase handles this safely)
+    }
+
+    const folderFilter = folderId === 'none' ? '__none' : folderId
+    const tagIds = tags || []
+    const page = Math.floor(offset / limit) + 1
 
     let filteredProjectIds: string[] | null = null
 

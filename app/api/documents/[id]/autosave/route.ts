@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { generateContentHash } from '@/lib/content-hash'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
+import { sanitizeHTML, detectXSSPatterns } from '@/lib/security/sanitize'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,7 +85,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = (await request.json()) as AutosavePayload
-    const html = body.html
+
+    // Security: Sanitize HTML content to prevent XSS attacks
+    let html = body.html
+    if (html && typeof html === 'string') {
+      // Detect malicious patterns
+      if (detectXSSPatterns(html)) {
+        logger.warn('XSS patterns detected in document content', {
+          operation: 'autosave:xss_detection',
+          userId: user.id,
+          documentId,
+          contentLength: html.length,
+        })
+      }
+
+      // Sanitize the HTML (removes scripts, iframes, event handlers, etc.)
+      html = sanitizeHTML(html, false) // Keep formatting HTML, just remove dangerous patterns
+    }
+
     const structure = normalizeStructure(body.structure)
     const metadata = body.metadata ?? {}
     const anchorIds = normalizeAnchorIds(body.anchorIds)

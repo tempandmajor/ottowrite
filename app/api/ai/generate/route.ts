@@ -782,7 +782,7 @@ function mapLocationToStoryBibleEntry(record: any): StoryBibleEntry {
   }
 }
 
-function mapWorldElementToStoryBibleEntry(record: any): StoryBibleEntry {
+export function mapWorldElementToStoryBibleEntry(record: any): StoryBibleEntry {
   const summary =
     typeof record.summary === 'string' && record.summary.trim().length > 0
       ? record.summary
@@ -844,7 +844,7 @@ function mapLocationImportance(category?: string | null): 'main' | 'supporting' 
   }
 }
 
-function mapWorldElementType(type?: string | null): StoryBibleEntry['entityType'] {
+export function mapWorldElementType(type?: string | null): StoryBibleEntry['entityType'] {
   switch ((type ?? '').toLowerCase()) {
     case 'location':
       return 'location'
@@ -858,7 +858,7 @@ function mapWorldElementType(type?: string | null): StoryBibleEntry['entityType'
   }
 }
 
-function inferWorldElementImportance(record: any): StoryBibleImportance {
+export function inferWorldElementImportance(record: any): StoryBibleImportance {
   const tags: string[] = Array.isArray(record?.tags) ? record.tags : []
   if (tags.some((tag) => typeof tag === 'string' && tag.toLowerCase().includes('primary'))) {
     return 'main'
@@ -869,7 +869,7 @@ function inferWorldElementImportance(record: any): StoryBibleImportance {
   return 'minor'
 }
 
-function mapSnapshotToContextExcerpt(
+export function mapSnapshotToContextExcerpt(
   record: any,
   documentLookup: Map<string, { title: string; type?: string | null }>
 ): ContextExcerpt | null {
@@ -916,7 +916,7 @@ function mapSnapshotToContextExcerpt(
   }
 }
 
-function normalizeExcerptSource(
+export function normalizeExcerptSource(
   source: unknown,
   docType?: string | null
 ): ContextExcerpt['source'] {
@@ -938,7 +938,7 @@ function normalizeExcerptSource(
   }
 }
 
-function truncateSnapshotContent(text: string, maxLength = 1200): string {
+export function truncateSnapshotContent(text: string, maxLength = 1200): string {
   if (text.length <= maxLength) {
     return text
   }

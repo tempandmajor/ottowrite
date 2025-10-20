@@ -62,8 +62,10 @@ import { ConflictResolutionPanel } from '@/components/editor/conflict-resolution
 import { AutosaveErrorAlert } from '@/components/editor/autosave-error-alert'
 import { UndoRedoControls } from '@/components/editor/undo-redo-controls'
 import { DocumentMetadataForm } from '@/components/editor/document-metadata-form'
+import { InlineAnalyticsPanel } from '@/components/editor/inline-analytics-panel'
 import type { ScreenplayAct } from '@/types/screenplay'
 import { ReadingTimeWidget } from '@/components/editor/reading-time-widget'
+import { CharacterSceneIndex } from '@/components/editor/character-scene-index'
 
 // Loading fallback component
 const EditorLoadingFallback = () => (
@@ -518,6 +520,7 @@ export default function EditorPage() {
         setMetadata(initialMetadata)
         setActiveSceneId(null)
         setSceneAnchors(initialAnchors)
+        setScreenplayStructure([])
 
         const initialHash = await computeClientContentHash({
           html: initialHtml,
@@ -615,7 +618,10 @@ export default function EditorPage() {
           .split(/\s+/)
           .filter((w: string) => w.length > 0).length
 
-        contentData = { screenplay }
+        contentData = {
+          screenplay,
+          screenplayStructure: cloneScreenplayStructure(screenplayStructure),
+        }
       } else {
         const text = content.replace(/<[^>]*>/g, ' ')
         wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length
@@ -637,7 +643,10 @@ export default function EditorPage() {
       setDocument((prev) => {
         if (!prev) return prev
         const nextContent = isScriptType(document.type)
-          ? contentData
+          ? {
+              ...(prev.content ?? {}),
+              ...contentData,
+            }
           : {
               ...(prev.content ?? {}),
               ...contentData,
@@ -680,6 +689,7 @@ export default function EditorPage() {
     content,
     document,
     sceneAnchors,
+    screenplayStructure,
     setBaseHash,
     setDocument,
     setIsDirty,
@@ -687,6 +697,7 @@ export default function EditorPage() {
     setSaving,
     structure,
     title,
+    metadata,
     toast,
   ])
 
@@ -757,6 +768,22 @@ export default function EditorPage() {
       }
     },
     [toast]
+  )
+
+  const handleScreenplayStructureChange = useCallback(
+    (nextActs: ScreenplayAct[]) => {
+      setScreenplayStructure((prev) => {
+        const sanitized = sanitiseScreenplayStructure(nextActs, screenplayScenes)
+        const anchors = flattenScreenplaySceneIds(sanitized)
+        setSceneAnchors(anchors)
+
+        if (screenplayStructuresEqual(prev, sanitized)) {
+          return prev
+        }
+        return cloneScreenplayStructure(sanitized)
+      })
+    },
+    [screenplayScenes, setSceneAnchors]
   )
 
   const insertAIText = (rawText: string) => {
@@ -1112,7 +1139,7 @@ export default function EditorPage() {
     return null
   }
 
-  const showStructureSidebar = !isScriptType(document.type)
+  const showStructureSidebar = Boolean(document)
 
   return (
     <div className="min-h-screen bg-background">
@@ -1270,23 +1297,37 @@ export default function EditorPage() {
             : 'lg:grid lg:grid-cols-[minmax(0,1fr)_320px]'
         }`}
       >
-        {showStructureSidebar && (
+        {showStructureSidebar && document && (
           <div className="space-y-4">
-            <ChapterSidebar
-              chapters={structure}
-              onChange={handleStructureChange}
-              activeSceneId={activeSceneId}
-              onSelectScene={handleSceneSelect}
-              onCreateScene={handleSceneCreated}
-              onInsertAnchor={handleInsertAnchor}
-              missingAnchors={missingAnchors}
-              metadata={metadata}
-            />
-            <ReadingTimeWidget
-              content={content}
-              wordCount={wordCount}
-              structure={structure}
-            />
+            {isScriptType(document.type) ? (
+              <ScreenplayActBoard
+                acts={screenplayStructure}
+                onChange={handleScreenplayStructureChange}
+                sceneMeta={screenplaySceneMeta}
+              />
+            ) : (
+              <>
+                <ChapterSidebar
+                  chapters={structure}
+                  onChange={handleStructureChange}
+                  activeSceneId={activeSceneId}
+                  onSelectScene={handleSceneSelect}
+                  onCreateScene={handleSceneCreated}
+                  onInsertAnchor={handleInsertAnchor}
+                  missingAnchors={missingAnchors}
+                />
+                <ReadingTimeWidget
+                  content={content}
+                  wordCount={wordCount}
+                  structure={structure}
+                />
+                <CharacterSceneIndex
+                  content={content}
+                  structure={structure}
+                  onNavigateToScene={handleSceneSelect}
+                />
+              </>
+            )}
           </div>
         )}
         <div className="space-y-6">
@@ -1384,6 +1425,13 @@ export default function EditorPage() {
         </div>
 
         <div className="space-y-4">
+          <InlineAnalyticsPanel
+            documentType={document.type}
+            contentHtml={isScriptType(document.type) ? '' : content}
+            structure={isScriptType(document.type) ? undefined : structure}
+            screenplayElements={isScriptType(document.type) ? screenplayContent : undefined}
+            wordCount={wordCount}
+          />
           <Card className="border-none bg-card/80 shadow-card">
             <CardHeader>
               <CardTitle>AI assistant</CardTitle>

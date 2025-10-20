@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react'
+import { useState, useRef, useEffect, KeyboardEvent, useCallback, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 type ElementType = 'scene' | 'action' | 'character' | 'dialogue' | 'parenthetical' | 'transition'
 
@@ -29,6 +30,46 @@ export function ScreenplayEditor({
   editable = true,
   onReady,
 }: ScreenplayEditorProps) {
+  const ELEMENT_LAYOUT: Record<
+    ElementType,
+    { container: string; textarea: string; background?: string; rowLength: number }
+  > = useMemo(
+    () => ({
+      scene: {
+        container: 'justify-start',
+        textarea: 'w-full text-left font-semibold uppercase tracking-[0.25em]',
+        background: 'bg-amber-50/60',
+        rowLength: 52,
+      },
+      action: {
+        container: 'justify-start',
+        textarea: 'w-full text-left leading-relaxed',
+        rowLength: 68,
+      },
+      character: {
+        container: 'justify-center',
+        textarea: 'w-[45%] mx-auto text-center uppercase font-semibold tracking-[0.15em]',
+        rowLength: 38,
+      },
+      dialogue: {
+        container: 'justify-center',
+        textarea: 'w-[65%] mx-auto text-left leading-relaxed',
+        rowLength: 42,
+      },
+      parenthetical: {
+        container: 'justify-center',
+        textarea: 'w-[50%] mx-auto text-center italic leading-snug',
+        rowLength: 30,
+      },
+      transition: {
+        container: 'justify-end',
+        textarea: 'w-[40%] ml-auto text-right uppercase font-semibold tracking-[0.2em]',
+        rowLength: 34,
+      },
+    }),
+    []
+  )
+
   const generateElementId = useCallback(
     () =>
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -109,6 +150,35 @@ export function ScreenplayEditor({
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>, index: number) => {
     const element = elements[index]
 
+    if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+      const shortcutMap: Record<string, ElementType> = {
+        Digit1: 'scene',
+        Digit2: 'action',
+        Digit3: 'character',
+        Digit4: 'dialogue',
+        Digit5: 'parenthetical',
+        Digit6: 'transition',
+      }
+      const nextType = shortcutMap[e.code]
+      if (nextType) {
+        e.preventDefault()
+        const formatted = formatContent(element.content, nextType)
+        updateElements((current) => {
+          const next = [...current]
+          next[index] = { ...next[index], type: nextType, content: formatted }
+          return next
+        })
+        requestAnimationFrame(() => {
+          const target = inputRefs.current[index]
+          if (target) {
+            const caret = target.selectionStart ?? target.value.length
+            focusAndSetSelection(index, caret)
+          }
+        })
+        return
+      }
+    }
+
     // Tab - cycle through element types
     if (e.key === 'Tab') {
       e.preventDefault()
@@ -118,7 +188,11 @@ export function ScreenplayEditor({
 
       updateElements((current) => {
         const next = [...current]
-        next[index] = { ...next[index], type: nextType }
+        next[index] = {
+          ...next[index],
+          type: nextType,
+          content: formatContent(next[index].content, nextType),
+        }
         return next
       })
     }
@@ -164,11 +238,44 @@ export function ScreenplayEditor({
   }
 
   const formatContent = useCallback((value: string, type: ElementType) => {
-    if (type === 'scene' || type === 'character' || type === 'transition') {
-      return value.toUpperCase()
+    const normalized = value.replace(/\r\n/g, '\n')
+    switch (type) {
+      case 'scene': {
+        const cleaned = normalized.replace(/\s+/g, ' ').trim().toUpperCase()
+        return cleaned
+      }
+      case 'character': {
+        const cleaned = normalized.replace(/\s+/g, ' ').trim().toUpperCase()
+        return cleaned
+      }
+      case 'transition': {
+        let cleaned = normalized.replace(/\s+/g, ' ').trim().toUpperCase()
+        if (cleaned && !cleaned.endsWith(':')) {
+          cleaned += ':'
+        }
+        return cleaned
+      }
+      case 'parenthetical': {
+        const inner = normalized.replace(/^\((.*)\)$/s, '$1').trim()
+        return inner ? `(${inner})` : ''
+      }
+      default:
+        return normalized
     }
-    return value
   }, [])
+
+  const estimateRows = useCallback(
+    (text: string, type: ElementType) => {
+      const layout = ELEMENT_LAYOUT[type]
+      const maxLength = layout?.rowLength ?? 60
+      const lines = text.split('\n').reduce((sum, line) => {
+        const length = line.trim().length || 1
+        return sum + Math.max(1, Math.ceil(length / maxLength))
+      }, 0)
+      return Math.max(1, lines)
+    },
+    [ELEMENT_LAYOUT]
+  )
 
   const insertTextAtCursor = useCallback(
     (rawText: string) => {
@@ -296,25 +403,6 @@ export function ScreenplayEditor({
     }
   }
 
-  const getElementStyle = (type: ElementType): string => {
-    switch (type) {
-      case 'scene':
-        return 'font-bold uppercase'
-      case 'action':
-        return ''
-      case 'character':
-        return 'ml-[30%] uppercase font-semibold'
-      case 'dialogue':
-        return 'ml-[15%] mr-[20%]'
-      case 'parenthetical':
-        return 'ml-[25%] mr-[30%] italic'
-      case 'transition':
-        return 'ml-auto text-right uppercase font-semibold'
-      default:
-        return ''
-    }
-  }
-
   const getPlaceholder = (type: ElementType): string => {
     switch (type) {
       case 'scene':
@@ -369,26 +457,37 @@ export function ScreenplayEditor({
 
       {/* Screenplay Content */}
       <div className="space-y-1 font-mono text-[12pt] leading-relaxed">
-        {elements.map((element, index) => (
-          <div key={element.id} className="relative group">
-            <div className={`flex items-start ${getElementStyle(element.type)}`}>
-              <textarea
-                ref={(el) => {
-              inputRefs.current[index] = el
-            }}
-            value={element.content}
-            onChange={(e) => handleChange(index, formatContent(e.target.value, element.type))}
-            onKeyDown={(e) => handleKeyDown(e, index)}
-            onFocus={(e) => rememberSelection(index, e.currentTarget)}
-            onClick={(e) => rememberSelection(index, e.currentTarget)}
-            onKeyUp={(e) => rememberSelection(index, e.currentTarget)}
-            onSelect={(e) => rememberSelection(index, e.currentTarget)}
-            placeholder={getPlaceholder(element.type)}
-            disabled={!editable}
-            className="w-full bg-transparent border-none outline-none resize-none overflow-hidden placeholder-gray-400 focus:bg-gray-50 min-h-[1.5rem]"
-            rows={Math.max(1, Math.ceil(element.content.length / 60))}
-          />
-            </div>
+        {elements.map((element, index) => {
+          const layout = ELEMENT_LAYOUT[element.type]
+          return (
+            <div key={element.id} className="relative group">
+              <div
+                className={cn(
+                  'flex items-start px-2 py-1 transition-colors rounded-md',
+                  layout?.container ?? 'justify-start',
+                  layout?.background ?? ''
+                )}
+              >
+                <textarea
+                  ref={(el) => {
+                    inputRefs.current[index] = el
+                  }}
+                  value={element.content}
+                  onChange={(e) => handleChange(index, formatContent(e.target.value, element.type))}
+                  onKeyDown={(e) => handleKeyDown(e, index)}
+                  onFocus={(e) => rememberSelection(index, e.currentTarget)}
+                  onClick={(e) => rememberSelection(index, e.currentTarget)}
+                  onKeyUp={(e) => rememberSelection(index, e.currentTarget)}
+                  onSelect={(e) => rememberSelection(index, e.currentTarget)}
+                  placeholder={getPlaceholder(element.type)}
+                  disabled={!editable}
+                  className={cn(
+                    'bg-transparent border-none outline-none resize-none overflow-hidden placeholder-gray-400 focus:bg-muted/30 focus:outline-none min-h-[1.5rem] whitespace-pre-wrap leading-relaxed text-[12pt] transition-colors rounded-md px-1 py-0.5',
+                    layout?.textarea ?? 'w-full'
+                  )}
+                  rows={estimateRows(element.content, element.type)}
+                />
+              </div>
 
             {/* Element type indicator */}
             {editable && (
@@ -396,8 +495,9 @@ export function ScreenplayEditor({
                 <span className="text-xs text-gray-400 uppercase">{element.type}</span>
               </div>
             )}
-          </div>
-        ))}
+            </div>
+          )
+        })}
       </div>
 
       {/* Help Text */}
@@ -408,6 +508,12 @@ export function ScreenplayEditor({
             <li>• <kbd className="px-2 py-1 bg-gray-100 rounded">TAB</kbd> - Cycle element type</li>
             <li>• <kbd className="px-2 py-1 bg-gray-100 rounded">ENTER</kbd> - New element</li>
             <li>• <kbd className="px-2 py-1 bg-gray-100 rounded">BACKSPACE</kbd> (on empty line) - Delete element</li>
+            <li>
+              • <kbd className="px-2 py-1 bg-gray-100 rounded">⌘ / Ctrl</kbd>
+              <span className="mx-1">+</span>
+              <kbd className="px-2 py-1 bg-gray-100 rounded">1</kbd>-<kbd className="px-2 py-1 bg-gray-100 rounded">6</kbd>
+              <span className="ml-1">Jump to Scene, Action, Character, Dialogue, Parenthetical, Transition</span>
+            </li>
           </ul>
         </div>
       )}

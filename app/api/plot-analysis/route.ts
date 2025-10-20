@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { analyzePlotHoles, extractTextContent } from '@/lib/ai/plot-analyzer'
 import type { AnalysisType } from '@/lib/ai/plot-analyzer'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // Allow up to 60 seconds for AI analysis
@@ -15,7 +17,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -23,10 +25,9 @@ export async function GET(request: NextRequest) {
     const projectId = searchParams.get('project_id')
 
     if (!documentId && !projectId) {
-      return NextResponse.json(
-        { error: 'Document ID or Project ID required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Document ID or Project ID required', {
+        userId: user.id,
+      })
     }
 
     let query = supabase
@@ -43,15 +44,25 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error fetching plot analyses', {
+        userId: user.id,
+        documentId,
+        projectId,
+        operation: 'plot_analysis:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch analyses', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json(data || [])
+    return successResponse(data || [])
   } catch (error) {
-    console.error('Error fetching plot analyses:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch analyses' },
-      { status: 500 }
-    )
+    logger.error('Error in GET /api/plot-analysis', {
+      operation: 'plot_analysis:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch analyses', { details: error })
   }
 }
 
@@ -64,26 +75,23 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { document_id, analysis_type = 'full' } = body
 
     if (!document_id) {
-      return NextResponse.json(
-        { error: 'Document ID required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Document ID required', { userId: user.id })
     }
 
     // Validate analysis type
     const validTypes: AnalysisType[] = ['full', 'timeline', 'character', 'logic', 'quick']
     if (!validTypes.includes(analysis_type)) {
-      return NextResponse.json(
-        { error: 'Invalid analysis type' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Invalid analysis type', {
+        userId: user.id,
+        validTypes: validTypes.join(', '),
+      })
     }
 
     // Get document
@@ -95,19 +103,16 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (docError || !document) {
-      return NextResponse.json(
-        { error: 'Document not found' },
-        { status: 404 }
-      )
+      return errorResponses.notFound('Document not found', { userId: user.id })
     }
 
     // Extract text content
     const textContent = extractTextContent(document.content)
 
     if (!textContent || textContent.trim().length < 100) {
-      return NextResponse.json(
-        { error: 'Document content too short for analysis (minimum 100 characters)' },
-        { status: 400 }
+      return errorResponses.badRequest(
+        'Document content too short for analysis (minimum 100 characters)',
+        { userId: user.id, contentLength: textContent?.length || 0 }
       )
     }
 
@@ -171,7 +176,11 @@ export async function POST(request: NextRequest) {
           .insert(issuesForDb)
 
         if (issuesError) {
-          console.error('Error inserting issues:', issuesError)
+          logger.error('Error inserting plot issues', {
+            userId: user.id,
+            analysisId: analysis.id,
+            operation: 'plot_analysis:insert_issues',
+          }, issuesError)
           // Don't fail the whole request, just log
         }
       }
@@ -183,7 +192,7 @@ export async function POST(request: NextRequest) {
         .eq('id', analysis.id)
         .single()
 
-      return NextResponse.json(completeAnalysis)
+      return successResponse(completeAnalysis)
     } catch (analysisError) {
       // Mark analysis as failed
       await supabase
@@ -196,13 +205,23 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', analysis.id)
 
+      logger.error('Plot analysis failed', {
+        userId: user.id,
+        analysisId: analysis.id,
+        documentId: document_id,
+        analysisType: analysis_type,
+        operation: 'plot_analysis:ai_analysis',
+      }, analysisError instanceof Error ? analysisError : undefined)
+
       throw analysisError
     }
   } catch (error) {
-    console.error('Error creating plot analysis:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to analyze plot' },
-      { status: 500 }
+    logger.error('Error creating plot analysis', {
+      operation: 'plot_analysis:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError(
+      error instanceof Error ? error.message : 'Failed to analyze plot',
+      { details: error }
     )
   }
 }
@@ -216,14 +235,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'Analysis ID required' }, { status: 400 })
+      return errorResponses.badRequest('Analysis ID required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -232,14 +251,23 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
       .eq('user_id', user.id)
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error deleting plot analysis', {
+        userId: user.id,
+        analysisId: id,
+        operation: 'plot_analysis:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete analysis', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Error deleting analysis:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete analysis' },
-      { status: 500 }
-    )
+    logger.error('Error in DELETE /api/plot-analysis', {
+      operation: 'plot_analysis:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete analysis', { details: error })
   }
 }

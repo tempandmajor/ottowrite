@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +14,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -22,10 +24,7 @@ export async function GET(request: NextRequest) {
     const resolved = searchParams.get('resolved')
 
     if (!analysisId) {
-      return NextResponse.json(
-        { error: 'Analysis ID required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Analysis ID required', { userId: user.id })
     }
 
     let query = supabase
@@ -49,7 +48,17 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error fetching plot issues', {
+        userId: user.id,
+        analysisId,
+        operation: 'plot_issues:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch issues', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
     const severityPriority: Record<string, number> = {
       critical: 1,
@@ -67,13 +76,12 @@ export async function GET(request: NextRequest) {
       return aTime - bTime
     })
 
-    return NextResponse.json(sorted)
+    return successResponse(sorted)
   } catch (error) {
-    console.error('Error fetching plot issues:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch issues' },
-      { status: 500 }
-    )
+    logger.error('Error in GET /api/plot-analysis/issues', {
+      operation: 'plot_issues:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch issues', { details: error })
   }
 }
 
@@ -86,14 +94,14 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { id, is_resolved, resolution_notes } = body
 
     if (!id) {
-      return NextResponse.json({ error: 'Issue ID required' }, { status: 400 })
+      return errorResponses.badRequest('Issue ID required', { userId: user.id })
     }
 
     const updates: any = {}
@@ -120,15 +128,24 @@ export async function PATCH(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error updating plot issue', {
+        userId: user.id,
+        issueId: id,
+        operation: 'plot_issues:update',
+      }, error)
+      return errorResponses.internalError('Failed to update issue', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json(data)
+    return successResponse(data)
   } catch (error) {
-    console.error('Error updating issue:', error)
-    return NextResponse.json(
-      { error: 'Failed to update issue' },
-      { status: 500 }
-    )
+    logger.error('Error in PATCH /api/plot-analysis/issues', {
+      operation: 'plot_issues:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to update issue', { details: error })
   }
 }
 
@@ -141,14 +158,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'Issue ID required' }, { status: 400 })
+      return errorResponses.badRequest('Issue ID required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -157,14 +174,23 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
       .eq('user_id', user.id)
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error deleting plot issue', {
+        userId: user.id,
+        issueId: id,
+        operation: 'plot_issues:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete issue', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Error deleting issue:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete issue' },
-      { status: 500 }
-    )
+    logger.error('Error in DELETE /api/plot-analysis/issues', {
+      operation: 'plot_issues:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete issue', { details: error })
   }
 }

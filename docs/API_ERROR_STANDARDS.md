@@ -273,7 +273,7 @@ When migrating an API route to standard error responses:
 
 ## Migrated Routes
 
-✅ **Phase 2 Complete (13/40 routes - 32.5%)**
+✅ **Phase 3 Complete (15/40 routes - 37.5%)**
 
 ### Payment & Billing (3 routes) ✅
 - `/api/checkout/create-session` - Stripe checkout sessions
@@ -287,7 +287,7 @@ When migrating an API route to standard error responses:
 ### Documents (1 route) ✅
 - `/api/documents/[id]/autosave` - Document autosave with conflict detection
 
-### Characters (2 routes)
+### Characters (1 route)
 - `/api/characters` - Character CRUD operations (GET, POST, PATCH, DELETE) ✅
 - `/api/characters/arcs` - Character arcs 🔄
 - `/api/characters/relationships` - Character relationships 🔄
@@ -301,14 +301,18 @@ When migrating an API route to standard error responses:
 - `/api/locations` - Location CRUD operations (GET, POST, PATCH, DELETE)
 - `/api/locations/events` - Location events 🔄
 
-🔄 **Remaining Routes (27 routes - 67.5%)**
+### Plot Analysis (2 routes) ✅
+- `/api/plot-analysis` - Plot analysis CRUD (GET, POST, DELETE) with AI integration
+- `/api/plot-analysis/issues` - Plot issue management (GET, PATCH, DELETE)
+
+🔄 **Remaining Routes (25 routes - 62.5%)**
 
 ### High Priority (Recommend Next)
-1. `/api/plot-analysis/**` - Plot analysis (2 routes)
-2. `/api/projects/folders` - Project folders
-3. `/api/projects/tags` - Project tags
-4. `/api/characters/arcs` - Character arcs
-5. `/api/characters/relationships` - Character relationships
+1. `/api/projects/folders` - Project folders (4 methods)
+2. `/api/projects/tags` - Project tags (4 methods)
+3. `/api/characters/arcs` - Character arcs
+4. `/api/characters/relationships` - Character relationships
+5. `/api/locations/events` - Location events
 
 ### Medium Priority
 6. `/api/characters/arcs` - Character arcs
@@ -378,9 +382,9 @@ content-type: application/json
 
 ---
 
-**Status**: Phase 2 of migration complete (13/40 routes - 32.5%)
-**Completed**: 2025-01-20 (TICKET-004 - Phase 2)
-**Build Status**: ✅ Passing (9.8s, 0 errors, 0 warnings)
-**Next Steps**: Migrate remaining 27 API routes following documented patterns (67.5% remaining)
+**Status**: Phase 3 of migration complete (15/40 routes - 37.5%)
+**Completed**: 2025-01-20 (TICKET-004 - Phase 3)
+**Build Status**: ✅ Passing (8.3s, 0 errors, 0 warnings)
+**Next Steps**: Migrate remaining 25 API routes following documented patterns (62.5% remaining)
 
-**Phase 2 Progress**: Added 5 critical routes including Stripe webhooks (payment processing), customer portal, project query (advanced filtering), and full locations CRUD.
+**Phase 3 Progress**: Added plot analysis routes with AI integration (5 analysis types), plot issue management with severity filtering and resolution tracking. Critical features for core writing assistance functionality now fully standardized.

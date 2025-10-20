@@ -118,12 +118,12 @@ describe('Cursor-Aware Insertion', () => {
     })
 
     it('should insert multi-paragraph text as new elements', () => {
-      const element: ScreenplayElement = {
+      const _element: ScreenplayElement = {
         id: '1',
         type: 'action',
         content: 'John enters.',
       }
-      const cursorStart = 12 // After "John enters."
+      const _cursorStart = 12 // After "John enters."
       const insertText = '\n\nHe looks around.\n\nHe sits down.'
 
       // Multi-paragraph insertion creates new elements

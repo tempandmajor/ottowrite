@@ -273,30 +273,42 @@ When migrating an API route to standard error responses:
 
 ## Migrated Routes
 
-✅ **Phase 1 Complete (8/40 routes - 20%)**
+✅ **Phase 2 Complete (13/40 routes - 32.5%)**
 
-### Payment & Billing (3 routes)
+### Payment & Billing (3 routes) ✅
 - `/api/checkout/create-session` - Stripe checkout sessions
-- `/api/ai/templates` - User prompt templates
+- `/api/checkout/customer-portal` - Customer billing portal
+- `/api/webhooks/stripe` - Stripe webhook handler (CRITICAL!)
 
-### AI & Generation (2 routes)
+### AI & Generation (2 routes) ✅
 - `/api/ai/generate` - AI content generation
 - `/api/ai/templates` - AI prompt templates
 
-### Documents (1 route)
+### Documents (1 route) ✅
 - `/api/documents/[id]/autosave` - Document autosave with conflict detection
 
-### Characters (1 route)
-- `/api/characters` - Character CRUD operations (GET, POST, PATCH, DELETE)
+### Characters (2 routes)
+- `/api/characters` - Character CRUD operations (GET, POST, PATCH, DELETE) ✅
+- `/api/characters/arcs` - Character arcs 🔄
+- `/api/characters/relationships` - Character relationships 🔄
 
-🔄 **Remaining Routes (32 routes - 80%)**
+### Projects (1 route)
+- `/api/projects/query` - Project query with filtering, search, pagination ✅
+- `/api/projects/folders` - Folder CRUD operations 🔄
+- `/api/projects/tags` - Tag CRUD operations 🔄
+
+### Locations (1 route) ✅
+- `/api/locations` - Location CRUD operations (GET, POST, PATCH, DELETE)
+- `/api/locations/events` - Location events 🔄
+
+🔄 **Remaining Routes (27 routes - 67.5%)**
 
 ### High Priority (Recommend Next)
-1. `/api/webhooks/stripe` - Stripe webhook handler (critical for payments)
-2. `/api/checkout/customer-portal` - Customer billing portal
-3. `/api/projects/**` - Project management (4 routes)
-4. `/api/locations/**` - Location management (2 routes)
-5. `/api/plot-analysis/**` - Plot analysis (2 routes)
+1. `/api/plot-analysis/**` - Plot analysis (2 routes)
+2. `/api/projects/folders` - Project folders
+3. `/api/projects/tags` - Project tags
+4. `/api/characters/arcs` - Character arcs
+5. `/api/characters/relationships` - Character relationships
 
 ### Medium Priority
 6. `/api/characters/arcs` - Character arcs
@@ -366,7 +378,9 @@ content-type: application/json
 
 ---
 
-**Status**: Phase 1 of migration complete (8/40 routes - 20%)
-**Completed**: 2025-01-20 (TICKET-004 - Phase 1)
-**Build Status**: ✅ Passing (8.3s, 0 errors, 0 warnings)
-**Next Steps**: Migrate remaining 32 API routes following documented patterns (80% remaining)
+**Status**: Phase 2 of migration complete (13/40 routes - 32.5%)
+**Completed**: 2025-01-20 (TICKET-004 - Phase 2)
+**Build Status**: ✅ Passing (9.8s, 0 errors, 0 warnings)
+**Next Steps**: Migrate remaining 27 API routes following documented patterns (67.5% remaining)
+
+**Phase 2 Progress**: Added 5 critical routes including Stripe webhooks (payment processing), customer portal, project query (advanced filtering), and full locations CRUD.

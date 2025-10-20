@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getStripeClient } from '@/lib/stripe/config'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export async function POST() {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { data: profile, error: profileError } = await supabase
@@ -22,7 +23,14 @@ export async function POST() {
       .single()
 
     if (profileError) {
-      throw profileError
+      logger.error('Failed to fetch user profile for customer portal', {
+        userId: user.id,
+        operation: 'customer_portal:fetch_profile',
+      }, profileError)
+      return errorResponses.internalError('Failed to access customer portal', {
+        details: profileError,
+        userId: user.id,
+      })
     }
 
     const stripe = getStripeClient()
@@ -47,9 +55,11 @@ export async function POST() {
       return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/settings`,
     })
 
-    return NextResponse.json({ url: session.url })
+    return successResponse({ url: session.url })
   } catch (error) {
-    console.error('Failed to create customer portal session:', error)
-    return NextResponse.json({ error: 'Failed to open customer portal' }, { status: 500 })
+    logger.error('Failed to create customer portal session', {
+      operation: 'customer_portal:create_session',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to open customer portal', { details: error })
   }
 }

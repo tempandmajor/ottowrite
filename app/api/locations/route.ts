@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +14,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
 
     if (!projectId) {
-      return NextResponse.json({ error: 'project_id is required' }, { status: 400 })
+      return errorResponses.badRequest('project_id is required', { userId: user.id })
     }
 
     let query = supabase
@@ -57,14 +59,23 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      console.error('Error fetching locations:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error fetching locations', {
+        userId: user.id,
+        projectId,
+        operation: 'locations:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch locations', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ locations: data ?? [] })
+    return successResponse({ locations: data ?? [] })
   } catch (error) {
-    console.error('Error in GET /api/locations:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in GET /api/locations', {
+      operation: 'locations:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch locations', { details: error })
   }
 }
 
@@ -77,7 +88,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -96,10 +107,9 @@ export async function POST(request: NextRequest) {
     } = body
 
     if (!project_id || !name || !category) {
-      return NextResponse.json(
-        { error: 'project_id, name and category are required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('project_id, name and category are required', {
+        userId: user.id,
+      })
     }
 
     // verify project ownership
@@ -111,7 +121,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (projectError || !project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return errorResponses.notFound('Project not found', { userId: user.id })
     }
 
     const { data, error } = await supabase
@@ -134,14 +144,23 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error creating location:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error creating location', {
+        userId: user.id,
+        projectId: project_id,
+        operation: 'locations:create',
+      }, error)
+      return errorResponses.internalError('Failed to create location', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ location: data }, { status: 201 })
+    return successResponse({ location: data }, 201)
   } catch (error) {
-    console.error('Error in POST /api/locations:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in POST /api/locations', {
+      operation: 'locations:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create location', { details: error })
   }
 }
 
@@ -154,14 +173,14 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { id, ...updates } = body
 
     if (!id) {
-      return NextResponse.json({ error: 'Location id is required' }, { status: 400 })
+      return errorResponses.badRequest('Location id is required', { userId: user.id })
     }
 
     delete updates.user_id
@@ -178,14 +197,23 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error updating location:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error updating location', {
+        userId: user.id,
+        locationId: id,
+        operation: 'locations:update',
+      }, error)
+      return errorResponses.internalError('Failed to update location', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ location: data })
+    return successResponse({ location: data })
   } catch (error) {
-    console.error('Error in PATCH /api/locations:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in PATCH /api/locations', {
+      operation: 'locations:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to update location', { details: error })
   }
 }
 
@@ -198,14 +226,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'Location id is required' }, { status: 400 })
+      return errorResponses.badRequest('Location id is required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -215,13 +243,22 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', user.id)
 
     if (error) {
-      console.error('Error deleting location:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error deleting location', {
+        userId: user.id,
+        locationId: id,
+        operation: 'locations:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete location', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Error in DELETE /api/locations:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in DELETE /api/locations', {
+      operation: 'locations:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete location', { details: error })
   }
 }

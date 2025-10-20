@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -12,7 +14,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -60,7 +62,7 @@ export async function GET(request: NextRequest) {
             .order('name', { ascending: true }),
         ])
 
-        return NextResponse.json({
+        return successResponse({
           projects: [],
           pagination: {
             total: 0,
@@ -81,7 +83,7 @@ export async function GET(request: NextRequest) {
         .map(([projectId]) => projectId)
 
       if (filteredProjectIds.length === 0) {
-        return NextResponse.json({
+        return successResponse({
           projects: [],
           pagination: {
             total: 0,
@@ -205,7 +207,7 @@ export async function GET(request: NextRequest) {
       folder: project.folder_id ? foldersById[project.folder_id] ?? null : null,
     }))
 
-    return NextResponse.json({
+    return successResponse({
       projects,
       pagination: {
         total: count ?? 0,
@@ -216,7 +218,9 @@ export async function GET(request: NextRequest) {
       availableTags: availableTags ?? [],
     })
   } catch (error) {
-    console.error('Project query failed:', error)
-    return NextResponse.json({ error: 'Failed to query projects' }, { status: 500 })
+    logger.error('Project query failed', {
+      operation: 'projects:query',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to query projects', { details: error })
   }
 }

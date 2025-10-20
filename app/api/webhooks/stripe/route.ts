@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { headers } from 'next/headers'
 import { getStripeClient, getTierByPriceId } from '@/lib/stripe/config'
 import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import Stripe from 'stripe'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +14,8 @@ export async function POST(request: NextRequest) {
   const signature = headersList.get('stripe-signature')
 
   if (!signature) {
-    return NextResponse.json({ error: 'No signature' }, { status: 400 })
+    logger.warn('Webhook missing signature', { operation: 'webhook:stripe' })
+    return errorResponses.badRequest('No signature provided')
   }
 
   let event: Stripe.Event
@@ -25,8 +28,10 @@ export async function POST(request: NextRequest) {
       process.env.STRIPE_WEBHOOK_SECRET!
     )
   } catch (err) {
-    console.error('Webhook signature verification failed:', err)
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    logger.error('Webhook signature verification failed', {
+      operation: 'webhook:stripe:verify',
+    }, err instanceof Error ? err : undefined)
+    return errorResponses.badRequest('Invalid signature')
   }
 
   const supabase = createServiceRoleClient()
@@ -82,10 +87,10 @@ export async function POST(request: NextRequest) {
               : session.customer?.id ?? null
 
           if (!supabaseUserId) {
-            console.warn(
-              'checkout.session.completed missing supabase_user_id metadata',
-              { sessionId: session.id }
-            )
+            logger.warn('Webhook missing supabase_user_id', {
+              operation: 'webhook:stripe:checkout_completed',
+              sessionId: session.id,
+            })
             break
           }
 
@@ -214,10 +219,10 @@ export async function POST(request: NextRequest) {
               (subscription.metadata?.supabase_user_id as string | undefined) ??
               null
           } catch (subscriptionError) {
-            console.error(
-              'Failed to retrieve subscription metadata for invoice.payment_succeeded',
-              subscriptionError
-            )
+            logger.error('Failed to retrieve subscription for invoice.payment_succeeded', {
+              operation: 'webhook:stripe:invoice_payment_succeeded',
+              subscriptionId,
+            }, subscriptionError instanceof Error ? subscriptionError : undefined)
           }
 
           const stripeCustomerId =
@@ -264,10 +269,10 @@ export async function POST(request: NextRequest) {
               (subscription.metadata?.supabase_user_id as string | undefined) ??
               null
           } catch (subscriptionError) {
-            console.error(
-              'Failed to retrieve subscription metadata for invoice.payment_failed',
-              subscriptionError
-            )
+            logger.error('Failed to retrieve subscription for invoice.payment_failed', {
+              operation: 'webhook:stripe:invoice_payment_failed',
+              subscriptionId,
+            }, subscriptionError instanceof Error ? subscriptionError : undefined)
           }
 
           const stripeCustomerId =
@@ -295,15 +300,18 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`)
+        logger.info('Unhandled webhook event type', {
+          operation: 'webhook:stripe',
+          eventType: event.type,
+        })
     }
 
-    return NextResponse.json({ received: true })
+    return successResponse({ received: true })
   } catch (error) {
-    console.error('Webhook handler error:', error)
-    return NextResponse.json(
-      { error: 'Webhook handler failed' },
-      { status: 500 }
-    )
+    logger.error('Webhook handler error', {
+      operation: 'webhook:stripe:handler',
+      eventType: event.type,
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Webhook handler failed', { details: error })
   }
 }

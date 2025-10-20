@@ -14,6 +14,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import type { DocumentMetadata } from './document-metadata-form'
+import { Badge } from '@/components/ui/badge'
 
 export type SceneMetadata = {
   pov?: string
@@ -48,6 +50,7 @@ interface ChapterSidebarProps {
   onCreateScene: (chapterId: string, sceneId: string) => void
   onInsertAnchor?: (sceneId: string) => void
   missingAnchors?: Set<string>
+  metadata?: DocumentMetadata
 }
 
 const pacingOptions: Array<{ label: string; value: SceneMetadata['pacing'] }> = [
@@ -75,6 +78,7 @@ export function ChapterSidebar({
   onCreateScene,
   onInsertAnchor,
   missingAnchors,
+  metadata,
 }: ChapterSidebarProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
@@ -243,6 +247,26 @@ export function ChapterSidebar({
         <p className="text-sm text-muted-foreground">
           Organize your manuscript, document POV changes, and keep track of pacing.
         </p>
+        {/* Document Metadata Display */}
+        {metadata && (metadata.povCharacter || metadata.pacingTarget || metadata.tone) && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {metadata.povCharacter && (
+              <Badge variant="secondary" className="text-xs">
+                POV: {metadata.povCharacter}
+              </Badge>
+            )}
+            {metadata.pacingTarget && (
+              <Badge variant="secondary" className="text-xs capitalize">
+                {metadata.pacingTarget}
+              </Badge>
+            )}
+            {metadata.tone && (
+              <Badge variant="outline" className="text-xs">
+                {metadata.tone}
+              </Badge>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between gap-2">

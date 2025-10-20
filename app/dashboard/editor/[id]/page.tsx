@@ -57,10 +57,13 @@ const VersionHistory = lazy(() => import('@/components/editor/version-history').
 
 // Eagerly load critical components that are always visible
 import { ChapterSidebar } from '@/components/editor/chapter-sidebar'
+import { ScreenplayActBoard } from '@/components/editor/screenplay-act-board'
 import { ConflictResolutionPanel } from '@/components/editor/conflict-resolution-panel'
 import { AutosaveErrorAlert } from '@/components/editor/autosave-error-alert'
 import { UndoRedoControls } from '@/components/editor/undo-redo-controls'
 import { DocumentMetadataForm } from '@/components/editor/document-metadata-form'
+import type { ScreenplayAct } from '@/types/screenplay'
+import { ReadingTimeWidget } from '@/components/editor/reading-time-widget'
 
 // Loading fallback component
 const EditorLoadingFallback = () => (
@@ -110,6 +113,195 @@ function extractSceneAnchors(html?: string): string[] {
   return Array.from(ids)
 }
 
+const SCREENPLAY_BLUEPRINT: Array<{ title: string; sequences: string[] }> = [
+  { title: 'Act I', sequences: ['Setup', 'Catalyst'] },
+  { title: 'Act II', sequences: ['Midpoint Build', 'All Is Lost'] },
+  { title: 'Act III', sequences: ['Finale', 'Resolution'] },
+]
+
+const cloneScreenplayStructure = (acts: ScreenplayAct[]): ScreenplayAct[] =>
+  acts.map((act) => ({
+    ...act,
+    sequences: act.sequences.map((sequence) => ({
+      ...sequence,
+      sceneIds: [...sequence.sceneIds],
+    })),
+  }))
+
+const flattenScreenplaySceneIds = (acts: ScreenplayAct[]): string[] => {
+  const seen = new Set<string>()
+  const ordered: string[] = []
+  acts.forEach((act) => {
+    act.sequences.forEach((sequence) => {
+      sequence.sceneIds.forEach((id) => {
+        if (!seen.has(id)) {
+          seen.add(id)
+          ordered.push(id)
+        }
+      })
+    })
+  })
+  return ordered
+}
+
+function createDefaultScreenplayStructure(scenes: ScreenplayElement[]): ScreenplayAct[] {
+  const sanitizedScenes = scenes.filter((scene) => scene && typeof scene.id === 'string')
+  const totalScenes = sanitizedScenes.length
+  const totalSequences = SCREENPLAY_BLUEPRINT.reduce(
+    (sum, act) => sum + act.sequences.length,
+    0
+  )
+  const chunkSize = Math.max(1, Math.ceil(totalScenes / Math.max(totalSequences, 1)))
+  let cursor = 0
+
+  const acts = SCREENPLAY_BLUEPRINT.map((actBlueprint, actIndex) => {
+    const sequences = actBlueprint.sequences.map((sequenceTitle, sequenceIndex) => {
+      const start = cursor
+      const end = Math.min(start + chunkSize, sanitizedScenes.length)
+      const assignedScenes = sanitizedScenes.slice(start, end)
+      cursor = end
+
+      return {
+        id: `${actIndex + 1}-${sequenceIndex + 1}-${generateClientId()}`,
+        title: sequenceTitle,
+        summary: null,
+        color: null,
+        sceneIds: assignedScenes.map((scene) => scene.id),
+      }
+    })
+
+    return {
+      id: `${actIndex + 1}-${generateClientId()}`,
+      title: actBlueprint.title,
+      summary: null,
+      sequences,
+    }
+  })
+
+  const remaining = sanitizedScenes.slice(cursor)
+  if (remaining.length > 0 && acts.length > 0) {
+    const lastSequence =
+      acts[acts.length - 1].sequences[acts[acts.length - 1].sequences.length - 1]
+    lastSequence.sceneIds = [...lastSequence.sceneIds, ...remaining.map((scene) => scene.id)]
+  }
+
+  if (acts.length === 0) {
+    return [
+      {
+        id: `1-${generateClientId()}`,
+        title: 'Act I',
+        summary: null,
+        sequences: [
+          {
+            id: `1-1-${generateClientId()}`,
+            title: 'Sequence 1',
+            summary: null,
+            color: null,
+            sceneIds: [],
+          },
+        ],
+      },
+    ]
+  }
+
+  return acts
+}
+
+function sanitiseScreenplayStructure(
+  current: ScreenplayAct[] | null | undefined,
+  scenes: ScreenplayElement[]
+): ScreenplayAct[] {
+  const sceneMap = new Map(
+    scenes
+      .filter((scene) => scene && typeof scene.id === 'string')
+      .map((scene, index) => [scene.id, { scene, index }])
+  )
+
+  let baseStructure =
+    current && Array.isArray(current) && current.length > 0
+      ? cloneScreenplayStructure(current)
+      : createDefaultScreenplayStructure(scenes)
+
+  baseStructure = baseStructure.map((act, actIndex) => {
+    const sequences =
+      act.sequences && act.sequences.length > 0
+        ? act.sequences.map((sequence, sequenceIndex) => ({
+            ...sequence,
+            id: sequence.id || `${actIndex + 1}-${sequenceIndex + 1}-${generateClientId()}`,
+            title: sequence.title || `Sequence ${sequenceIndex + 1}`,
+            sceneIds: Array.from(
+              new Set((sequence.sceneIds ?? []).filter((sceneId) => sceneMap.has(sceneId)))
+            ),
+          }))
+        : [
+            {
+              id: `${actIndex + 1}-1-${generateClientId()}`,
+              title: 'Sequence 1',
+              summary: null,
+              color: null,
+              sceneIds: [],
+            },
+          ]
+
+    return {
+      id: act.id || `${actIndex + 1}-${generateClientId()}`,
+      title: act.title || `Act ${actIndex + 1}`,
+      summary: act.summary ?? null,
+      sequences,
+    }
+  })
+
+  const assigned = new Set<string>()
+  baseStructure.forEach((act) =>
+    act.sequences.forEach((sequence) =>
+      sequence.sceneIds.forEach((sceneId) => assigned.add(sceneId))
+    )
+  )
+
+  const unassignedScenes = scenes
+    .filter((scene) => scene && typeof scene.id === 'string')
+    .filter((scene) => !assigned.has(scene.id))
+    .map((scene) => scene.id)
+
+  if (unassignedScenes.length > 0) {
+    if (baseStructure.length === 0) {
+      baseStructure = createDefaultScreenplayStructure(scenes)
+    }
+    const targetSequence =
+      baseStructure[0]?.sequences[0] ??
+      ({
+        id: `1-1-${generateClientId()}`,
+        title: 'Sequence 1',
+        summary: null,
+        color: null,
+        sceneIds: [],
+      } satisfies ScreenplayAct['sequences'][number])
+    targetSequence.sceneIds = [...targetSequence.sceneIds, ...unassignedScenes]
+    if (!baseStructure[0]) {
+      baseStructure = [
+        {
+          id: `1-${generateClientId()}`,
+          title: 'Act I',
+          summary: null,
+          sequences: [targetSequence],
+        },
+      ]
+    } else if (!baseStructure[0].sequences.includes(targetSequence)) {
+      baseStructure[0] = {
+        ...baseStructure[0],
+        sequences: [targetSequence, ...baseStructure[0].sequences],
+      }
+    }
+  }
+
+  return baseStructure
+}
+
+const screenplayStructuresEqual = (a: ScreenplayAct[], b: ScreenplayAct[]) => {
+  if (a === b) return true
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
 export default function EditorPage() {
   const params = useParams()
   const router = useRouter()
@@ -151,6 +343,7 @@ export default function EditorPage() {
   const [showExportModal, setShowExportModal] = useState(false)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [screenplayStructure, setScreenplayStructure] = useState<ScreenplayAct[]>([])
   const lastSceneFocusMissRef = useRef<string | null>(null)
   const tiptapApiRef = useRef<TiptapEditorApi | null>(null)
   const screenplayApiRef = useRef<ScreenplayEditorApi | null>(null)
@@ -260,7 +453,41 @@ export default function EditorPage() {
         return
       }
 
-      const typedData = data as EditorDocumentRecord
+      let typedData = data as EditorDocumentRecord
+      let normalizedContent = typedData.content ?? {}
+
+      if (isScriptType(typedData.type)) {
+        const rawScreenplay = Array.isArray(normalizedContent.screenplay)
+          ? (normalizedContent.screenplay as ScreenplayElement[])
+          : []
+
+        const normalizedScreenplay = rawScreenplay.map((element, index) => ({
+          id: element?.id || `${index + 1}-${generateClientId()}`,
+          type: (element?.type as ScreenplayElement['type']) ?? 'action',
+          content: element?.content ?? (element as any)?.text ?? '',
+        }))
+
+        const sceneElements = normalizedScreenplay.filter(
+          (element) => element.type === 'scene'
+        )
+
+        const initialStructure = sanitiseScreenplayStructure(
+          normalizedContent.screenplayStructure as ScreenplayAct[] | null | undefined,
+          sceneElements
+        )
+
+        normalizedContent = {
+          ...normalizedContent,
+          screenplay: normalizedScreenplay,
+          screenplayStructure: initialStructure,
+        }
+
+        typedData = {
+          ...typedData,
+          content: normalizedContent,
+        }
+      }
+
       setDocument(typedData)
       setTitle(typedData.title)
       setLastSavedAt(typedData.updated_at ? new Date(typedData.updated_at) : new Date())
@@ -268,10 +495,15 @@ export default function EditorPage() {
       setServerContent(null)
 
       if (isScriptType(typedData.type)) {
-        setContent(JSON.stringify(typedData.content?.screenplay || []))
+        const screenplayElements = (normalizedContent.screenplay as ScreenplayElement[]) ?? []
+        const initialStructure =
+          (normalizedContent.screenplayStructure as ScreenplayAct[]) ?? []
+
+        setContent(JSON.stringify(screenplayElements))
+        setScreenplayStructure(cloneScreenplayStructure(initialStructure))
         setStructure([])
         setActiveSceneId(null)
-        setSceneAnchors([])
+        setSceneAnchors(flattenScreenplaySceneIds(initialStructure))
         setBaseHash(null)
       } else {
         const initialHtml = typedData.content?.html || ''
@@ -476,7 +708,7 @@ export default function EditorPage() {
     (nextMetadata: typeof metadata) => {
       setMetadata(nextMetadata)
     },
-    [setMetadata]
+    [metadata, setMetadata]
   )
 
   const handleSceneCreated = useCallback(
@@ -596,7 +828,15 @@ export default function EditorPage() {
   const handleRestoreVersion = (versionContent: any, versionTitle: string) => {
     setTitle(versionTitle)
     if (isScriptType(document?.type)) {
-      setContent(JSON.stringify(versionContent?.screenplay || []))
+      const restoredScreenplay = Array.isArray(versionContent?.screenplay)
+        ? (versionContent.screenplay as ScreenplayElement[])
+        : []
+      const restoredStructure = Array.isArray(versionContent?.screenplayStructure)
+        ? (versionContent.screenplayStructure as ScreenplayAct[])
+        : []
+      setContent(JSON.stringify(restoredScreenplay))
+      setScreenplayStructure(cloneScreenplayStructure(restoredStructure))
+      setSceneAnchors(flattenScreenplaySceneIds(restoredStructure))
     } else {
       setContent(versionContent?.html || '')
       const restoredStructure = Array.isArray(versionContent?.structure)
@@ -613,18 +853,32 @@ export default function EditorPage() {
 
     const originalTitle = document.title || ''
     const originalSignature = isScriptType(document.type)
-      ? JSON.stringify(document.content?.screenplay || [])
+      ? JSON.stringify({
+          screenplay: document.content?.screenplay || [],
+          screenplayStructure: document.content?.screenplayStructure || [],
+        })
       : JSON.stringify({
           html: document.content?.html || '',
           structure: document.content?.structure || [],
         })
 
     const currentSignature = isScriptType(document.type)
-      ? content
+      ? JSON.stringify({
+          screenplay: screenplayContent,
+          screenplayStructure,
+        })
       : JSON.stringify({ html: content, structure })
 
     setIsDirty(currentSignature !== originalSignature || title !== originalTitle)
-  }, [content, document, setIsDirty, structure, title])
+  }, [
+    content,
+    document,
+    screenplayContent,
+    screenplayStructure,
+    setIsDirty,
+    structure,
+    title,
+  ])
 
   const screenplayContent = useMemo<ScreenplayElement[]>(() => {
     if (!isScriptType(document?.type)) return []
@@ -636,6 +890,24 @@ export default function EditorPage() {
       return []
     }
   }, [content, document?.type])
+
+  const screenplayScenes = useMemo(() => {
+    if (!isScriptType(document?.type)) return [] as ScreenplayElement[]
+    return screenplayContent.filter((element) => element.type === 'scene')
+  }, [document?.type, screenplayContent])
+
+  const screenplaySceneMeta = useMemo(() => {
+    const meta: Record<string, { label: string; index: number }> = {}
+    screenplayScenes.forEach((scene, index) => {
+      if (!scene?.id) return
+      const normalized = (scene.content ?? '').trim()
+      meta[scene.id] = {
+        label: normalized.length > 0 ? normalized : `Scene ${index + 1}`,
+        index,
+      }
+    })
+    return meta
+  }, [screenplayScenes])
 
   const wordCount = useMemo(() => {
     if (!document) return 0
@@ -654,6 +926,19 @@ export default function EditorPage() {
       .split(/\s+/)
       .filter((w) => w.length > 0).length
   }, [document, content, screenplayContent])
+
+  useEffect(() => {
+    if (!document || !isScriptType(document.type)) return
+    setScreenplayStructure((prev) => {
+      const next = sanitiseScreenplayStructure(prev, screenplayScenes)
+      const anchors = flattenScreenplaySceneIds(next)
+      setSceneAnchors(anchors)
+      if (screenplayStructuresEqual(prev, next)) {
+        return prev
+      }
+      return cloneScreenplayStructure(next)
+    })
+  }, [document, screenplayScenes, setSceneAnchors])
 
 
   const isProseDocument = Boolean(document && !isScriptType(document.type))
@@ -995,6 +1280,12 @@ export default function EditorPage() {
               onCreateScene={handleSceneCreated}
               onInsertAnchor={handleInsertAnchor}
               missingAnchors={missingAnchors}
+              metadata={metadata}
+            />
+            <ReadingTimeWidget
+              content={content}
+              wordCount={wordCount}
+              structure={structure}
             />
           </div>
         )}

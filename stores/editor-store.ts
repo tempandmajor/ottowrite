@@ -3,11 +3,13 @@ import { useShallow } from 'zustand/react/shallow'
 
 import type { Chapter } from '@/components/editor/chapter-sidebar'
 import type { DocumentMetadata } from '@/components/editor/document-metadata-form'
+import type { ScreenplayAct } from '@/types/screenplay'
 
 export type EditorDocumentContent = {
   html?: string
   screenplay?: any
   structure?: Chapter[]
+  screenplayStructure?: ScreenplayAct[]
   metadata?: DocumentMetadata
 }
 

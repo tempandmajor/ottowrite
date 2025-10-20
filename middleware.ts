@@ -4,6 +4,8 @@ import { checkAuthThrottle } from './lib/security/auth-throttle'
 import { getOrGenerateRequestId, REQUEST_ID_HEADER } from './lib/request-id'
 import { applyRateLimit, addRateLimitHeaders } from './lib/security/api-rate-limiter'
 import { logRequest, startRequestTimer, shouldLogRequest } from './lib/middleware/request-logger'
+import { validateSession, generateSessionFingerprint } from './lib/security/session-manager'
+import { generateCSRFToken, CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from './lib/security/csrf'
 
 export async function middleware(request: NextRequest) {
   // Start request timer for logging
@@ -50,6 +52,24 @@ export async function middleware(request: NextRequest) {
 
   // Add request ID to response headers for debugging
   supabaseResponse.headers.set(REQUEST_ID_HEADER, requestId)
+
+  // Add security headers
+  supabaseResponse.headers.set('X-Content-Type-Options', 'nosniff')
+  supabaseResponse.headers.set('X-Frame-Options', 'DENY')
+  supabaseResponse.headers.set('X-XSS-Protection', '1; mode=block')
+  supabaseResponse.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  supabaseResponse.headers.set(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=()'
+  )
+
+  // Add Strict-Transport-Security in production
+  if (process.env.NODE_ENV === 'production') {
+    supabaseResponse.headers.set(
+      'Strict-Transport-Security',
+      'max-age=31536000; includeSubDomains; preload'
+    )
+  }
 
   // Clone request headers and add request ID for downstream handlers
   const requestHeaders = new Headers(request.headers)
@@ -103,6 +123,26 @@ export async function middleware(request: NextRequest) {
     // Just refresh the session, don't do auth checks
     // Auth checks are now handled by the server component layout
     const { data: { user } } = await supabase.auth.getUser()
+
+    // Generate and set CSRF token for authenticated users
+    if (user) {
+      const csrfToken = generateCSRFToken()
+      supabaseResponse.cookies.set(CSRF_COOKIE_NAME, csrfToken, {
+        ...baseCookieOptions,
+        httpOnly: true,
+      })
+      supabaseResponse.headers.set(CSRF_HEADER_NAME, csrfToken)
+
+      // Validate session fingerprint for security
+      const fingerprint = generateSessionFingerprint(request)
+      const isValidSession = await validateSession(user.id, fingerprint)
+
+      if (!isValidSession) {
+        console.warn(`Session validation failed for user ${user.id}`)
+        // Log suspicious activity but don't block yet - just warn
+        // In production, you might want to force re-authentication
+      }
+    }
 
     // Add rate limit headers to response
     supabaseResponse = addRateLimitHeaders(supabaseResponse, request, user?.id)

@@ -42,26 +42,23 @@ npm install
 
 3. Set up environment variables:
 
-Create a `.env.local` file in the root directory (see `VERCEL_ENV_VARS.md` for the authoritative checklist and secret sources):
+Copy the example environment file and fill in your actual values:
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-# Server-only keys (never expose in the browser)
-SUPABASE_ANON_KEY=your_supabase_anon_key         # optional fallback for SSR
-SUPABASE_URL=your_supabase_url                         # optional fallback for SSR
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
-STRIPE_SECRET_KEY=your_stripe_secret_key
-STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
-STRIPE_PRICE_HOBBYIST=price_id_for_hobbyist_plan
-STRIPE_PRICE_PROFESSIONAL=price_id_for_professional_plan
-STRIPE_PRICE_STUDIO=price_id_for_studio_plan
-# Optional AI vendor keys
-# ANTHROPIC_API_KEY=your_anthropic_api_key
-# OPENAI_API_KEY=your_openai_api_key
-# DEEPSEEK_API_KEY=your_deepseek_api_key
+```bash
+cp .env.example .env.local
 ```
+
+**Required Variables:**
+- Supabase: URL, anon key, service role key (from [Supabase Dashboard](https://app.supabase.com/project/_/settings/api))
+- Stripe: Secret key, publishable key, webhook secret, price IDs (from [Stripe Dashboard](https://dashboard.stripe.com/test/apikeys))
+- AI Keys: At least one of Anthropic, OpenAI, or DeepSeek API keys
+
+See `.env.example` for detailed documentation and all available options.
+
+**⚠️ Security Warning:**
+- NEVER commit `.env.local` or any file containing real API keys to git
+- Use test keys (sk_test_, pk_test_) for development
+- Rotate keys immediately if accidentally exposed
 4. Run the development server:
 \`\`\`bash
 npm run dev
@@ -84,11 +81,16 @@ npm run build-storybook      # generate static bundle (CI equivalent)
 
 2. Import the project to Vercel
 
-3. Add the required variables in Vercel Dashboard → Settings → Environment Variables (Production, Preview, Development):
+3. Add environment variables in Vercel Dashboard → Settings → Environment Variables
 
-- Supabase: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-- Stripe: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_HOBBYIST`, `STRIPE_PRICE_PROFESSIONAL`, `STRIPE_PRICE_STUDIO`
-- Optional AI vendors: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`
+Reference `.env.example` for the complete list of required and optional variables. Make sure to use **production keys** (not test keys) for the production environment.
+
+**Critical Variables:**
+- All Supabase keys (URL, anon key, service role key)
+- All Stripe keys (secret, publishable, webhook secret, price IDs)
+- At least one AI provider key (Anthropic/OpenAI/DeepSeek)
+- Set `NEXT_PUBLIC_APP_URL` to your production domain
+
 4. Deploy!
 
 ### Apply database migrations

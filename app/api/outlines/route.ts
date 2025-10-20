@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 import { generateOutline } from '@/lib/ai/outline-generator'
 import type { OutlineSection as GeneratedOutlineSection } from '@/lib/ai/outline-generator'
 
@@ -44,17 +46,14 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
 
     if (!projectId) {
-      return NextResponse.json(
-        { error: 'Project ID required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Project ID required', { userId: user.id })
     }
 
     const { data, error } = await supabase
@@ -64,15 +63,24 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error fetching outlines', {
+        userId: user.id,
+        projectId,
+        operation: 'outlines:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch outlines', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json(data || [])
+    return successResponse({ outlines: data || [] })
   } catch (error) {
-    console.error('Error fetching outlines:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch outlines' },
-      { status: 500 }
-    )
+    logger.error('Error in GET /api/outlines', {
+      operation: 'outlines:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch outlines', { details: error })
   }
 }
 
@@ -85,25 +93,25 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { project_id, premise, format, additional_context, existing_content } = body
 
     if (!project_id || !premise || !format) {
-      return NextResponse.json(
-        { error: 'Project ID, premise, and format are required' },
-        { status: 400 }
+      return errorResponses.badRequest(
+        'Project ID, premise, and format are required',
+        { userId: user.id }
       )
     }
 
     // Validate format
     const validFormats = ['chapter_summary', 'scene_by_scene', 'treatment', 'beat_outline', 'custom']
     if (!validFormats.includes(format)) {
-      return NextResponse.json(
-        { error: 'Invalid format' },
-        { status: 400 }
+      return errorResponses.badRequest(
+        `Invalid format. Valid formats: ${validFormats.join(', ')}`,
+        { userId: user.id }
       )
     }
 
@@ -116,21 +124,32 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (projectError || !project) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      )
+      return errorResponses.notFound('Project not found', { userId: user.id })
     }
 
     // Generate outline using Claude 4.5
-    const generatedContent = await generateOutline({
-      premise,
-      format,
-      projectType: project.type,
-      genre: project.genre,
-      additionalContext: additional_context,
-      existingContent: existing_content,
-    })
+    let generatedContent
+    try {
+      generatedContent = await generateOutline({
+        premise,
+        format,
+        projectType: project.type,
+        genre: project.genre,
+        additionalContext: additional_context,
+        existingContent: existing_content,
+      })
+    } catch (aiError) {
+      logger.error('AI outline generation failed', {
+        userId: user.id,
+        projectId: project_id,
+        format,
+        operation: 'outlines:ai_generate',
+      }, aiError instanceof Error ? aiError : undefined)
+      return errorResponses.internalError('Failed to generate outline with AI', {
+        details: aiError,
+        userId: user.id,
+      })
+    }
 
     // Create outline record
     const { data: outline, error: createError } = await supabase
@@ -153,7 +172,17 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (createError) throw createError
+    if (createError) {
+      logger.error('Error creating outline record', {
+        userId: user.id,
+        projectId: project_id,
+        operation: 'outlines:create',
+      }, createError)
+      return errorResponses.internalError('Failed to create outline', {
+        details: createError,
+        userId: user.id,
+      })
+    }
 
     const sectionsForDb = mapSectionsForDb(generatedContent.sections, outline.id, user.id)
 
@@ -163,19 +192,31 @@ export async function POST(request: NextRequest) {
         .insert(sectionsForDb)
 
       if (sectionsError) {
-        console.error('Error inserting outline sections:', sectionsError)
+        logger.error('Error inserting outline sections', {
+          userId: user.id,
+          outlineId: outline.id,
+          sectionCount: sectionsForDb.length,
+          operation: 'outlines:create_sections',
+        }, sectionsError)
+
         // Clean up the outline record to avoid inconsistency
         await supabase.from('outlines').delete().eq('id', outline.id).eq('user_id', user.id)
-        throw new Error('Failed to store outline sections')
+
+        return errorResponses.internalError('Failed to store outline sections', {
+          details: sectionsError,
+          userId: user.id,
+        })
       }
     }
 
-    return NextResponse.json(outline)
+    return successResponse({ outline }, 201)
   } catch (error) {
-    console.error('Error generating outline:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to generate outline' },
-      { status: 500 }
+    logger.error('Error in POST /api/outlines', {
+      operation: 'outlines:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError(
+      error instanceof Error ? error.message : 'Failed to generate outline',
+      { details: error }
     )
   }
 }
@@ -189,14 +230,14 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { id, ...updates } = body
 
     if (!id) {
-      return NextResponse.json({ error: 'Outline ID required' }, { status: 400 })
+      return errorResponses.badRequest('Outline ID required', { userId: user.id })
     }
 
     const { data, error } = await supabase
@@ -207,7 +248,21 @@ export async function PATCH(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error updating outline', {
+        userId: user.id,
+        outlineId: id,
+        operation: 'outlines:update',
+      }, error)
+      return errorResponses.internalError('Failed to update outline', {
+        details: error,
+        userId: user.id,
+      })
+    }
+
+    if (!data) {
+      return errorResponses.notFound('Outline not found', { userId: user.id })
+    }
 
     if (updates.content && Array.isArray(updates.content)) {
       const sectionsForDb = mapSectionsForDb(
@@ -223,8 +278,15 @@ export async function PATCH(request: NextRequest) {
         .eq('user_id', user.id)
 
       if (deleteError) {
-        console.error('Error clearing outline sections:', deleteError)
-        throw new Error('Failed to update outline sections')
+        logger.error('Error clearing outline sections', {
+          userId: user.id,
+          outlineId: id,
+          operation: 'outlines:clear_sections',
+        }, deleteError)
+        return errorResponses.internalError('Failed to update outline sections', {
+          details: deleteError,
+          userId: user.id,
+        })
       }
 
       if (sectionsForDb.length > 0) {
@@ -233,19 +295,26 @@ export async function PATCH(request: NextRequest) {
           .insert(sectionsForDb)
 
         if (insertError) {
-          console.error('Error inserting outline sections:', insertError)
-          throw new Error('Failed to update outline sections')
+          logger.error('Error inserting outline sections', {
+            userId: user.id,
+            outlineId: id,
+            sectionCount: sectionsForDb.length,
+            operation: 'outlines:insert_sections',
+          }, insertError)
+          return errorResponses.internalError('Failed to update outline sections', {
+            details: insertError,
+            userId: user.id,
+          })
         }
       }
     }
 
-    return NextResponse.json(data)
+    return successResponse({ outline: data })
   } catch (error) {
-    console.error('Error updating outline:', error)
-    return NextResponse.json(
-      { error: 'Failed to update outline' },
-      { status: 500 }
-    )
+    logger.error('Error in PATCH /api/outlines', {
+      operation: 'outlines:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to update outline', { details: error })
   }
 }
 
@@ -258,14 +327,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'Outline ID required' }, { status: 400 })
+      return errorResponses.badRequest('Outline ID required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -274,14 +343,23 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
       .eq('user_id', user.id)
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error deleting outline', {
+        userId: user.id,
+        outlineId: id,
+        operation: 'outlines:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete outline', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Error deleting outline:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete outline' },
-      { status: 500 }
-    )
+    logger.error('Error in DELETE /api/outlines', {
+      operation: 'outlines:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete outline', { details: error })
   }
 }

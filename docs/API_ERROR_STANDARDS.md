@@ -273,7 +273,7 @@ When migrating an API route to standard error responses:
 
 ## Migrated Routes
 
-✅ **Phase 5 Complete (20/40 routes - 50%)**
+✅ **Phase 6 Complete (23/40 routes - 57.5%)**
 
 ### Payment & Billing (3 routes) ✅
 - `/api/checkout/create-session` - Stripe checkout sessions
@@ -305,16 +305,21 @@ When migrating an API route to standard error responses:
 - `/api/plot-analysis` - Plot analysis CRUD (GET, POST, DELETE) with AI integration
 - `/api/plot-analysis/issues` - Plot issue management (GET, PATCH, DELETE)
 
-🔄 **Remaining Routes (20 routes - 50%)**
+### Story Planning (3 routes) ✅
+- `/api/story-beats` - Story beats CRUD with template initialization (GET, POST, PATCH, DELETE) ✅
+- `/api/story-beats/templates` - Beat templates list with filtering (GET) ✅
+- `/api/outlines` - AI outline generation and management (GET, POST, PATCH, DELETE) ✅
+
+🔄 **Remaining Routes (17 routes - 42.5%)**
 
 ### High Priority (Recommend Next)
-1. `/api/story-beats` - Story beats CRUD
-2. `/api/story-beats/templates` - Beat templates
-3. `/api/outlines` - Outline management
+1. `/api/analytics/enqueue` - Analytics job queue
+2. `/api/analytics/sessions` - Analytics sessions
+3. `/api/analytics/jobs/[jobId]` - Analytics job status
 
 ### Medium Priority
-4. `/api/analytics/**` - Analytics (3 routes)
-5. `/api/telemetry/**` - Telemetry (2 routes)
+4. `/api/telemetry/ui` - UI telemetry tracking
+5. `/api/telemetry/autosave-failure` - Autosave failure tracking
 
 ### Lower Priority
 6. `/api/documents/**` - Document operations (2 routes)
@@ -376,9 +381,9 @@ content-type: application/json
 
 ---
 
-**Status**: Phase 5 of migration complete (20/40 routes - 50% 🎯)
-**Completed**: 2025-01-20 (TICKET-004 - Phase 5)
-**Build Status**: ✅ Passing (9.0s, 0 errors, 0 warnings)
-**Next Steps**: Migrate remaining 20 API routes following documented patterns (50% remaining)
+**Status**: Phase 6 of migration complete (23/40 routes - 57.5%)
+**Completed**: 2025-01-20 (TICKET-004 - Phase 6)
+**Build Status**: ✅ Passing (10.7s, 0 errors, 0 warnings)
+**Next Steps**: Migrate remaining 17 API routes following documented patterns (42.5% remaining)
 
-**Phase 5 Progress**: Added character and location feature routes (arcs, relationships, events). Character arc stages track emotional state, beliefs, and relationship status across story progression. Character relationships support bidirectional queries (by character via RPC or by project via JOINs), self-relationship prevention, strength ratings, and temporal tracking. Location events track story events with importance ratings, character involvement, and flexible metadata. Fixed TypeScript null/undefined handling in logger context fields across multiple phases.
+**Phase 6 Progress**: Added story planning routes (story beats, beat templates, outlines). Story beats support both manual creation and template-based initialization via RPC function with template-not-found detection. Beat templates feature type aliasing (series→novel) and array overlap filtering. Outlines route includes AI-powered generation with Claude 4.5, transactional section insertion with rollback on failure, and separate error handling for AI generation vs database operations. All routes properly handle RPC errors and multi-step database transactions.

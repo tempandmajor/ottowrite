@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +14,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -20,10 +22,7 @@ export async function GET(request: NextRequest) {
     const beatType = searchParams.get('beat_type')
 
     if (!projectId) {
-      return NextResponse.json(
-        { error: 'Project ID required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Project ID required', { userId: user.id })
     }
 
     let query = supabase
@@ -39,15 +38,25 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error fetching story beats', {
+        userId: user.id,
+        projectId,
+        beatType: beatType ?? undefined,
+        operation: 'story_beats:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch story beats', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json(data || [])
+    return successResponse({ beats: data || [] })
   } catch (error) {
-    console.error('Error fetching story beats:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch story beats' },
-      { status: 500 }
-    )
+    logger.error('Error in GET /api/story-beats', {
+      operation: 'story_beats:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch story beats', { details: error })
   }
 }
 
@@ -60,17 +69,14 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { project_id, template_name, beats } = body
 
     if (!project_id) {
-      return NextResponse.json(
-        { error: 'Project ID required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Project ID required', { userId: user.id })
     }
 
     // If template_name provided, initialize from template
@@ -86,13 +92,24 @@ export async function POST(request: NextRequest) {
 
       if (rpcError) {
         const isTemplateMissing = rpcError.message?.toLowerCase().includes('template not found')
-        return NextResponse.json(
-          { error: isTemplateMissing ? 'Template not found' : 'Failed to initialize beats' },
-          { status: isTemplateMissing ? 404 : 500 }
-        )
+
+        if (isTemplateMissing) {
+          return errorResponses.notFound('Template not found', { userId: user.id })
+        }
+
+        logger.error('Error initializing beats from template', {
+          userId: user.id,
+          projectId: project_id,
+          templateName: template_name,
+          operation: 'story_beats:initialize_template',
+        }, rpcError)
+        return errorResponses.internalError('Failed to initialize beats', {
+          details: rpcError,
+          userId: user.id,
+        })
       }
 
-      return NextResponse.json(createdBeats || [])
+      return successResponse({ beats: createdBeats || [] })
     }
 
     // Otherwise, create individual beats
@@ -108,18 +125,30 @@ export async function POST(request: NextRequest) {
         )
         .select()
 
-      if (createError) throw createError
+      if (createError) {
+        logger.error('Error creating story beats', {
+          userId: user.id,
+          projectId: project_id,
+          beatCount: beats.length,
+          operation: 'story_beats:create',
+        }, createError)
+        return errorResponses.internalError('Failed to create story beats', {
+          details: createError,
+          userId: user.id,
+        })
+      }
 
-      return NextResponse.json(createdBeats)
+      return successResponse({ beats: createdBeats })
     }
 
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    return errorResponses.badRequest('Either template_name or beats array is required', {
+      userId: user.id,
+    })
   } catch (error) {
-    console.error('Error creating story beats:', error)
-    return NextResponse.json(
-      { error: 'Failed to create story beats' },
-      { status: 500 }
-    )
+    logger.error('Error in POST /api/story-beats', {
+      operation: 'story_beats:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create story beats', { details: error })
   }
 }
 
@@ -132,14 +161,14 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { id, ...updates } = body
 
     if (!id) {
-      return NextResponse.json({ error: 'Beat ID required' }, { status: 400 })
+      return errorResponses.badRequest('Beat ID required', { userId: user.id })
     }
 
     const { data, error } = await supabase
@@ -150,15 +179,28 @@ export async function PATCH(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error updating story beat', {
+        userId: user.id,
+        beatId: id,
+        operation: 'story_beats:update',
+      }, error)
+      return errorResponses.internalError('Failed to update story beat', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json(data)
+    if (!data) {
+      return errorResponses.notFound('Story beat not found', { userId: user.id })
+    }
+
+    return successResponse({ beat: data })
   } catch (error) {
-    console.error('Error updating story beat:', error)
-    return NextResponse.json(
-      { error: 'Failed to update story beat' },
-      { status: 500 }
-    )
+    logger.error('Error in PATCH /api/story-beats', {
+      operation: 'story_beats:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to update story beat', { details: error })
   }
 }
 
@@ -171,14 +213,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'Beat ID required' }, { status: 400 })
+      return errorResponses.badRequest('Beat ID required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -187,14 +229,23 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
       .eq('user_id', user.id)
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error deleting story beat', {
+        userId: user.id,
+        beatId: id,
+        operation: 'story_beats:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete story beat', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Error deleting story beat:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete story beat' },
-      { status: 500 }
-    )
+    logger.error('Error in DELETE /api/story-beats', {
+      operation: 'story_beats:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete story beat', { details: error })
   }
 }

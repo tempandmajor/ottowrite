@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,14 +33,21 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error fetching beat templates', {
+        suitableFor: suitableFor ?? undefined,
+        operation: 'beat_templates:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch beat templates', {
+        details: error,
+      })
+    }
 
-    return NextResponse.json(data || [])
+    return successResponse({ templates: data || [] })
   } catch (error) {
-    console.error('Error fetching beat templates:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch beat templates' },
-      { status: 500 }
-    )
+    logger.error('Error in GET /api/story-beats/templates', {
+      operation: 'beat_templates:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch beat templates', { details: error })
   }
 }

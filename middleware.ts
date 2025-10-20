@@ -3,8 +3,12 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { checkAuthThrottle } from './lib/security/auth-throttle'
 import { getOrGenerateRequestId, REQUEST_ID_HEADER } from './lib/request-id'
 import { applyRateLimit, addRateLimitHeaders } from './lib/security/api-rate-limiter'
+import { logRequest, startRequestTimer, shouldLogRequest } from './lib/middleware/request-logger'
 
 export async function middleware(request: NextRequest) {
+  // Start request timer for logging
+  const startTime = startRequestTimer()
+
   // Generate or extract request ID for tracing
   const requestId = getOrGenerateRequestId(request)
 
@@ -102,10 +106,20 @@ export async function middleware(request: NextRequest) {
 
     // Add rate limit headers to response
     supabaseResponse = addRateLimitHeaders(supabaseResponse, request, user?.id)
+
+    // Log request/response for monitoring and debugging
+    if (shouldLogRequest(request)) {
+      logRequest(request, supabaseResponse, startTime, user?.id)
+    }
   } catch (error) {
     console.error('Middleware: Error refreshing session:', error)
     // Don't throw - let the request continue to the server component
     // which will handle auth properly
+
+    // Still log the request even if session refresh failed
+    if (shouldLogRequest(request)) {
+      logRequest(request, supabaseResponse, startTime)
+    }
   }
 
   return supabaseResponse

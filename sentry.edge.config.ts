@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
+import { enhancedBeforeSend } from './lib/monitoring/sentry-config'
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -12,17 +13,12 @@ Sentry.init({
   // Only enable in production
   enabled: process.env.NODE_ENV === 'production',
 
-  // Filter out sensitive information
-  beforeSend(event) {
-    // Scrub sensitive data from edge runtime events
-    if (event.request?.headers) {
-      delete event.request.headers['authorization']
-      delete event.request.headers['cookie']
-    }
+  // Enhanced error filtering, classification, and alerting
+  beforeSend: enhancedBeforeSend,
 
-    return event
-  },
+  // Release tracking (uses git commit SHA from Vercel)
+  release: process.env.VERCEL_GIT_COMMIT_SHA,
 
-  // Ignore common non-critical errors
-  ignoreErrors: ['Unauthorized', 'Not found', '401', '404'],
+  // Dist for identifying specific builds
+  dist: process.env.VERCEL_DEPLOYMENT_ID,
 })

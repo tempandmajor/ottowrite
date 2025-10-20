@@ -2,8 +2,77 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
+import { validateQuery, validateBody, validationErrorResponse, commonValidators } from '@/lib/validation/middleware'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
+
+// Validation schemas for relationship endpoints
+const relationshipListQuerySchema = z.object({
+  project_id: commonValidators.uuid.optional(),
+  character_id: commonValidators.uuid.optional(),
+}).refine(data => data.project_id || data.character_id, {
+  message: 'Either project_id or character_id is required',
+})
+
+const relationshipCreateSchema = z.object({
+  project_id: commonValidators.uuid,
+  character_a_id: commonValidators.uuid,
+  character_b_id: commonValidators.uuid,
+  relationship_type: z.enum([
+    'family',
+    'friend',
+    'enemy',
+    'rival',
+    'mentor',
+    'mentee',
+    'romantic',
+    'professional',
+    'ally',
+    'other',
+  ]),
+  description: commonValidators.optionalString(2000),
+  strength: z.number().int().min(1).max(10).optional().default(5),
+  is_positive: z.boolean().optional().default(true),
+  status: z.enum(['current', 'past', 'developing', 'broken']).optional().default('current'),
+  starts_at: commonValidators.optionalString(500),
+  ends_at: commonValidators.optionalString(500),
+  key_moments: z.array(z.string().max(1000)).max(20).optional(),
+  notes: commonValidators.optionalString(5000),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+}).refine(data => data.character_a_id !== data.character_b_id, {
+  message: 'Cannot create relationship with the same character',
+  path: ['character_b_id'],
+})
+
+const relationshipUpdateSchema = z.object({
+  id: commonValidators.uuid,
+  relationship_type: z.enum([
+    'family',
+    'friend',
+    'enemy',
+    'rival',
+    'mentor',
+    'mentee',
+    'romantic',
+    'professional',
+    'ally',
+    'other',
+  ]).optional(),
+  description: commonValidators.optionalString(2000),
+  strength: z.number().int().min(1).max(10).optional(),
+  is_positive: z.boolean().optional(),
+  status: z.enum(['current', 'past', 'developing', 'broken']).optional(),
+  starts_at: commonValidators.optionalString(500),
+  ends_at: commonValidators.optionalString(500),
+  key_moments: z.array(z.string().max(1000)).max(20).optional(),
+  notes: commonValidators.optionalString(5000),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+})
+
+const relationshipDeleteQuerySchema = z.object({
+  id: commonValidators.uuid,
+})
 
 // GET - List relationships for a project or character
 export async function GET(request: NextRequest) {
@@ -17,15 +86,13 @@ export async function GET(request: NextRequest) {
       return errorResponses.unauthorized()
     }
 
-    const { searchParams } = new URL(request.url)
-    const projectId = searchParams.get('project_id')
-    const characterId = searchParams.get('character_id')
-
-    if (!projectId && !characterId) {
-      return errorResponses.badRequest('project_id or character_id is required', {
-        userId: user.id,
-      })
+    // Validate query parameters
+    const validation = validateQuery(request, relationshipListQuerySchema)
+    if (!validation.success) {
+      return validationErrorResponse(validation, user.id)
     }
+
+    const { project_id: projectId, character_id: characterId } = validation.data!
 
     if (characterId) {
       // Get relationships for a specific character using the RPC function
@@ -93,7 +160,12 @@ export async function POST(request: NextRequest) {
       return errorResponses.unauthorized()
     }
 
-    const body = await request.json()
+    // Validate request body
+    const validation = await validateBody(request, relationshipCreateSchema)
+    if (!validation.success) {
+      return validationErrorResponse(validation, user.id)
+    }
+
     const {
       project_id,
       character_a_id,
@@ -108,20 +180,7 @@ export async function POST(request: NextRequest) {
       key_moments,
       notes,
       metadata,
-    } = body
-
-    if (!project_id || !character_a_id || !character_b_id || !relationship_type) {
-      return errorResponses.badRequest(
-        'project_id, character_a_id, character_b_id, and relationship_type are required',
-        { userId: user.id }
-      )
-    }
-
-    if (character_a_id === character_b_id) {
-      return errorResponses.badRequest('Cannot create relationship with the same character', {
-        userId: user.id,
-      })
-    }
+    } = validation.data!
 
     // Verify both characters belong to user and project
     const { data: characters, error: charError } = await supabase
@@ -189,20 +248,21 @@ export async function PATCH(request: NextRequest) {
       return errorResponses.unauthorized()
     }
 
-    const body = await request.json()
-    const { id, ...updates } = body
-
-    if (!id) {
-      return errorResponses.badRequest('Relationship id is required', { userId: user.id })
+    // Validate request body
+    const validation = await validateBody(request, relationshipUpdateSchema)
+    if (!validation.success) {
+      return validationErrorResponse(validation, user.id)
     }
 
-    // Remove fields that shouldn't be updated
-    delete updates.user_id
-    delete updates.project_id
-    delete updates.character_a_id
-    delete updates.character_b_id
-    delete updates.created_at
-    delete updates.updated_at
+    const { id, ...updates } = validation.data!
+
+    // Remove fields that shouldn't be updated (if they somehow got through)
+    delete (updates as any).user_id
+    delete (updates as any).project_id
+    delete (updates as any).character_a_id
+    delete (updates as any).character_b_id
+    delete (updates as any).created_at
+    delete (updates as any).updated_at
 
     const { data: relationship, error } = await supabase
       .from('character_relationships')
@@ -249,12 +309,13 @@ export async function DELETE(request: NextRequest) {
       return errorResponses.unauthorized()
     }
 
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-
-    if (!id) {
-      return errorResponses.badRequest('Relationship id is required', { userId: user.id })
+    // Validate query parameters
+    const validation = validateQuery(request, relationshipDeleteQuerySchema)
+    if (!validation.success) {
+      return validationErrorResponse(validation, user.id)
     }
+
+    const { id } = validation.data!
 
     const { error } = await supabase
       .from('character_relationships')

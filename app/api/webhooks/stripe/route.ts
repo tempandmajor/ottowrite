@@ -5,6 +5,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role'
 import Stripe from 'stripe'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
+import { WEBHOOK_SECURITY } from '@/lib/validation/schemas/webhooks'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,26 +14,57 @@ export async function POST(request: NextRequest) {
   const headersList = await headers()
   const signature = headersList.get('stripe-signature')
 
+  // Security: Validate required headers
   if (!signature) {
-    logger.warn('Webhook missing signature', { operation: 'webhook:stripe' })
+    logger.warn('Webhook missing signature', {
+      operation: 'webhook:stripe:missing_signature',
+    })
     return errorResponses.badRequest('No signature provided')
+  }
+
+  // Security: Validate webhook secret is configured
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    logger.error('STRIPE_WEBHOOK_SECRET not configured', {
+      operation: 'webhook:stripe:config_error',
+    })
+    return errorResponses.internalError('Webhook not configured')
   }
 
   let event: Stripe.Event
 
   const stripe = getStripeClient()
   try {
+    // Security: Verify webhook signature to prevent replay attacks
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      process.env.STRIPE_WEBHOOK_SECRET
     )
   } catch (err) {
     logger.error('Webhook signature verification failed', {
-      operation: 'webhook:stripe:verify',
+      operation: 'webhook:stripe:verify_failed',
     }, err instanceof Error ? err : undefined)
     return errorResponses.badRequest('Invalid signature')
   }
+
+  // Security: Check event age to prevent replay attacks
+  const eventAge = Date.now() - (event.created * 1000)
+  if (eventAge > WEBHOOK_SECURITY.MAX_EVENT_AGE_MS) {
+    logger.warn('Webhook event too old', {
+      operation: 'webhook:stripe:event_too_old',
+      eventId: event.id,
+      eventAge,
+      maxAge: WEBHOOK_SECURITY.MAX_EVENT_AGE_MS,
+    })
+    return errorResponses.badRequest('Event too old')
+  }
+
+  // Security: Log event type for monitoring
+  logger.info('Processing Stripe webhook', {
+    operation: 'webhook:stripe:process',
+    eventType: event.type,
+    eventId: event.id,
+  })
 
   const supabase = createServiceRoleClient()
   const isoFromUnix = (value?: number | null) =>

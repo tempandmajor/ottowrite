@@ -2,8 +2,79 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
+import { validateQuery, validateBody, validationErrorResponse, commonValidators } from '@/lib/validation/middleware'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
+
+// Validation schemas for character endpoints
+const characterListQuerySchema = z.object({
+  project_id: commonValidators.uuid,
+  role: z.enum(['protagonist', 'antagonist', 'supporting', 'minor', 'other']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+})
+
+const characterCreateSchema = z.object({
+  project_id: commonValidators.uuid,
+  name: commonValidators.nonEmptyString(200),
+  role: z.enum(['protagonist', 'antagonist', 'supporting', 'minor', 'other']),
+  importance: z.number().int().min(1).max(10).optional().default(5),
+  age: z.number().int().min(0).max(200).optional(),
+  gender: commonValidators.optionalString(50),
+  appearance: commonValidators.optionalString(2000),
+  physical_description: commonValidators.optionalString(2000),
+  personality_traits: commonValidators.optionalString(2000),
+  strengths: commonValidators.optionalString(2000),
+  weaknesses: commonValidators.optionalString(2000),
+  fears: commonValidators.optionalString(2000),
+  desires: commonValidators.optionalString(2000),
+  backstory: commonValidators.optionalString(5000),
+  arc_type: commonValidators.optionalString(100),
+  character_arc: commonValidators.optionalString(5000),
+  internal_conflict: commonValidators.optionalString(2000),
+  external_conflict: commonValidators.optionalString(2000),
+  first_appearance: commonValidators.optionalString(500),
+  last_appearance: commonValidators.optionalString(500),
+  story_function: commonValidators.optionalString(1000),
+  image_url: z.string().url().optional(),
+  voice_description: commonValidators.optionalString(2000),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+  notes: commonValidators.optionalString(5000),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+})
+
+const characterUpdateSchema = z.object({
+  id: commonValidators.uuid,
+  name: commonValidators.optionalString(200),
+  role: z.enum(['protagonist', 'antagonist', 'supporting', 'minor', 'other']).optional(),
+  importance: z.number().int().min(1).max(10).optional(),
+  age: z.number().int().min(0).max(200).optional(),
+  gender: commonValidators.optionalString(50),
+  appearance: commonValidators.optionalString(2000),
+  physical_description: commonValidators.optionalString(2000),
+  personality_traits: commonValidators.optionalString(2000),
+  strengths: commonValidators.optionalString(2000),
+  weaknesses: commonValidators.optionalString(2000),
+  fears: commonValidators.optionalString(2000),
+  desires: commonValidators.optionalString(2000),
+  backstory: commonValidators.optionalString(5000),
+  arc_type: commonValidators.optionalString(100),
+  character_arc: commonValidators.optionalString(5000),
+  internal_conflict: commonValidators.optionalString(2000),
+  external_conflict: commonValidators.optionalString(2000),
+  first_appearance: commonValidators.optionalString(500),
+  last_appearance: commonValidators.optionalString(500),
+  story_function: commonValidators.optionalString(1000),
+  image_url: z.string().url().optional(),
+  voice_description: commonValidators.optionalString(2000),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+  notes: commonValidators.optionalString(5000),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+})
+
+const characterDeleteQuerySchema = z.object({
+  id: commonValidators.uuid,
+})
 
 // GET - List characters for a project
 export async function GET(request: NextRequest) {
@@ -17,14 +88,13 @@ export async function GET(request: NextRequest) {
       return errorResponses.unauthorized()
     }
 
-    const { searchParams } = new URL(request.url)
-    const projectId = searchParams.get('project_id')
-    const role = searchParams.get('role')
-    const limit = searchParams.get('limit')
-
-    if (!projectId) {
-      return errorResponses.badRequest('project_id is required', { userId: user.id })
+    // Validate query parameters
+    const validation = validateQuery(request, characterListQuerySchema)
+    if (!validation.success) {
+      return validationErrorResponse(validation, user.id)
     }
+
+    const { project_id: projectId, role, limit } = validation.data!
 
     let query = supabase
       .from('characters')
@@ -39,7 +109,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (limit) {
-      query = query.limit(parseInt(limit))
+      query = query.limit(limit)
     }
 
     const { data: characters, error } = await query
@@ -77,7 +147,12 @@ export async function POST(request: NextRequest) {
       return errorResponses.unauthorized()
     }
 
-    const body = await request.json()
+    // Validate request body
+    const validation = await validateBody(request, characterCreateSchema)
+    if (!validation.success) {
+      return validationErrorResponse(validation, user.id)
+    }
+
     const {
       project_id,
       name,
@@ -105,13 +180,7 @@ export async function POST(request: NextRequest) {
       tags,
       notes,
       metadata,
-    } = body
-
-    if (!project_id || !name || !role) {
-      return errorResponses.badRequest('project_id, name, and role are required', {
-        userId: user.id,
-      })
-    }
+    } = validation.data!
 
     // Verify project belongs to user
     const { data: project, error: projectError } = await supabase
@@ -192,18 +261,19 @@ export async function PATCH(request: NextRequest) {
       return errorResponses.unauthorized()
     }
 
-    const body = await request.json()
-    const { id, ...updates } = body
-
-    if (!id) {
-      return errorResponses.badRequest('Character id is required', { userId: user.id })
+    // Validate request body
+    const validation = await validateBody(request, characterUpdateSchema)
+    if (!validation.success) {
+      return validationErrorResponse(validation, user.id)
     }
 
-    // Remove fields that shouldn't be updated
-    delete updates.user_id
-    delete updates.project_id
-    delete updates.created_at
-    delete updates.updated_at
+    const { id, ...updates } = validation.data!
+
+    // Remove fields that shouldn't be updated (if they somehow got through)
+    delete (updates as any).user_id
+    delete (updates as any).project_id
+    delete (updates as any).created_at
+    delete (updates as any).updated_at
 
     const { data: character, error } = await supabase
       .from('characters')
@@ -250,12 +320,13 @@ export async function DELETE(request: NextRequest) {
       return errorResponses.unauthorized()
     }
 
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-
-    if (!id) {
-      return errorResponses.badRequest('Character id is required', { userId: user.id })
+    // Validate query parameters
+    const validation = validateQuery(request, characterDeleteQuerySchema)
+    if (!validation.success) {
+      return validationErrorResponse(validation, user.id)
     }
+
+    const { id } = validation.data!
 
     const { error } = await supabase
       .from('characters')

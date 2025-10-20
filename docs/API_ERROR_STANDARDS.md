@@ -273,7 +273,7 @@ When migrating an API route to standard error responses:
 
 ## Migrated Routes
 
-✅ **Phase 4 Complete (17/40 routes - 42.5%)**
+✅ **Phase 5 Complete (20/40 routes - 50%)**
 
 ### Payment & Billing (3 routes) ✅
 - `/api/checkout/create-session` - Stripe checkout sessions
@@ -287,52 +287,46 @@ When migrating an API route to standard error responses:
 ### Documents (1 route) ✅
 - `/api/documents/[id]/autosave` - Document autosave with conflict detection
 
-### Characters (1 route)
+### Characters (3 routes) ✅
 - `/api/characters` - Character CRUD operations (GET, POST, PATCH, DELETE) ✅
-- `/api/characters/arcs` - Character arcs 🔄
-- `/api/characters/relationships` - Character relationships 🔄
+- `/api/characters/arcs` - Character arc stages (GET, POST, PATCH, DELETE) ✅
+- `/api/characters/relationships` - Character relationships (GET, POST, PATCH, DELETE) ✅
 
 ### Projects (3 routes) ✅
 - `/api/projects/query` - Project query with filtering, search, pagination ✅
 - `/api/projects/folders` - Folder CRUD operations (GET, POST, PATCH, DELETE) ✅
 - `/api/projects/tags` - Tag CRUD operations with project count (GET, POST, PATCH, DELETE) ✅
 
-### Locations (1 route) ✅
-- `/api/locations` - Location CRUD operations (GET, POST, PATCH, DELETE)
-- `/api/locations/events` - Location events 🔄
+### Locations (2 routes) ✅
+- `/api/locations` - Location CRUD operations (GET, POST, PATCH, DELETE) ✅
+- `/api/locations/events` - Location event management (GET, POST, PATCH, DELETE) ✅
 
 ### Plot Analysis (2 routes) ✅
 - `/api/plot-analysis` - Plot analysis CRUD (GET, POST, DELETE) with AI integration
 - `/api/plot-analysis/issues` - Plot issue management (GET, PATCH, DELETE)
 
-🔄 **Remaining Routes (23 routes - 57.5%)**
+🔄 **Remaining Routes (20 routes - 50%)**
 
 ### High Priority (Recommend Next)
-1. `/api/characters/arcs` - Character development arcs
-2. `/api/characters/relationships` - Character relationships
-3. `/api/locations/events` - Location events
-4. `/api/characters/relationships` - Character relationships
-5. `/api/locations/events` - Location events
+1. `/api/story-beats` - Story beats CRUD
+2. `/api/story-beats/templates` - Beat templates
+3. `/api/outlines` - Outline management
 
 ### Medium Priority
-6. `/api/characters/arcs` - Character arcs
-7. `/api/characters/relationships` - Character relationships
-8. `/api/story-beats/**` - Story beats (2 routes)
-9. `/api/outlines` - Outlines
-10. `/api/analytics/**` - Analytics (3 routes)
-11. `/api/telemetry/**` - Telemetry (2 routes)
+4. `/api/analytics/**` - Analytics (3 routes)
+5. `/api/telemetry/**` - Telemetry (2 routes)
 
 ### Lower Priority
-12. `/api/documents/**` - Document operations (2 routes)
-13. `/api/templates/**` - Template operations (2 routes)
-14. `/api/ai/ensemble/**` - Ensemble AI (3 routes)
-15. `/api/ai/generate-coverage` - Coverage generation
-16. `/api/ai/background-task` - Background tasks
-17. `/api/analysis/dialogue-voice` - Dialogue analysis
-18. `/api/world-elements` - World building
-19. `/api/research/search` - Research
-20. `/api/beat-board` - Beat board
-21. `/api/account/**` - Account management (2 routes)
+6. `/api/documents/**` - Document operations (2 routes)
+7. `/api/templates/**` - Template operations (2 routes)
+8. `/api/ai/ensemble/**` - Ensemble AI (3 routes)
+9. `/api/ai/generate-coverage` - Coverage generation
+10. `/api/ai/background-task` - Background tasks
+11. `/api/analysis/dialogue-voice` - Dialogue analysis
+12. `/api/world-elements` - World building
+13. `/api/research/search` - Research
+14. `/api/beat-board` - Beat board
+15. `/api/account/**` - Account management (2 routes)
 
 ## Testing Error Responses
 
@@ -382,9 +376,9 @@ content-type: application/json
 
 ---
 
-**Status**: Phase 4 of migration complete (17/40 routes - 42.5%)
-**Completed**: 2025-01-20 (TICKET-004 - Phase 4)
-**Build Status**: ✅ Passing (8.4s, 0 errors, 0 warnings)
-**Next Steps**: Migrate remaining 23 API routes following documented patterns (57.5% remaining)
+**Status**: Phase 5 of migration complete (20/40 routes - 50% 🎯)
+**Completed**: 2025-01-20 (TICKET-004 - Phase 5)
+**Build Status**: ✅ Passing (9.0s, 0 errors, 0 warnings)
+**Next Steps**: Migrate remaining 20 API routes following documented patterns (50% remaining)
 
-**Phase 4 Progress**: Added project organization routes (folders & tags). Full CRUD operations for hierarchical folder structure with parent-child relationships, and tag management with project count tracking. Includes uniqueness constraint handling (409 conflict responses) for duplicate tag names.
+**Phase 5 Progress**: Added character and location feature routes (arcs, relationships, events). Character arc stages track emotional state, beliefs, and relationship status across story progression. Character relationships support bidirectional queries (by character via RPC or by project via JOINs), self-relationship prevention, strength ratings, and temporal tracking. Location events track story events with importance ratings, character involvement, and flexible metadata. Fixed TypeScript null/undefined handling in logger context fields across multiple phases.

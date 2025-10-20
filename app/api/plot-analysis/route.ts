@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
     if (error) {
       logger.error('Error fetching plot analyses', {
         userId: user.id,
-        documentId,
-        projectId,
+        documentId: documentId ?? undefined,
+        projectId: projectId ?? undefined,
         operation: 'plot_analysis:fetch',
       }, error)
       return errorResponses.internalError('Failed to fetch analyses', {
@@ -88,10 +88,10 @@ export async function POST(request: NextRequest) {
     // Validate analysis type
     const validTypes: AnalysisType[] = ['full', 'timeline', 'character', 'logic', 'quick']
     if (!validTypes.includes(analysis_type)) {
-      return errorResponses.badRequest('Invalid analysis type', {
-        userId: user.id,
-        validTypes: validTypes.join(', '),
-      })
+      return errorResponses.badRequest(
+        `Invalid analysis type. Valid types: ${validTypes.join(', ')}`,
+        { userId: user.id }
+      )
     }
 
     // Get document
@@ -111,8 +111,8 @@ export async function POST(request: NextRequest) {
 
     if (!textContent || textContent.trim().length < 100) {
       return errorResponses.badRequest(
-        'Document content too short for analysis (minimum 100 characters)',
-        { userId: user.id, contentLength: textContent?.length || 0 }
+        `Document content too short for analysis (minimum 100 characters, got ${textContent?.length || 0})`,
+        { userId: user.id }
       )
     }
 

@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,14 +14,14 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const characterId = searchParams.get('character_id')
 
     if (!characterId) {
-      return NextResponse.json({ error: 'character_id is required' }, { status: 400 })
+      return errorResponses.badRequest('character_id is required', { userId: user.id })
     }
 
     const { data: arcStages, error } = await supabase
@@ -30,14 +32,23 @@ export async function GET(request: NextRequest) {
       .order('stage_order', { ascending: true })
 
     if (error) {
-      console.error('Error fetching arc stages:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error fetching arc stages', {
+        userId: user.id,
+        characterId,
+        operation: 'character_arcs:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch arc stages', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ arcStages })
+    return successResponse({ arcStages })
   } catch (error) {
-    console.error('Error in GET /api/characters/arcs:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in GET /api/characters/arcs', {
+      operation: 'character_arcs:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch arc stages', { details: error })
   }
 }
 
@@ -50,7 +61,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -71,9 +82,9 @@ export async function POST(request: NextRequest) {
     } = body
 
     if (!character_id || !stage_name || stage_order === undefined) {
-      return NextResponse.json(
-        { error: 'character_id, stage_name, and stage_order are required' },
-        { status: 400 }
+      return errorResponses.badRequest(
+        'character_id, stage_name, and stage_order are required',
+        { userId: user.id }
       )
     }
 
@@ -86,7 +97,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (charError || !character) {
-      return NextResponse.json({ error: 'Character not found' }, { status: 404 })
+      return errorResponses.notFound('Character not found', { userId: user.id })
     }
 
     const { data: arcStage, error } = await supabase
@@ -111,14 +122,23 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error creating arc stage:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error creating arc stage', {
+        userId: user.id,
+        characterId: character_id,
+        operation: 'character_arcs:create',
+      }, error)
+      return errorResponses.internalError('Failed to create arc stage', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ arcStage }, { status: 201 })
+    return successResponse({ arcStage }, 201)
   } catch (error) {
-    console.error('Error in POST /api/characters/arcs:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in POST /api/characters/arcs', {
+      operation: 'character_arcs:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create arc stage', { details: error })
   }
 }
 
@@ -131,14 +151,14 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { id, ...updates } = body
 
     if (!id) {
-      return NextResponse.json({ error: 'Arc stage id is required' }, { status: 400 })
+      return errorResponses.badRequest('Arc stage id is required', { userId: user.id })
     }
 
     // Remove fields that shouldn't be updated
@@ -156,18 +176,27 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error updating arc stage:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error updating arc stage', {
+        userId: user.id,
+        arcStageId: id,
+        operation: 'character_arcs:update',
+      }, error)
+      return errorResponses.internalError('Failed to update arc stage', {
+        details: error,
+        userId: user.id,
+      })
     }
 
     if (!arcStage) {
-      return NextResponse.json({ error: 'Arc stage not found' }, { status: 404 })
+      return errorResponses.notFound('Arc stage not found', { userId: user.id })
     }
 
-    return NextResponse.json({ arcStage })
+    return successResponse({ arcStage })
   } catch (error) {
-    console.error('Error in PATCH /api/characters/arcs:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in PATCH /api/characters/arcs', {
+      operation: 'character_arcs:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to update arc stage', { details: error })
   }
 }
 
@@ -180,14 +209,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'Arc stage id is required' }, { status: 400 })
+      return errorResponses.badRequest('Arc stage id is required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -197,13 +226,22 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', user.id)
 
     if (error) {
-      console.error('Error deleting arc stage:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error deleting arc stage', {
+        userId: user.id,
+        arcStageId: id,
+        operation: 'character_arcs:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete arc stage', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Error in DELETE /api/characters/arcs:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in DELETE /api/characters/arcs', {
+      operation: 'character_arcs:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete arc stage', { details: error })
   }
 }

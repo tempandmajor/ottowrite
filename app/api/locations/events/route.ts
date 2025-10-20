@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +14,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -20,10 +22,9 @@ export async function GET(request: NextRequest) {
     const locationId = searchParams.get('location_id')
 
     if (!projectId && !locationId) {
-      return NextResponse.json(
-        { error: 'project_id or location_id is required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('project_id or location_id is required', {
+        userId: user.id,
+      })
     }
 
     let query = supabase
@@ -43,14 +44,24 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      console.error('Error fetching location events:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error fetching location events', {
+        userId: user.id,
+        projectId: projectId ?? undefined,
+        locationId: locationId ?? undefined,
+        operation: 'location_events:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch location events', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ events: data ?? [] })
+    return successResponse({ events: data ?? [] })
   } catch (error) {
-    console.error('Error in GET /api/locations/events:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in GET /api/locations/events', {
+      operation: 'location_events:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch location events', { details: error })
   }
 }
 
@@ -63,7 +74,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -80,9 +91,9 @@ export async function POST(request: NextRequest) {
     } = body
 
     if (!project_id || !location_id || !title) {
-      return NextResponse.json(
-        { error: 'project_id, location_id and title are required' },
-        { status: 400 }
+      return errorResponses.badRequest(
+        'project_id, location_id and title are required',
+        { userId: user.id }
       )
     }
 
@@ -94,7 +105,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (projectError || !project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return errorResponses.notFound('Project not found', { userId: user.id })
     }
 
     const { data, error } = await supabase
@@ -115,14 +126,24 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error creating location event:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error creating location event', {
+        userId: user.id,
+        projectId: project_id,
+        locationId: location_id,
+        operation: 'location_events:create',
+      }, error)
+      return errorResponses.internalError('Failed to create location event', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ event: data }, { status: 201 })
+    return successResponse({ event: data }, 201)
   } catch (error) {
-    console.error('Error in POST /api/locations/events:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in POST /api/locations/events', {
+      operation: 'location_events:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create location event', { details: error })
   }
 }
 
@@ -135,14 +156,14 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { id, ...updates } = body
 
     if (!id) {
-      return NextResponse.json({ error: 'Event id is required' }, { status: 400 })
+      return errorResponses.badRequest('Event id is required', { userId: user.id })
     }
 
     delete updates.user_id
@@ -160,14 +181,27 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error updating location event:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error updating location event', {
+        userId: user.id,
+        eventId: id,
+        operation: 'location_events:update',
+      }, error)
+      return errorResponses.internalError('Failed to update location event', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ event: data })
+    if (!data) {
+      return errorResponses.notFound('Location event not found', { userId: user.id })
+    }
+
+    return successResponse({ event: data })
   } catch (error) {
-    console.error('Error in PATCH /api/locations/events:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in PATCH /api/locations/events', {
+      operation: 'location_events:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to update location event', { details: error })
   }
 }
 
@@ -180,14 +214,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'Event id is required' }, { status: 400 })
+      return errorResponses.badRequest('Event id is required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -197,13 +231,22 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', user.id)
 
     if (error) {
-      console.error('Error deleting location event:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error deleting location event', {
+        userId: user.id,
+        eventId: id,
+        operation: 'location_events:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete location event', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Error in DELETE /api/locations/events:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in DELETE /api/locations/events', {
+      operation: 'location_events:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete location event', { details: error })
   }
 }

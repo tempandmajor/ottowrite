@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +14,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -20,10 +22,9 @@ export async function GET(request: NextRequest) {
     const characterId = searchParams.get('character_id')
 
     if (!projectId && !characterId) {
-      return NextResponse.json(
-        { error: 'project_id or character_id is required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('project_id or character_id is required', {
+        userId: user.id,
+      })
     }
 
     if (characterId) {
@@ -33,11 +34,18 @@ export async function GET(request: NextRequest) {
       })
 
       if (error) {
-        console.error('Error fetching character relationships:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        logger.error('Error fetching character relationships', {
+          userId: user.id,
+          characterId,
+          operation: 'character_relationships:fetch_by_character',
+        }, error)
+        return errorResponses.internalError('Failed to fetch character relationships', {
+          details: error,
+          userId: user.id,
+        })
       }
 
-      return NextResponse.json({ relationships })
+      return successResponse({ relationships })
     } else {
       // Get all relationships for a project
       const { data: relationships, error } = await supabase
@@ -52,15 +60,24 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('Error fetching project relationships:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        logger.error('Error fetching project relationships', {
+          userId: user.id,
+          projectId: projectId ?? undefined,
+          operation: 'character_relationships:fetch_by_project',
+        }, error)
+        return errorResponses.internalError('Failed to fetch project relationships', {
+          details: error,
+          userId: user.id,
+        })
       }
 
-      return NextResponse.json({ relationships })
+      return successResponse({ relationships })
     }
   } catch (error) {
-    console.error('Error in GET /api/characters/relationships:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in GET /api/characters/relationships', {
+      operation: 'character_relationships:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch relationships', { details: error })
   }
 }
 
@@ -73,7 +90,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -94,17 +111,16 @@ export async function POST(request: NextRequest) {
     } = body
 
     if (!project_id || !character_a_id || !character_b_id || !relationship_type) {
-      return NextResponse.json(
-        { error: 'project_id, character_a_id, character_b_id, and relationship_type are required' },
-        { status: 400 }
+      return errorResponses.badRequest(
+        'project_id, character_a_id, character_b_id, and relationship_type are required',
+        { userId: user.id }
       )
     }
 
     if (character_a_id === character_b_id) {
-      return NextResponse.json(
-        { error: 'Cannot create relationship with the same character' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Cannot create relationship with the same character', {
+        userId: user.id,
+      })
     }
 
     // Verify both characters belong to user and project
@@ -116,7 +132,7 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
 
     if (charError || !characters || characters.length !== 2) {
-      return NextResponse.json({ error: 'Characters not found' }, { status: 404 })
+      return errorResponses.notFound('Characters not found', { userId: user.id })
     }
 
     const { data: relationship, error } = await supabase
@@ -141,14 +157,23 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error creating relationship:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error creating relationship', {
+        userId: user.id,
+        projectId: project_id,
+        operation: 'character_relationships:create',
+      }, error)
+      return errorResponses.internalError('Failed to create relationship', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ relationship }, { status: 201 })
+    return successResponse({ relationship }, 201)
   } catch (error) {
-    console.error('Error in POST /api/characters/relationships:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in POST /api/characters/relationships', {
+      operation: 'character_relationships:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create relationship', { details: error })
   }
 }
 
@@ -161,14 +186,14 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { id, ...updates } = body
 
     if (!id) {
-      return NextResponse.json({ error: 'Relationship id is required' }, { status: 400 })
+      return errorResponses.badRequest('Relationship id is required', { userId: user.id })
     }
 
     // Remove fields that shouldn't be updated
@@ -188,18 +213,27 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error updating relationship:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error updating relationship', {
+        userId: user.id,
+        relationshipId: id,
+        operation: 'character_relationships:update',
+      }, error)
+      return errorResponses.internalError('Failed to update relationship', {
+        details: error,
+        userId: user.id,
+      })
     }
 
     if (!relationship) {
-      return NextResponse.json({ error: 'Relationship not found' }, { status: 404 })
+      return errorResponses.notFound('Relationship not found', { userId: user.id })
     }
 
-    return NextResponse.json({ relationship })
+    return successResponse({ relationship })
   } catch (error) {
-    console.error('Error in PATCH /api/characters/relationships:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in PATCH /api/characters/relationships', {
+      operation: 'character_relationships:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to update relationship', { details: error })
   }
 }
 
@@ -212,14 +246,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'Relationship id is required' }, { status: 400 })
+      return errorResponses.badRequest('Relationship id is required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -229,13 +263,22 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', user.id)
 
     if (error) {
-      console.error('Error deleting relationship:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error deleting relationship', {
+        userId: user.id,
+        relationshipId: id,
+        operation: 'character_relationships:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete relationship', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Error in DELETE /api/characters/relationships:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in DELETE /api/characters/relationships', {
+      operation: 'character_relationships:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete relationship', { details: error })
   }
 }

@@ -41,7 +41,7 @@ export const SUBSCRIPTION_TIERS = {
     features: {
       aiWordsPerMonth: 100000,
       maxDocuments: -1, // unlimited
-      models: ['claude-sonnet-4.5', 'gpt-5', 'deepseek-v3'],
+      models: ['claude-sonnet-4.5', 'gpt-5', 'deepseek-chat'],
       exports: ['pdf', 'docx', 'markdown', 'txt', 'epub'],
       versionHistory: -1, // unlimited
       collaboration: false,
@@ -57,7 +57,7 @@ export const SUBSCRIPTION_TIERS = {
     features: {
       aiWordsPerMonth: 500000,
       maxDocuments: -1,
-      models: ['claude-sonnet-4.5', 'gpt-5', 'deepseek-v3'],
+      models: ['claude-sonnet-4.5', 'gpt-5', 'deepseek-chat'],
       exports: ['pdf', 'docx', 'markdown', 'txt', 'epub', 'fdx', 'fountain'],
       versionHistory: -1,
       collaboration: false,
@@ -74,7 +74,7 @@ export const SUBSCRIPTION_TIERS = {
     features: {
       aiWordsPerMonth: 2000000,
       maxDocuments: -1,
-      models: ['claude-sonnet-4.5', 'gpt-5', 'deepseek-v3'],
+      models: ['claude-sonnet-4.5', 'gpt-5', 'deepseek-chat'],
       exports: ['pdf', 'docx', 'markdown', 'txt', 'epub', 'fdx', 'fountain'],
       versionHistory: -1,
       collaboration: true,

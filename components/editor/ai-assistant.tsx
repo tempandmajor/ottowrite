@@ -526,7 +526,7 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
               <SelectItem value="gpt-5">
                 GPT-5 (Analytical)
               </SelectItem>
-              <SelectItem value="deepseek-v3">
+              <SelectItem value="deepseek-chat">
                 DeepSeek V3 (Cost-effective)
               </SelectItem>
             </SelectContent>

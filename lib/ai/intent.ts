@@ -28,10 +28,10 @@ type ClassifyParams = {
 const COMMAND_MODEL_MAP: Record<AICommand, AIModel> = {
   continue: 'claude-sonnet-4.5',
   rewrite: 'gpt-5',
-  shorten: 'deepseek-v3',
+  shorten: 'deepseek-chat',
   expand: 'claude-sonnet-4.5',
   tone_shift: 'gpt-5',
-  summarize: 'deepseek-v3',
+  summarize: 'deepseek-chat',
   brainstorm: 'claude-sonnet-4.5',
   notes: 'gpt-5',
 }

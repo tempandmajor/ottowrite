@@ -35,7 +35,7 @@ const DEFAULT_MAX_TOKENS = 2000
 const _ALLOWED_MODELS: AIModel[] = [
   'claude-sonnet-4.5',
   'gpt-5',
-  'deepseek-v3',
+  'deepseek-chat',
 ]
 const CONTEXT_TOKEN_BUDGET = 2200
 const CONTEXT_RESERVE_RATIO = 0.1

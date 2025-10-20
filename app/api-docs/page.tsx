@@ -163,7 +163,7 @@ export default function APIDocsPage() {
               <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
                 <li>• Claude Sonnet 4.5 (Anthropic)</li>
                 <li>• GPT-5 + Responses API (OpenAI)</li>
-                <li>• DeepSeek V3.1-Terminus</li>
+                <li>• DeepSeek Chat (V3.1-Terminus)</li>
               </ul>
             </div>
           </div>

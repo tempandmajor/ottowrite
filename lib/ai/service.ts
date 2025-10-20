@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 
-export type AIModel = 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-v3'
+export type AIModel = 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-chat'
 
 export type AIRequest = {
   model: AIModel
@@ -57,7 +57,7 @@ function getDeepSeekClient(): OpenAI {
 const PRICING = {
   'claude-sonnet-4.5': { input: 3, output: 15 },
   'gpt-5': { input: 5, output: 15 }, // Estimated pricing
-  'deepseek-v3': { input: 0.27, output: 1.1 },
+  'deepseek-chat': { input: 0.27, output: 1.1 },
 }
 
 /**
@@ -152,7 +152,8 @@ export async function generateWithGPT5(
 }
 
 /**
- * Generate text using DeepSeek V3
+ * Generate text using DeepSeek Chat (V3.1-Terminus)
+ * Uses non-thinking mode for faster, direct responses
  */
 export async function generateWithDeepSeek(
   prompt: string,
@@ -184,8 +185,8 @@ export async function generateWithDeepSeek(
   const inputTokens = completion.usage?.prompt_tokens || 0
   const outputTokens = completion.usage?.completion_tokens || 0
   const totalCost =
-    (inputTokens / 1000000) * PRICING['deepseek-v3'].input +
-    (outputTokens / 1000000) * PRICING['deepseek-v3'].output
+    (inputTokens / 1000000) * PRICING['deepseek-chat'].input +
+    (outputTokens / 1000000) * PRICING['deepseek-chat'].output
 
   return {
     content,
@@ -194,7 +195,7 @@ export async function generateWithDeepSeek(
       outputTokens,
       totalCost,
     },
-    model: 'deepseek-v3',
+    model: 'deepseek-chat',
   }
 }
 
@@ -209,7 +210,7 @@ export async function generateWithAI(request: AIRequest): Promise<AIResponse> {
       return generateWithClaude(prompt, context, maxTokens)
     case 'gpt-5':
       return generateWithGPT5(prompt, context, maxTokens)
-    case 'deepseek-v3':
+    case 'deepseek-chat':
       return generateWithDeepSeek(prompt, context, maxTokens)
     default:
       throw new Error(`Unsupported AI model: ${model}`)
@@ -226,7 +227,7 @@ export function getRecommendedModel(taskType: 'creative' | 'analytical' | 'bulk'
     case 'analytical':
       return 'gpt-5' // Best for reasoning and analysis
     case 'bulk':
-      return 'deepseek-v3' // Most cost-effective for large operations
+      return 'deepseek-chat' // Most cost-effective for large operations
     default:
       return 'claude-sonnet-4.5'
   }

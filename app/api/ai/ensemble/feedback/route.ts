@@ -21,11 +21,11 @@ export async function POST(request: NextRequest) {
       project_id?: string | null
       document_id?: string | null
       prompt?: string
-      selected_model?: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-v3' | 'blend'
+      selected_model?: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-chat' | 'blend'
       selection_reason?: string
       inserted_text?: string
       suggestions?: Array<{
-        model: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-v3'
+        model: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-chat'
         content: string
         usage: {
           inputTokens: number

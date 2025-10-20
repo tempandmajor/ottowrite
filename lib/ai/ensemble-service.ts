@@ -5,7 +5,7 @@ import {
 } from '@/lib/ai/service'
 
 export type EnsembleSuggestion = {
-  model: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-v3' | 'blend'
+  model: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-chat' | 'blend'
   content: string
   usage: {
     inputTokens: number
@@ -33,7 +33,7 @@ export async function generateEnsembleSuggestions(params: {
 type BlendParams = {
   prompt: string
   suggestions: Array<{
-    model: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-v3'
+    model: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-chat'
     content: string
   }>
   context?: string

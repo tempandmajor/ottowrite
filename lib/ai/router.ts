@@ -30,7 +30,7 @@ const MODEL_CAPABILITIES: Record<
     speedScore: 0.6,
     maxContextTokens: 128000,
   },
-  'deepseek-v3': {
+  'deepseek-chat': {
     strengths: ['summaries', 'short edits', 'cheap experiments'],
     weaknesses: ['creative voice'],
     costScore: 0.2,
@@ -100,14 +100,14 @@ export function routeAIRequest(input: RoutingInput): RoutingDecision {
 
   if (userTier === 'hobbyist' && chosenModel === 'gpt-5' && classification.command === 'summarize') {
     rationale.push('Hobbyist tier summary -> switching to more cost-effective DeepSeek V3')
-    chosenModel = 'deepseek-v3'
+    chosenModel = 'deepseek-chat'
     confidence = Math.min(confidence, 0.7)
   }
 
   const selectionRatio = selectionLength / Math.max(documentLength, 1)
   if (selectionRatio < 0.05 && classification.command === 'rewrite') {
     rationale.push('Very small selection detected; using DeepSeek for rapid edits')
-    chosenModel = 'deepseek-v3'
+    chosenModel = 'deepseek-chat'
   }
 
   const alternatives = createAlternativeSuggestions(chosenModel)

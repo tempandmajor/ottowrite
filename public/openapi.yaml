@@ -133,12 +133,12 @@ components:
       enum:
         - claude-sonnet-4.5
         - gpt-5
-        - deepseek-v3.1-terminus
+        - deepseek-chat
       description: |
         Supported AI models:
-        - **claude-sonnet-4.5**: Anthropic Claude Sonnet 4.5 (released Sep 2025, best for creative writing, nuanced dialogue, character development)
+        - **claude-sonnet-4.5**: Anthropic Claude Sonnet 4.5 (API: claude-sonnet-4.5-20250929, released Sep 2025, best for creative writing, nuanced dialogue, character development)
         - **gpt-5**: OpenAI GPT-5 with Responses API (released Oct 2025, best for technical/analytical tasks, structured output, reasoning)
-        - **deepseek-v3.1-terminus**: DeepSeek V3.1-Terminus (released Aug 2025, cost-effective with hybrid thinking modes, 40% improvement on SWE-bench)
+        - **deepseek-chat**: DeepSeek Chat (V3.1-Terminus non-thinking mode, released Aug 2025, cost-effective with fast direct responses)
 
     AIGenerateRequest:
       type: object

@@ -10,7 +10,7 @@ import { Loader2, Copy, Check, Sparkles, ThumbsUp, GitMerge } from 'lucide-react
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
-type BaseModel = 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-v3'
+type BaseModel = 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-chat'
 type SuggestionModel = BaseModel | 'blend'
 
 type Suggestion = {
@@ -33,7 +33,7 @@ type EnsembleGeneratorProps = {
 const MODEL_LABELS: Record<SuggestionModel, string> = {
   'claude-sonnet-4.5': 'Claude Sonnet 4.5',
   'gpt-5': 'GPT-5',
-  'deepseek-v3': 'DeepSeek V3',
+  'deepseek-chat': 'DeepSeek Chat',
   blend: 'Blended draft',
 }
 

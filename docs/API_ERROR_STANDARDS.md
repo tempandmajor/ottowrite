@@ -273,7 +273,7 @@ When migrating an API route to standard error responses:
 
 ## Migrated Routes
 
-✅ **Phase 8 Complete (32/40 routes - 80%)**
+✅ **Phase 9 Complete (36/40 routes - 90%)**
 
 ### Payment & Billing (3 routes) ✅
 - `/api/checkout/create-session` - Stripe checkout sessions
@@ -325,19 +325,19 @@ When migrating an API route to standard error responses:
 - `/api/templates` - Template listing with filtering and creation (GET, POST) ✅
 - `/api/templates/[id]/use` - Create document from template with usage tracking (POST) ✅
 
-🔄 **Remaining Routes (8 routes - 20%)**
+### AI Ensemble & Coverage (4 routes) ✅
+- `/api/ai/ensemble` - Multi-model AI suggestion generation with quota tracking (POST) ✅
+- `/api/ai/ensemble/blend` - Blend multiple AI suggestions into one (POST) ✅
+- `/api/ai/ensemble/feedback` - Store ensemble feedback for model selection (POST) ✅
+- `/api/ai/generate-coverage` - Generate script coverage reports with AI (POST) ✅
 
-### High Priority (Recommend Next - Phase 9)
-1. `/api/ai/ensemble` - Ensemble AI main
-2. `/api/ai/ensemble/blend` - Ensemble blend
-3. `/api/ai/ensemble/feedback` - Ensemble feedback
-4. `/api/ai/generate-coverage` - Coverage generation
+🔄 **Remaining Routes (4 routes - 10%)**
 
-### Medium Priority (Phase 10)
-5. `/api/ai/background-task` - Background tasks
-6. `/api/analysis/dialogue-voice` - Dialogue analysis
-7. `/api/world-elements` - World building
-8. `/api/research/search` - Research
+### Final Batch (Phase 10)
+1. `/api/ai/background-task` - Background tasks
+2. `/api/analysis/dialogue-voice` - Dialogue analysis
+3. `/api/world-elements` - World building
+4. `/api/research/search` - Research
 
 ## Testing Error Responses
 
@@ -387,9 +387,9 @@ content-type: application/json
 
 ---
 
-**Status**: Phase 8 of migration complete (32/40 routes - 80% 🎯)
-**Completed**: 2025-01-20 (TICKET-004 - Phase 8)
-**Build Status**: ✅ Passing (10.6s, 0 errors, 0 warnings)
-**Next Steps**: Migrate remaining 8 API routes following documented patterns (20% remaining)
+**Status**: Phase 9 of migration complete (36/40 routes - 90% 🎯)
+**Completed**: 2025-01-20 (TICKET-004 - Phase 9)
+**Build Status**: ✅ Passing (9.2s, 0 errors, 0 warnings)
+**Next Steps**: Migrate remaining 4 API routes following documented patterns (10% remaining - final stretch!)
 
-**Phase 8 Progress**: Added documents and templates routes (4 routes). Document duplication supports both single and bulk operations with custom title handling and "(Copy)" suffix generation. Template management includes listing with type/category filtering, creation with schema compatibility detection (title vs name columns), and template-to-document conversion with usage tracking. RPC integration for template usage increment and user plan usage refresh. Position-aware duplication with automatic increment. Template usage count tracking for popularity metrics. All routes follow standardized error response patterns with structured logging and proper HTTP status codes.
+**Phase 9 Progress**: Added AI ensemble and coverage routes (4 routes). Ensemble generation uses 3 AI models simultaneously with strict rate limiting (expensive operation), request quota checking (3 requests per call), and monthly word limit validation. Blend operation combines multiple AI suggestions with minimum 2 required. Feedback tracking stores user model preferences with usage metrics for analytics. Coverage generation includes script validation (min 200 chars), format validation (6 valid formats), project ownership verification, genre tag normalization, script truncation (60K max), and comprehensive report generation with word counting across 13 fields. All routes include proper quota checks, usage tracking, AI word limit enforcement, and non-blocking RPC calls for plan usage refresh. Error responses properly nest limit/used/upgradeRequired data in details field per TypeScript schema requirements.

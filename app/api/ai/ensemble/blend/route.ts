@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateBlendedSuggestion } from '@/lib/ai/ensemble-service'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -13,7 +15,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = (await request.json()) as {
@@ -32,14 +34,13 @@ export async function POST(request: NextRequest) {
     const suggestions = body.suggestions ?? []
 
     if (!prompt) {
-      return NextResponse.json({ error: 'Prompt is required.' }, { status: 400 })
+      return errorResponses.badRequest('Prompt is required', { userId: user.id })
     }
 
     if (suggestions.length < 2) {
-      return NextResponse.json(
-        { error: 'At least two suggestions are required to blend.' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('At least two suggestions are required to blend', {
+        userId: user.id,
+      })
     }
 
     const suggestionPayload = suggestions.map((suggestion) => ({
@@ -54,12 +55,13 @@ export async function POST(request: NextRequest) {
       additionalInstructions: body.additional_instructions,
     })
 
-    return NextResponse.json({ suggestion: blended })
+    return successResponse({ suggestion: blended })
   } catch (error) {
-    console.error('Failed to blend ensemble suggestions:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to blend suggestions.' },
-      { status: 500 }
-    )
+    logger.error('Failed to blend ensemble suggestions', {
+      operation: 'ensemble:blend',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to blend suggestions', {
+      details: error,
+    })
   }
 }

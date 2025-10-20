@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import {
   generateCoverageReport,
@@ -6,6 +6,8 @@ import {
 } from '@/lib/ai/coverage-service'
 import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
 import { checkAIRequestQuota } from '@/lib/account/quota'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { data: profile } = await supabase
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found.' }, { status: 404 })
+      return errorResponses.notFound('Profile not found', { userId: user.id })
     }
 
     const plan = profile.subscription_tier ?? 'free'
@@ -61,28 +63,36 @@ export async function POST(request: NextRequest) {
     const requestQuota = await checkAIRequestQuota(supabase, user.id, plan, 1)
     if (!requestQuota.allowed) {
       const formattedPlan = plan.charAt(0).toUpperCase() + plan.slice(1)
-      return NextResponse.json(
+      return errorResponses.tooManyRequests(
+        `You have reached the ${formattedPlan} plan limit of ${requestQuota.limit} AI requests this month.`,
+        undefined,
         {
-          error: `You have reached the ${formattedPlan} plan limit of ${requestQuota.limit} AI requests this month.`,
-          limit: requestQuota.limit,
-          used: requestQuota.used,
-          upgradeRequired: true,
-        },
-        { status: 429 }
+          code: 'AI_REQUEST_LIMIT_EXCEEDED',
+          userId: user.id,
+          details: {
+            limit: requestQuota.limit,
+            used: requestQuota.used,
+            upgradeRequired: true,
+          },
+        }
       )
     }
 
     const monthlyLimit = getMonthlyAIWordLimit(plan)
     const currentUsage = profile.ai_words_used_this_month ?? 0
     if (currentUsage >= monthlyLimit) {
-      return NextResponse.json(
+      return errorResponses.tooManyRequests(
+        'Monthly AI word limit exceeded',
+        undefined,
         {
-          error: 'Monthly AI word limit exceeded',
-          limit: monthlyLimit,
-          used: currentUsage,
-          upgradeRequired: true,
-        },
-        { status: 429 }
+          code: 'AI_WORD_LIMIT_EXCEEDED',
+          userId: user.id,
+          details: {
+            limit: monthlyLimit,
+            used: currentUsage,
+            upgradeRequired: true,
+          },
+        }
       )
     }
 
@@ -96,20 +106,19 @@ export async function POST(request: NextRequest) {
     const developmentNotes: string | undefined = body?.development_notes
 
     if (!projectId) {
-      return NextResponse.json({ error: 'Project ID is required.' }, { status: 400 })
+      return errorResponses.badRequest('Project ID is required', { userId: user.id })
     }
 
     if (!scriptText || scriptText.trim().length < 200) {
-      return NextResponse.json(
-        { error: 'Script sample must be at least 200 characters.' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Script sample must be at least 200 characters', {
+        userId: user.id,
+      })
     }
 
     if (!format || !VALID_FORMATS.includes(format)) {
-      return NextResponse.json(
-        { error: 'Invalid format. Choose one of feature, pilot, episode, short, limited_series, other.' },
-        { status: 400 }
+      return errorResponses.badRequest(
+        'Invalid format. Choose one of feature, pilot, episode, short, limited_series, other',
+        { userId: user.id }
       )
     }
 
@@ -121,7 +130,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (projectError || !project) {
-      return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
+      return errorResponses.notFound('Project not found', { userId: user.id })
     }
 
     const resolvedTitle =
@@ -200,19 +209,23 @@ export async function POST(request: NextRequest) {
     try {
       await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
     } catch (refreshError) {
-      console.warn('refresh_user_plan_usage failed after coverage generation', refreshError)
+      logger.warn('refresh_user_plan_usage failed after coverage generation', {
+        userId: user.id,
+        operation: 'coverage:refresh_usage',
+      }, refreshError instanceof Error ? refreshError : undefined)
     }
 
-    return NextResponse.json({
+    return successResponse({
       report,
       usage,
       model,
     })
   } catch (error) {
-    console.error('Coverage generation failed:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to generate coverage.' },
-      { status: 500 }
-    )
+    logger.error('Coverage generation failed', {
+      operation: 'coverage:generate',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to generate coverage report', {
+      details: error,
+    })
   }
 }

@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateEnsembleSuggestions } from '@/lib/ai/ensemble-service'
 import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
 import { checkAIRequestQuota } from '@/lib/account/quota'
 import { checkAIRateLimit, createAIRateLimitResponse } from '@/lib/security/ai-rate-limit'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -25,7 +27,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { data: profile } = await supabase
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+      return errorResponses.notFound('Profile not found', { userId: user.id })
     }
 
     const plan = profile.subscription_tier || 'free'
@@ -44,14 +46,18 @@ export async function POST(request: NextRequest) {
     const requestQuota = await checkAIRequestQuota(supabase, user.id, plan, ENSEMBLE_REQUESTS)
     if (!requestQuota.allowed) {
       const formattedPlan = plan.charAt(0).toUpperCase() + plan.slice(1)
-      return NextResponse.json(
+      return errorResponses.tooManyRequests(
+        `You have reached the ${formattedPlan} plan limit of ${requestQuota.limit} AI requests this month.`,
+        undefined,
         {
-          error: `You have reached the ${formattedPlan} plan limit of ${requestQuota.limit} AI requests this month.`,
-          limit: requestQuota.limit,
-          used: requestQuota.used,
-          upgradeRequired: true,
-        },
-        { status: 429 }
+          code: 'AI_REQUEST_LIMIT_EXCEEDED',
+          userId: user.id,
+          details: {
+            limit: requestQuota.limit,
+            used: requestQuota.used,
+            upgradeRequired: true,
+          },
+        }
       )
     }
 
@@ -64,10 +70,9 @@ export async function POST(request: NextRequest) {
     const maxTokens: number | undefined = body?.maxTokens ?? undefined
 
     if (!prompt || prompt.trim().length < 5) {
-      return NextResponse.json(
-        { error: 'Prompt must be at least 5 characters long.' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Prompt must be at least 5 characters long.', {
+        userId: user.id,
+      })
     }
 
     const suggestions = await generateEnsembleSuggestions({
@@ -81,14 +86,18 @@ export async function POST(request: NextRequest) {
     }, 0)
 
     if (currentUsage + totalWords > monthlyLimit) {
-      return NextResponse.json(
+      return errorResponses.tooManyRequests(
+        'Monthly AI word limit exceeded',
+        undefined,
         {
-          error: 'Monthly AI word limit exceeded',
-          limit: monthlyLimit,
-          used: currentUsage,
-          upgradeRequired: true,
-        },
-        { status: 429 }
+          code: 'AI_WORD_LIMIT_EXCEEDED',
+          userId: user.id,
+          details: {
+            limit: monthlyLimit,
+            used: currentUsage,
+            upgradeRequired: true,
+          },
+        }
       )
     }
 
@@ -118,15 +127,19 @@ export async function POST(request: NextRequest) {
     try {
       await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
     } catch (refreshError) {
-      console.warn('refresh_user_plan_usage failed after ensemble generation', refreshError)
+      logger.warn('refresh_user_plan_usage failed after ensemble generation', {
+        userId: user.id,
+        operation: 'ensemble:refresh_usage',
+      }, refreshError instanceof Error ? refreshError : undefined)
     }
 
-    return NextResponse.json({ suggestions })
+    return successResponse({ suggestions })
   } catch (error) {
-    console.error('Ensemble generation failed:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to generate suggestions.' },
-      { status: 500 }
-    )
+    logger.error('Ensemble generation failed', {
+      operation: 'ensemble:generate',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to generate ensemble suggestions', {
+      details: error,
+    })
   }
 }

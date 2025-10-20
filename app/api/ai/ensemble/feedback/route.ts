@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -12,7 +14,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = (await request.json()) as {
@@ -48,14 +50,15 @@ export async function POST(request: NextRequest) {
     const suggestions = body.suggestions ?? []
 
     if (!prompt || !selectedModel) {
-      return NextResponse.json({ error: 'prompt and selected_model are required.' }, { status: 400 })
+      return errorResponses.badRequest('prompt and selected_model are required', {
+        userId: user.id,
+      })
     }
 
     if (!Array.isArray(suggestions) || suggestions.length === 0) {
-      return NextResponse.json(
-        { error: 'suggestions array is required to capture feedback.' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('suggestions array is required to capture feedback', {
+        userId: user.id,
+      })
     }
 
     const sanitizedSuggestions = suggestions.map((suggestion) => ({
@@ -82,15 +85,25 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      throw error
+      logger.error('Failed to store ensemble feedback', {
+        userId: user.id,
+        projectId: projectId ?? undefined,
+        documentId: documentId ?? undefined,
+        operation: 'ensemble:feedback',
+      }, error)
+      return errorResponses.internalError('Failed to store ensemble feedback', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ feedback: data })
+    return successResponse({ feedback: data })
   } catch (error) {
-    console.error('Failed to store ensemble feedback:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to store feedback.' },
-      { status: 500 }
-    )
+    logger.error('Ensemble feedback error', {
+      operation: 'ensemble:feedback',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to store feedback', {
+      details: error,
+    })
   }
 }

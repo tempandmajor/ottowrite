@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import {
   getAllowedPriceIds,
   getStripeClient,
   getTierByPriceId,
 } from '@/lib/stripe/config'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,30 +18,24 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const priceId = typeof body.priceId === 'string' ? body.priceId : null
 
     if (!priceId) {
-      return NextResponse.json({ error: 'Price ID required' }, { status: 400 })
+      return errorResponses.badRequest('Price ID required', { userId: user.id })
     }
 
     const allowedPriceIds = getAllowedPriceIds()
     if (!allowedPriceIds.includes(priceId)) {
-      return NextResponse.json(
-        { error: 'Invalid price ID' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Invalid price ID', { userId: user.id })
     }
 
     const subscriptionTier = getTierByPriceId(priceId)
     if (!subscriptionTier) {
-      return NextResponse.json(
-        { error: 'Subscription tier not found for price' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Subscription tier not found for price', { userId: user.id })
     }
 
     // Get or create Stripe customer
@@ -93,12 +89,13 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ url: session.url })
+    return successResponse({ url: session.url })
   } catch (error) {
-    console.error('Checkout session error:', error)
-    return NextResponse.json(
-      { error: 'Failed to create checkout session' },
-      { status: 500 }
-    )
+    logger.error('Checkout session error', {
+      operation: 'checkout:create_session',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create checkout session', {
+      details: error,
+    })
   }
 }

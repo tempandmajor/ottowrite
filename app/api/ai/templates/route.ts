@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
 
 type PromptTemplate = {
   id: string
@@ -17,7 +17,7 @@ export async function GET() {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return errorResponses.unauthorized()
   }
 
   const { data, error } = await supabase
@@ -27,10 +27,10 @@ export async function GET() {
     .single()
 
   if (error && error.code !== 'PGRST116') {
-    return NextResponse.json(
-      { error: 'Failed to load prompt templates' },
-      { status: 500 }
-    )
+    return errorResponses.internalError('Failed to load prompt templates', {
+      details: error,
+      userId: user.id,
+    })
   }
 
   const rawPreferences = data?.writing_preferences
@@ -51,7 +51,7 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ templates })
+  return successResponse({ templates })
 }
 
 export async function PUT(request: Request) {
@@ -61,7 +61,7 @@ export async function PUT(request: Request) {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return errorResponses.unauthorized()
   }
 
   const body = await request.json().catch(() => null)
@@ -86,10 +86,10 @@ export async function PUT(request: Request) {
     .single()
 
   if (profileError && profileError.code !== 'PGRST116') {
-    return NextResponse.json(
-      { error: 'Failed to load profile preferences' },
-      { status: 500 }
-    )
+    return errorResponses.internalError('Failed to load profile preferences', {
+      details: profileError,
+      userId: user.id,
+    })
   }
 
   const preferences: Record<string, unknown> =
@@ -105,11 +105,11 @@ export async function PUT(request: Request) {
     .eq('id', user.id)
 
   if (updateError) {
-    return NextResponse.json(
-      { error: 'Failed to save prompt templates' },
-      { status: 500 }
-    )
+    return errorResponses.internalError('Failed to save prompt templates', {
+      details: updateError,
+      userId: user.id,
+    })
   }
 
-  return NextResponse.json({ templates: sanitized })
+  return successResponse({ templates: sanitized })
 }

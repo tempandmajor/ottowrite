@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { generateWithAI, type AIModel } from '@/lib/ai/service'
@@ -9,6 +9,7 @@ import { logger } from '@/lib/monitoring/structured-logger'
 import { PerformanceTimer } from '@/lib/monitoring/performance'
 import { checkAIRateLimit, createAIRateLimitResponse } from '@/lib/security/ai-rate-limit'
 import { routeAIRequest } from '@/lib/ai/router'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
 import {
   buildContextBundle,
   generateContextPrompt,
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
     userId = user.id
 
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+      return errorResponses.notFound('User profile not found')
     }
 
     const plan = profile.subscription_tier || 'free'
@@ -94,14 +95,18 @@ export async function POST(request: NextRequest) {
     const requestQuota = await checkAIRequestQuota(supabase, user.id, plan, 1)
     if (!requestQuota.allowed) {
       const formattedPlan = plan.charAt(0).toUpperCase() + plan.slice(1)
-      return NextResponse.json(
+      return errorResponses.tooManyRequests(
+        `You have reached the ${formattedPlan} plan limit of ${requestQuota.limit} AI requests this month.`,
+        undefined,
         {
-          error: `You have reached the ${formattedPlan} plan limit of ${requestQuota.limit} AI requests this month.`,
-          limit: requestQuota.limit,
-          used: requestQuota.used,
-          upgradeRequired: true,
-        },
-        { status: 429 }
+          code: 'AI_REQUEST_LIMIT_EXCEEDED',
+          details: {
+            limit: requestQuota.limit,
+            used: requestQuota.used,
+            upgradeRequired: true,
+          },
+          userId: user.id,
+        }
       )
     }
 
@@ -109,14 +114,18 @@ export async function POST(request: NextRequest) {
     const currentUsage = profile.ai_words_used_this_month || 0
 
     if (currentUsage >= monthlyLimit) {
-      return NextResponse.json(
+      return errorResponses.tooManyRequests(
+        'Monthly AI word limit exceeded',
+        undefined,
         {
-          error: 'Monthly AI word limit exceeded',
-          limit: monthlyLimit,
-          used: currentUsage,
-          upgradeRequired: true,
-        },
-        { status: 429 }
+          code: 'AI_WORD_LIMIT_EXCEEDED',
+          details: {
+            limit: monthlyLimit,
+            used: currentUsage,
+            upgradeRequired: true,
+          },
+          userId: user.id,
+        }
       )
     }
 
@@ -132,30 +141,24 @@ export async function POST(request: NextRequest) {
     } = body
 
     if (typeof prompt !== 'string' || prompt.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Prompt is required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Prompt is required', { userId: user.id })
     }
 
     if (prompt.length > MAX_PROMPT_LENGTH) {
-      return NextResponse.json(
-        { error: `Prompt exceeds ${MAX_PROMPT_LENGTH} characters` },
-        { status: 400 }
+      return errorResponses.badRequest(
+        `Prompt exceeds ${MAX_PROMPT_LENGTH} characters`,
+        { userId: user.id }
       )
     }
 
     if (context && typeof context !== 'string') {
-      return NextResponse.json(
-        { error: 'Context must be a string' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Context must be a string', { userId: user.id })
     }
 
     if (typeof context === 'string' && context.length > MAX_PROMPT_LENGTH) {
-      return NextResponse.json(
-        { error: `Context exceeds ${MAX_PROMPT_LENGTH} characters` },
-        { status: 400 }
+      return errorResponses.badRequest(
+        `Context exceeds ${MAX_PROMPT_LENGTH} characters`,
+        { userId: user.id }
       )
     }
 
@@ -174,7 +177,7 @@ export async function POST(request: NextRequest) {
 
     if (typeof model === 'string') {
       if (!ALLOWED_MODELS.includes(model as AIModel)) {
-        return NextResponse.json({ error: 'Unsupported model requested' }, { status: 400 })
+        return errorResponses.badRequest('Unsupported model requested', { userId: user.id })
       }
       explicitModel = model as AIModel
     }
@@ -444,7 +447,7 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    return NextResponse.json(responsePayload)
+    return successResponse(responsePayload)
   } catch (error) {
     // Log AI generation failure with structured logging
     logger.aiRequest({
@@ -517,10 +520,10 @@ export async function POST(request: NextRequest) {
         }, logError instanceof Error ? logError : undefined)
       }
     }
-    return NextResponse.json(
-      { error: 'Failed to generate AI response' },
-      { status: 500 }
-    )
+    return errorResponses.internalError('Failed to generate AI response', {
+      details: error,
+      userId: userId || undefined,
+    })
   }
 }
 

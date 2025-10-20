@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateContentHash } from '@/lib/content-hash'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,12 +75,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { id: documentId } = await params
     if (!documentId) {
-      return NextResponse.json({ error: 'Missing document id' }, { status: 400 })
+      return errorResponses.badRequest('Missing document id')
     }
 
     const body = (await request.json()) as AutosavePayload
@@ -96,11 +98,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .single()
 
     if (documentError || !document) {
-      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+      return errorResponses.notFound('Document not found', { userId: user.id })
     }
 
     if (document.user_id !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      return errorResponses.forbidden('You do not have access to this document', { userId: user.id })
     }
 
     const existingContent = (document.content ?? {}) as Record<string, any>
@@ -115,8 +117,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     })
 
     if (baseHash && baseHash !== serverHash && !snapshotOnly) {
-      return NextResponse.json(
-        {
+      return errorResponses.conflict('Document has been modified by another session', {
+        code: 'AUTOSAVE_CONFLICT',
+        details: {
           status: 'conflict',
           hash: serverHash,
           document: {
@@ -126,8 +129,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             updatedAt: document.updated_at,
           },
         },
-        { status: 409 }
-      )
+        userId: user.id,
+      })
     }
 
     const updatedHtml = typeof html === 'string' ? html : existingHtml
@@ -164,17 +167,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .single()
 
     if (snapshotError) {
-      console.error('Failed to create document snapshot', snapshotError)
-      return NextResponse.json(
-        { error: snapshotError.message ?? 'Failed to create snapshot' },
-        { status: 400 }
-      )
+      logger.error('Failed to create document snapshot', {
+        userId: user.id,
+        documentId,
+        operation: 'autosave:snapshot',
+      }, snapshotError)
+      return errorResponses.internalError('Failed to create snapshot', {
+        details: snapshotError,
+        userId: user.id,
+      })
     }
 
     try {
       await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
     } catch (refreshError) {
-      console.warn('refresh_user_plan_usage failed after snapshot insert', refreshError)
+      logger.warn('refresh_user_plan_usage failed after snapshot insert', {
+        userId: user.id,
+        operation: 'autosave:refresh_usage',
+      }, refreshError instanceof Error ? refreshError : undefined)
     }
 
     const { data: profile } = await supabase
@@ -222,18 +232,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         .eq('id', documentId)
 
       if (updateError) {
-        console.error('Failed to update document during autosave', updateError)
-        return NextResponse.json({ error: 'Failed to save document' }, { status: 500 })
+        logger.error('Failed to update document during autosave', {
+          userId: user.id,
+          documentId,
+          operation: 'autosave:update_document',
+        }, updateError)
+        return errorResponses.internalError('Failed to save document', {
+          details: updateError,
+          userId: user.id,
+        })
       }
     }
 
-    return NextResponse.json({
+    return successResponse({
       status: snapshotOnly ? 'snapshot' : 'saved',
       hash: payloadHash,
       snapshotId: snapshot.id,
     })
   } catch (error) {
-    console.error('Autosave error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Autosave error', {
+      operation: 'autosave',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to save document', {
+      details: error,
+    })
   }
 }

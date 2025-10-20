@@ -1,0 +1,856 @@
+openapi: 3.1.0
+info:
+  title: OttoWrite API
+  version: 1.0.0
+  description: |
+    Comprehensive API for OttoWrite - AI-powered creative writing platform.
+
+    ## Features
+    - **AI Generation**: Hybrid AI models (Anthropic Claude, OpenAI GPT, DeepSeek)
+    - **Project Management**: Organize writing projects with rich metadata
+    - **Character Management**: Detailed character profiles and relationships
+    - **Plot Analysis**: AI-powered plot hole detection and story structure
+    - **World Building**: Locations, events, and world elements
+    - **Analytics**: Writing metrics and performance tracking
+
+    ## Authentication
+    All endpoints require authentication via Supabase JWT token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+
+    ## Rate Limiting
+    - **Write Operations**: 100 requests/hour
+    - **Read Operations**: 1000 requests/hour
+    - **AI Operations**: 50 requests/hour
+    - **Webhooks**: 1000 requests/hour
+
+    Rate limit headers are included in all responses:
+    - `X-RateLimit-Limit`: Maximum requests allowed
+    - `X-RateLimit-Remaining`: Requests remaining
+    - `X-RateLimit-Reset`: Unix timestamp when limit resets
+
+    ## Pagination
+    List endpoints support cursor-based pagination:
+    - `limit`: Number of items per page (max 100, default 50)
+    - `cursor`: Cursor for next page (returned in pagination metadata)
+
+  contact:
+    name: OttoWrite API Support
+    url: https://ottowrite.com/support
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://your-app.vercel.app/api
+    description: Production server
+  - url: http://localhost:3000/api
+    description: Development server
+
+tags:
+  - name: Health
+    description: Health check endpoints for monitoring
+  - name: AI
+    description: AI generation and ensemble endpoints
+  - name: Characters
+    description: Character management and relationships
+  - name: Projects
+    description: Project creation and management
+  - name: Documents
+    description: Document autosave and management
+  - name: Locations
+    description: Location and world building
+  - name: Plot Analysis
+    description: Plot hole detection and analysis
+  - name: Story Structure
+    description: Beat sheets and story structure
+  - name: Outlines
+    description: Story outlines and templates
+  - name: Analytics
+    description: Writing analytics and metrics
+  - name: Account
+    description: Account usage and telemetry
+  - name: Payments
+    description: Stripe checkout and billing
+  - name: Webhooks
+    description: Webhook endpoints
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT token from authentication
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - message
+            - code
+          properties:
+            message:
+              type: string
+              example: "Unauthorized"
+            code:
+              type: string
+              example: "UNAUTHORIZED"
+            details:
+              type: object
+              additionalProperties: true
+
+    PaginationMetadata:
+      type: object
+      required:
+        - limit
+        - hasMore
+      properties:
+        limit:
+          type: integer
+          example: 50
+          description: Number of items per page
+        nextCursor:
+          type: string
+          format: uuid
+          description: Cursor for next page (if hasMore is true)
+        hasMore:
+          type: boolean
+          example: true
+          description: Whether there are more items
+        total:
+          type: integer
+          example: 150
+          description: Total count (optional, expensive to calculate)
+
+    AIModel:
+      type: string
+      enum:
+        - claude-sonnet-4.5
+        - gpt-5
+        - deepseek-v3.1-terminus
+      description: |
+        Supported AI models:
+        - **claude-sonnet-4.5**: Anthropic Claude Sonnet 4.5 (released Sep 2025, best for creative writing, nuanced dialogue, character development)
+        - **gpt-5**: OpenAI GPT-5 with Responses API (released Oct 2025, best for technical/analytical tasks, structured output, reasoning)
+        - **deepseek-v3.1-terminus**: DeepSeek V3.1-Terminus (released Aug 2025, cost-effective with hybrid thinking modes, 40% improvement on SWE-bench)
+
+    AIGenerateRequest:
+      type: object
+      required:
+        - prompt
+        - documentId
+      properties:
+        prompt:
+          type: string
+          maxLength: 5000
+          example: "Write a dramatic opening scene for a mystery novel"
+          description: User's generation prompt
+        documentId:
+          type: string
+          format: uuid
+          description: Document ID for context
+        model:
+          $ref: '#/components/schemas/AIModel'
+          description: Optional model override (default: auto-routed)
+        maxTokens:
+          type: integer
+          minimum: 100
+          maximum: 3000
+          default: 2000
+          example: 2000
+          description: Maximum tokens to generate
+        context:
+          type: string
+          maxLength: 10000
+          description: Optional explicit context
+        selection:
+          type: string
+          maxLength: 10000
+          description: Current text selection in editor
+        enableContext:
+          type: boolean
+          default: true
+          description: Whether to include auto-generated context
+
+    AIGenerateResponse:
+      type: object
+      required:
+        - completion
+        - modelUsed
+        - tokensUsed
+      properties:
+        completion:
+          type: string
+          example: "The rain hammered against the window..."
+          description: Generated text
+        modelUsed:
+          $ref: '#/components/schemas/AIModel'
+          description: Model that was used
+        tokensUsed:
+          type: integer
+          example: 150
+          description: Tokens consumed
+        costUSD:
+          type: number
+          format: float
+          example: 0.0045
+          description: Estimated cost in USD
+        routing:
+          type: object
+          description: Routing decision metadata
+          properties:
+            model:
+              $ref: '#/components/schemas/AIModel'
+            confidence:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 1
+            intent:
+              type: string
+            rationale:
+              type: array
+              items:
+                type: string
+        contextPreview:
+          type: object
+          description: Preview of generated context
+          properties:
+            storyBible:
+              type: array
+              items:
+                type: object
+            timeline:
+              type: array
+              items:
+                type: object
+            excerpts:
+              type: array
+              items:
+                type: object
+
+    Character:
+      type: object
+      required:
+        - id
+        - project_id
+        - name
+        - role
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 200
+          example: "Elizabeth Bennett"
+        role:
+          type: string
+          enum: [protagonist, antagonist, supporting, minor, other]
+          example: "protagonist"
+        importance:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+          description: Character importance rating
+        age:
+          type: integer
+          minimum: 0
+          maximum: 200
+          example: 28
+        gender:
+          type: string
+          maxLength: 50
+          example: "Female"
+        appearance:
+          type: string
+          maxLength: 2000
+          description: Physical appearance
+        personality_traits:
+          type: string
+          maxLength: 2000
+          description: JSON array or comma-separated traits
+        strengths:
+          type: string
+          maxLength: 2000
+        weaknesses:
+          type: string
+          maxLength: 2000
+        fears:
+          type: string
+          maxLength: 2000
+        desires:
+          type: string
+          maxLength: 2000
+        backstory:
+          type: string
+          maxLength: 5000
+          description: Character's background story
+        arc_type:
+          type: string
+          maxLength: 100
+          enum: [positive, negative, flat, transformative, none]
+        character_arc:
+          type: string
+          maxLength: 5000
+          description: Description of character's arc
+        internal_conflict:
+          type: string
+          maxLength: 2000
+        external_conflict:
+          type: string
+          maxLength: 2000
+        first_appearance:
+          type: string
+          maxLength: 500
+        last_appearance:
+          type: string
+          maxLength: 500
+        story_function:
+          type: string
+          maxLength: 1000
+        image_url:
+          type: string
+          format: uri
+        voice_description:
+          type: string
+          maxLength: 2000
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 50
+          maxItems: 20
+        notes:
+          type: string
+          maxLength: 5000
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Project:
+      type: object
+      required:
+        - id
+        - name
+        - type
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "My Novel Project"
+        type:
+          type: string
+          enum: [novel, series, screenplay, play, short_story]
+          example: "novel"
+        genre:
+          type: array
+          items:
+            type: string
+          example: ["mystery", "thriller"]
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Document:
+      type: object
+      required:
+        - id
+        - title
+        - type
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: "Chapter 1"
+        type:
+          type: string
+          enum: [novel, screenplay, play, short_story]
+        content:
+          type: object
+          description: TipTap JSON content
+        word_count:
+          type: integer
+          example: 1500
+        position:
+          type: integer
+          description: Order in project
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    HealthStatus:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+        checks:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [ok, error]
+            env:
+              type: string
+              enum: [ok, error]
+        version:
+          type: string
+          example: "1.0.0"
+        uptime:
+          type: number
+          description: Uptime in seconds
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Basic health check for monitoring and load balancing
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness check
+      description: Readiness probe for container orchestration
+      operationId: getReadiness
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+                    example: true
+
+  /ai/generate:
+    post:
+      tags: [AI]
+      summary: Generate text with AI
+      description: |
+        Generate text using hybrid AI models (Anthropic Claude, OpenAI GPT, DeepSeek).
+
+        ## Model Routing
+        If no model is specified, the request is automatically routed based on:
+        - **Intent classification**: Determines the type of task
+        - **Complexity analysis**: Analyzes prompt complexity
+        - **Cost optimization**: Balances quality and cost
+
+        ## Rate Limiting
+        AI generation has strict rate limits: 50 requests/hour
+
+        ## Context Generation
+        System automatically generates relevant context from:
+        - Character profiles
+        - Plot points
+        - World building elements
+        - Recent document history
+      operationId: generateAI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIGenerateRequest'
+            examples:
+              creative:
+                summary: Creative writing
+                value:
+                  prompt: "Write a dramatic opening scene"
+                  documentId: "550e8400-e29b-41d4-a716-446655440000"
+                  maxTokens: 2000
+              analytical:
+                summary: Plot analysis
+                value:
+                  prompt: "Analyze the pacing in this chapter"
+                  documentId: "550e8400-e29b-41d4-a716-446655440000"
+                  model: "gpt-5"
+                  selection: "Chapter content here..."
+      responses:
+        '200':
+          description: Text generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIGenerateResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds until rate limit resets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '402':
+          description: Payment required (quota exceeded)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /characters:
+    get:
+      tags: [Characters]
+      summary: List characters
+      description: Get all characters for a project with optional filtering and pagination
+      operationId: listCharacters
+      parameters:
+        - name: project_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Project ID to filter characters
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [protagonist, antagonist, supporting, minor, other]
+          description: Filter by character role
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: Number of characters per page
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Pagination cursor
+      responses:
+        '200':
+          description: Characters retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Character'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationMetadata'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    post:
+      tags: [Characters]
+      summary: Create character
+      description: Create a new character for a project
+      operationId: createCharacter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - project_id
+                - name
+                - role
+              properties:
+                project_id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                  maxLength: 200
+                role:
+                  type: string
+                  enum: [protagonist, antagonist, supporting, minor, other]
+                importance:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                age:
+                  type: integer
+                  minimum: 0
+                  maximum: 200
+                gender:
+                  type: string
+                  maxLength: 50
+                backstory:
+                  type: string
+                  maxLength: 5000
+                # ... other character properties
+            example:
+              project_id: "550e8400-e29b-41d4-a716-446655440000"
+              name: "Elizabeth Bennett"
+              role: "protagonist"
+              age: 28
+              gender: "Female"
+              backstory: "A witty and independent young woman..."
+      responses:
+        '201':
+          description: Character created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Character'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    put:
+      tags: [Characters]
+      summary: Update character
+      description: Update an existing character
+      operationId: updateCharacter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                # ... all character properties as optional
+      responses:
+        '200':
+          description: Character updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Character'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Characters]
+      summary: Delete character
+      description: Delete a character by ID
+      operationId: deleteCharacter
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Character ID to delete
+      responses:
+        '204':
+          description: Character deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /webhooks/stripe:
+    post:
+      tags: [Webhooks]
+      summary: Stripe webhook
+      description: Handle Stripe webhook events for subscription management
+      operationId: stripeWebhook
+      security: []
+      parameters:
+        - name: stripe-signature
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Stripe webhook signature for verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Stripe event object
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid signature or payload
+
+  /account/usage:
+    get:
+      tags: [Account]
+      summary: Get account usage
+      description: Get current usage statistics for the authenticated user
+      operationId: getAccountUsage
+      responses:
+        '200':
+          description: Usage statistics retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  aiWordsUsed:
+                    type: integer
+                    example: 15000
+                  aiWordsLimit:
+                    type: integer
+                    example: 50000
+                  subscriptionTier:
+                    type: string
+                    enum: [free, hobbyist, professional, studio]
+                    example: "professional"
+                  resetDate:
+                    type: string
+                    format: date-time
+
+components:
+  responses:
+    Unauthorized:
+      description: Unauthorized - Invalid or missing authentication token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              message: "Unauthorized"
+              code: "UNAUTHORIZED"
+
+    BadRequest:
+      description: Bad Request - Invalid input parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              message: "Validation failed"
+              code: "VALIDATION_ERROR"
+              details:
+                field: "prompt"
+                message: "Prompt is required"
+
+    NotFound:
+      description: Not Found - Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              message: "Resource not found"
+              code: "NOT_FOUND"
+
+    TooManyRequests:
+      description: Too Many Requests - Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until rate limit resets
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Maximum requests allowed
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Requests remaining in window
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix timestamp when limit resets
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              message: "Rate limit exceeded"
+              code: "RATE_LIMIT_EXCEEDED"
+              details:
+                retryAfter: 3600
+                resetAt: "2025-01-20T15:00:00Z"

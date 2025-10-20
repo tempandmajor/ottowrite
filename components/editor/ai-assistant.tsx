@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -11,15 +11,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Sparkles, Copy, Check } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Loader2, Sparkles, Copy, Check, Plus, Pencil, Trash2, FolderKanban } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { AIModel } from '@/lib/ai/service'
 import type { AICommand } from '@/lib/ai/intent'
+import { trackEvent } from '@/lib/telemetry/track'
 
 type CommandOption = 'auto' | AICommand
 type ModelOption = 'auto' | AIModel
+type PromptIntent = AICommand
+
+type PromptTemplate = {
+  id: string
+  name: string
+  command: PromptIntent
+  content: string
+}
+
+type TemplateGroup = {
+  label: string
+  command: PromptIntent
+  templates: PromptTemplate[]
+}
+
+const generateTemplateId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`
 
 type RoutingDecision = {
   model: AIModel
@@ -99,7 +128,103 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
     selection: number
   } | null>(null)
   const [contextPreview, setContextPreview] = useState<ContextPreviewPayload | null>(null)
+  const [customTemplates, setCustomTemplates] = useState<PromptTemplate[]>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null>(null)
+  const [templateForm, setTemplateForm] = useState({
+    name: '',
+    command: 'continue' as PromptIntent,
+    content: '',
+  })
   const { toast } = useToast()
+
+  const defaultTemplateGroups: TemplateGroup[] = useMemo(() => {
+    const defaults: Record<PromptIntent, PromptTemplate[]> = {
+      continue: [
+        {
+          id: 'default-continue-1',
+          name: 'Continue scene',
+          command: 'continue',
+          content: 'Continue the current scene, keeping the same voice and pacing. Introduce the next beat organically.',
+        },
+        {
+          id: 'default-continue-2',
+          name: 'Describe next moment',
+          command: 'continue',
+          content: 'Write the next paragraph focusing on sensory details and character reactions.',
+        },
+      ],
+      rewrite: [
+        {
+          id: 'default-rewrite-1',
+          name: 'Polish prose',
+          command: 'rewrite',
+          content: 'Rewrite the selected passage to be tighter and more vivid, preserving core meaning.',
+        },
+        {
+          id: 'default-rewrite-2',
+          name: 'Show emotion',
+          command: 'rewrite',
+          content: 'Rewrite to show emotion through body language and environment rather than stating it directly.',
+        },
+      ],
+      shorten: [
+        {
+          id: 'default-shorten-1',
+          name: 'Tighten paragraph',
+          command: 'shorten',
+          content: 'Shorten the selection by 30% while keeping key plot beats and voice intact.',
+        },
+      ],
+      expand: [
+        {
+          id: 'default-expand-1',
+          name: 'Add sensory detail',
+          command: 'expand',
+          content: 'Expand this section by adding sensory details (sight, sound, touch) and grounding in the setting.',
+        },
+      ],
+      tone_shift: [
+        {
+          id: 'default-tone-1',
+          name: 'Increase tension',
+          command: 'tone_shift',
+          content: 'Rewrite the passage to increase tension and urgency while keeping the same plot beats.',
+        },
+      ],
+      summarize: [
+        {
+          id: 'default-summarize-1',
+          name: 'Chapter summary',
+          command: 'summarize',
+          content: 'Summarize the selected text in 3 bullet points focusing on key plot changes and emotions.',
+        },
+      ],
+      brainstorm: [
+        {
+          id: 'default-brainstorm-1',
+          name: 'What if variations',
+          command: 'brainstorm',
+          content: 'Provide three “what if” variations that push the scene in unexpected directions.',
+        },
+      ],
+      notes: [
+        {
+          id: 'default-notes-1',
+          name: 'Feedback',
+          command: 'notes',
+          content: 'Give concise editorial feedback highlighting strengths and opportunities for improvement.',
+        },
+      ],
+    }
+
+    return (Object.keys(defaults) as PromptIntent[]).map((intent) => ({
+      label: intent.replace('_', ' '),
+      command: intent,
+      templates: defaults[intent],
+    }))
+  }, [])
 
   const manualOverride = useMemo(() => selectedModel !== 'auto', [selectedModel])
   const tokenSummary = useMemo(() => {
@@ -130,6 +255,11 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
 
     try {
       const selection = getSelection?.() ?? ''
+      trackEvent('editor.ai.command_submit', {
+        command: command === 'auto' ? 'auto' : command,
+        manualOverride: command !== 'auto',
+        modelOverride: selectedModel !== 'auto',
+      })
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: {
@@ -158,6 +288,11 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
       if (typeof data.command === 'string') {
         setCommand(data.command as CommandOption)
       }
+      trackEvent('editor.ai.command_resolved', {
+        requestedCommand: command === 'auto' ? 'auto' : command,
+        resolvedCommand: typeof data.command === 'string' ? data.command : command,
+        model: data.model ?? selectedModel,
+      })
       setRouting(data.routing ? (data.routing as RoutingDecision) : null)
       setContextWarnings(Array.isArray(data.contextWarnings) ? data.contextWarnings : [])
       setContextTokens(
@@ -205,13 +340,111 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
     })
   }
 
-  const quickPrompts: Array<{ label: string; value: string; command: CommandOption }> = [
-    { label: 'Continue this scene', value: 'Continue writing this scene in the same style and tone.', command: 'continue' },
-    { label: 'Add dialogue', value: 'Add natural dialogue between the characters in this scene.', command: 'brainstorm' },
-    { label: 'Describe setting', value: 'Add vivid sensory details to describe the setting.', command: 'expand' },
-    { label: 'Show emotion', value: "Rewrite this to show the character's emotions through actions and body language instead of telling.", command: 'rewrite' },
-    { label: 'Increase tension', value: 'Rewrite this scene to increase tension and suspense.', command: 'tone_shift' },
-  ]
+  const loadTemplates = async () => {
+    setLoadingTemplates(true)
+    try {
+      const res = await fetch('/api/ai/templates', { cache: 'no-store' })
+      if (!res.ok) {
+        throw new Error('Failed to load templates')
+      }
+      const data = await res.json()
+      if (Array.isArray(data.templates)) {
+        setCustomTemplates(
+          data.templates.filter((item): item is PromptTemplate =>
+            typeof item?.id === 'string' &&
+            typeof item?.name === 'string' &&
+            typeof item?.command === 'string' &&
+            typeof item?.content === 'string'
+          )
+        )
+      } else {
+        setCustomTemplates([])
+      }
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Warning',
+        description: 'Could not load custom templates. Defaults will still be available.',
+      })
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }
+
+  const saveTemplates = async (templates: PromptTemplate[]) => {
+    try {
+      const res = await fetch('/api/ai/templates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templates }),
+      })
+      if (!res.ok) {
+        throw new Error('Failed to save templates')
+      }
+      setCustomTemplates(templates)
+      toast({ title: 'Templates saved' })
+      trackEvent('editor.ai.template_save', {
+        total: templates.length,
+      })
+    } catch (error) {
+      console.error(error)
+      toast({
+        title: 'Error',
+        description: 'Unable to save templates right now. Please try again later.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleTemplateSelect = (template: PromptTemplate) => {
+    setPrompt(template.content)
+    setCommand(template.command)
+    trackEvent('editor.ai.template_use', {
+      templateId: template.id,
+      command: template.command,
+      source: template.id.startsWith('default-') ? 'default' : 'custom',
+    })
+  }
+
+  const handleTemplateDialogClose = () => {
+    setTemplateDialogOpen(false)
+    setEditingTemplate(null)
+    setTemplateForm({ name: '', command: 'continue', content: '' })
+  }
+
+  const handleTemplateSubmit = async () => {
+    if (!templateForm.name.trim() || !templateForm.content.trim()) {
+      toast({
+        title: 'Template incomplete',
+        description: 'Please provide both a name and prompt text.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const template: PromptTemplate = {
+      id: editingTemplate?.id ?? generateTemplateId(),
+      name: templateForm.name.trim(),
+      command: templateForm.command,
+      content: templateForm.content.trim(),
+    }
+
+    const nextTemplates = editingTemplate
+      ? customTemplates.map((item) => (item.id === editingTemplate.id ? template : item))
+      : [...customTemplates, template]
+
+    await saveTemplates(nextTemplates)
+    handleTemplateDialogClose()
+  }
+
+  const handleTemplateDelete = async (templateId: string) => {
+    const nextTemplates = customTemplates.filter((item) => item.id !== templateId)
+    await saveTemplates(nextTemplates)
+  }
+
+  useEffect(() => {
+    void loadTemplates()
+  }, [])
 
   const availableCommands: Array<{ value: CommandOption; label: string }> = [
     { value: 'auto', label: 'Auto detect' },
@@ -225,11 +458,36 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
     { value: 'notes', label: 'Feedback / notes' },
   ]
 
-  const handleQuickPromptSelect = (value: string) => {
-    const selected = quickPrompts.find((item) => item.value === value)
-    setPrompt(value)
-    setCommand(selected?.command ?? 'auto')
-  }
+  const templateGroups = useMemo<TemplateGroup[]>(() => {
+    const grouped = [...defaultTemplateGroups]
+    if (customTemplates.length > 0) {
+      const customByCommand: Record<PromptIntent, PromptTemplate[]> = customTemplates.reduce(
+        (acc, template) => {
+          if (!acc[template.command]) {
+            acc[template.command] = []
+          }
+          acc[template.command].push(template)
+          return acc
+        },
+        {} as Record<PromptIntent, PromptTemplate[]>
+      )
+
+      Object.entries(customByCommand).forEach(([commandKey, templates]) => {
+        const existing = grouped.find((group) => group.command === commandKey)
+        if (existing) {
+          existing.templates = [...existing.templates, ...templates]
+        } else {
+          grouped.push({
+            label: commandKey.replace('_', ' '),
+            command: commandKey as PromptIntent,
+            templates,
+          })
+        }
+      })
+    }
+
+    return grouped.sort((a, b) => a.label.localeCompare(b.label))
+  }, [customTemplates, defaultTemplateGroups])
 
   return (
     <Card className="h-full flex flex-col">
@@ -272,19 +530,82 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
 
         <div className="space-y-2">
           <Label htmlFor="quick-prompts">Quick Prompts</Label>
-          <Select onValueChange={handleQuickPromptSelect}>
-            <SelectTrigger>
-              <SelectValue placeholder="Choose a quick prompt..." />
-            </SelectTrigger>
-            <SelectContent>
-              {quickPrompts.map((p) => (
-                <SelectItem key={p.label} value={p.value}>
-                  {p.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select
+              disabled={loadingTemplates}
+              onValueChange={(value) => {
+                const [type, templateId] = value.split(':')
+                const group = templateGroups.find((g) => g.command === (type as PromptIntent))
+                const template = group?.templates.find((item) => item.id === templateId)
+                if (template) {
+                  handleTemplateSelect(template)
+                }
+              }}
+            >
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder={loadingTemplates ? 'Loading templates…' : 'Choose a template…'} />
+              </SelectTrigger>
+              <SelectContent>
+                {templateGroups.map((group) => (
+                  <div key={group.command} className="space-y-1">
+                    <p className="px-2 text-xs uppercase tracking-wide text-muted-foreground">
+                      {group.label}
+                    </p>
+                    {group.templates.map((template) => (
+                      <SelectItem key={template.id} value={`${group.command}:${template.id}`}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </div>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="icon" variant="outline" onClick={openCreateTemplate}>
+              <Plus className="h-4 w-4" />
+              <span className="sr-only">Manage templates</span>
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Templates are grouped by intent. Choose one to pre-fill the prompt and set the command.
+          </p>
         </div>
+
+        {customTemplates.length > 0 && (
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <FolderKanban className="h-4 w-4" /> Your templates
+            </Label>
+            <div className="grid gap-2">
+              {customTemplates.map((template) => (
+                <div
+                  key={template.id}
+                  className="flex items-start justify-between gap-3 rounded-lg border bg-muted/40 px-3 py-2"
+                >
+                  <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{template.name}</span>
+                      <Badge variant="secondary" className="capitalize">
+                        {template.command.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    <p className="line-clamp-2 text-xs">
+                      {template.content}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="outline" onClick={() => handleTemplateSelect(template)}>
+                      Use
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => openEditTemplate(template)}>
+                      <Pencil className="h-4 w-4" />
+                      <span className="sr-only">Edit template</span>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="command">Command</Label>
@@ -500,6 +821,90 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
           </div>
         )}
       </CardContent>
+      <CardFooter>
+        <p className="text-xs text-muted-foreground">
+          Need reusable prompts? Create custom templates to save your favorite instructions.
+        </p>
+      </CardFooter>
+
+      <Dialog open={templateDialogOpen} onOpenChange={(open) => (open ? setTemplateDialogOpen(true) : handleTemplateDialogClose())}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingTemplate ? 'Edit template' : 'New template'}</DialogTitle>
+            <DialogDescription>Store reusable prompts grouped by command. Templates sync to your account.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="template-name">Template name</Label>
+              <Input
+                id="template-name"
+                value={templateForm.name}
+                onChange={(event) => setTemplateForm((prev) => ({ ...prev, name: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="template-command">Command</Label>
+              <Select
+                value={templateForm.command}
+                onValueChange={(value) => setTemplateForm((prev) => ({ ...prev, command: value as PromptIntent }))}
+              >
+                <SelectTrigger id="template-command">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCommands
+                    .filter((item) => item.value !== 'auto')
+                    .map((item) => (
+                      <SelectItem key={item.value} value={item.value as PromptIntent}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="template-content">Prompt</Label>
+              <Textarea
+                id="template-content"
+                rows={5}
+                value={templateForm.content}
+                onChange={(event) => setTemplateForm((prev) => ({ ...prev, content: event.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {editingTemplate && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-destructive"
+                onClick={() => handleTemplateDelete(editingTemplate.id)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Delete template
+              </Button>
+            )}
+            <div className="flex items-center gap-2 sm:ml-auto">
+              <Button type="button" variant="outline" onClick={handleTemplateDialogClose}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleTemplateSubmit}>
+                {editingTemplate ? 'Save changes' : 'Create template'}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
+  const openCreateTemplate = () => {
+    setEditingTemplate(null)
+    setTemplateForm({ name: '', command: 'continue', content: '' })
+    setTemplateDialogOpen(true)
+  }
+
+  const openEditTemplate = (template: PromptTemplate) => {
+    setEditingTemplate(template)
+    setTemplateForm({ name: template.name, command: template.command, content: template.content })
+    setTemplateDialogOpen(true)
+  }

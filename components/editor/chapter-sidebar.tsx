@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { trackEvent } from '@/lib/telemetry/track'
 import type { DocumentMetadata } from './document-metadata-form'
 import { Badge } from '@/components/ui/badge'
 
@@ -98,10 +99,15 @@ export function ChapterSidebar({
     }
     onChange([...chapters, newChapter])
     ensureExpanded(newChapter.id)
+    trackEvent('editor.sidebar.chapter_add', {
+      chapterId: newChapter.id,
+      position: chapters.length,
+    })
   }
 
   const handleRemoveChapter = (chapterId: string) => {
     onChange(chapters.filter((chapter) => chapter.id !== chapterId))
+    trackEvent('editor.sidebar.chapter_remove', { chapterId })
   }
 
   const handleAddScene = (chapterId: string) => {
@@ -126,6 +132,11 @@ export function ChapterSidebar({
     ensureExpanded(chapterId)
     onCreateScene(chapterId, sceneId)
     onSelectScene(sceneId)
+    trackEvent('editor.sidebar.scene_add', {
+      chapterId,
+      sceneId,
+      sceneCount: nextChapters.find((chapter) => chapter.id === chapterId)?.scenes.length ?? 0,
+    })
   }
 
   const handleRemoveScene = (chapterId: string, sceneId: string) => {
@@ -138,6 +149,7 @@ export function ChapterSidebar({
     if (activeSceneId === sceneId) {
       onSelectScene(null)
     }
+    trackEvent('editor.sidebar.scene_remove', { chapterId, sceneId })
   }
 
   const handleChapterUpdate = (chapterId: string, updates: Partial<Chapter>) => {
@@ -196,6 +208,11 @@ export function ChapterSidebar({
     const [removed] = reordered.splice(index, 1)
     reordered.splice(targetIndex, 0, removed)
     onChange(reordered)
+    trackEvent('editor.sidebar.chapter_move', {
+      chapterId,
+      from: index,
+      to: targetIndex,
+    })
   }
 
   const moveScene = (chapterId: string, sceneId: string, direction: -1 | 1) => {
@@ -210,6 +227,12 @@ export function ChapterSidebar({
     const [removed] = nextScenes.splice(index, 1)
     nextScenes.splice(targetIndex, 0, removed)
     handleChapterUpdate(chapterId, { scenes: nextScenes })
+    trackEvent('editor.sidebar.scene_move', {
+      chapterId,
+      sceneId,
+      from: index,
+      to: targetIndex,
+    })
   }
 
   const expandedState = useMemo(() => {
@@ -399,7 +422,14 @@ export function ChapterSidebar({
                                   size="icon"
                                   variant={isActive ? 'secondary' : 'ghost'}
                                   className="h-7 w-7 shrink-0"
-                                  onClick={() => onSelectScene(scene.id)}
+                                  onClick={() => {
+                                    onSelectScene(scene.id)
+                                    trackEvent('editor.sidebar.scene_select', {
+                                      sceneId: scene.id,
+                                      chapterId: chapter.id,
+                                      source: 'sidebar',
+                                    })
+                                  }}
                                   aria-label="Set as active scene"
                                 >
                                   <span className="text-xs font-semibold">{sceneIndex + 1}</span>

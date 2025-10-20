@@ -20,6 +20,180 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2025-10-20
+
+### Added - Editor Intelligence & Workflow Enhancements
+
+**Document Metadata System**:
+- POV Character field to track narrative perspective
+- Pacing Target selector (Slow, Balanced, Fast)
+- Tone field for consistent voice tracking
+- Metadata persisted in document content (JSONB)
+- Badge display in chapter sidebar header
+- Auto-save integration for seamless updates
+- Reload persistence verified
+
+**Live Reading Time & Pacing Widget**:
+- Real-time reading time calculation (250 WPM standard)
+- Words per chapter metrics
+- Intelligent pacing gauge (Fast <2k, Balanced 2-4k, Slow >4k words)
+- Visual progress bar for estimated read time
+- Auto-updates on content changes via optimized useMemo
+- Positioned in left sidebar for at-a-glance insights
+
+**Character & Scene Index**:
+- Tabbed interface for Characters and Scenes
+- Character detection from dialogue and prose
+  - Pattern 1: Screenplay dialogue "CHARACTER:" format
+  - Pattern 2: All-caps names with common word filtering
+- Character statistics: line count, scene count, last appearance
+- Scene parsing for INT/EXT, location, and time of day
+- Click-to-navigate to scenes for quick access
+- Character filtering and scene navigation
+- Real-time updates after content edits
+
+**AI-Assisted Writing Commands**:
+- 6 core commands fully implemented:
+  - **Continue**: Extend scene with consistent voice
+  - **Rewrite**: Polish prose for clarity and impact
+  - **Shorten**: Tighten text by ~30% while preserving meaning
+  - **Expand**: Add sensory details and grounding
+  - **Tone Shift**: Adjust emotional temperature
+  - **Brainstorm**: Generate "what if" variations
+- Command validation and backend routing to `/api/ai/generate`
+- Default prompt templates for each command
+- Custom template CRUD (Create, Read, Update, Delete)
+- Template grouping by command type
+
+**Cursor-Aware Content Insertion**:
+- Prose Editor (TiptapEditor):
+  - Insert at actual cursor position (not end of document)
+  - Replace selected text with AI-generated content
+  - Multi-line insertion support
+  - Unicode and special character handling
+- Screenplay Editor:
+  - Element-level cursor tracking with selectionRef
+  - Insert within current element at cursor
+  - Multi-paragraph insertion creates new elements
+  - Selection boundary respect
+- Comprehensive test coverage (17/17 tests passing)
+
+**Document Structure Navigation**:
+- Chapter sidebar with drag-and-drop reordering
+- Scene jump-to navigation with scroll-to-anchor
+- Visual structure tree (chapters → scenes)
+- Quick navigation via scene numbers
+- Already existed, verified in E2E QA
+
+### Added - Quality Assurance & Documentation
+
+**End-to-End Editor QA**:
+- Comprehensive QA report (`docs/EDITOR_E2E_QA.md`)
+- 70+ test cases across 5 categories
+- Automated verification of all components
+- Manual test scenarios documented
+- Pass/fail matrix with acceptance criteria
+- Known issues tracking
+- Performance metrics guidelines
+
+**Test Coverage**:
+- Cursor insertion tests (17/17 passing)
+- Selection extraction validation
+- Edge case coverage (empty docs, unicode, special chars)
+- Build verification (0 TypeScript errors)
+- Component export verification (4/4 found)
+- API route verification (6+ routes)
+
+**Documentation Updates**:
+- Feature documentation for all new capabilities
+- Implementation verification with file paths and line numbers
+- Manual QA scenarios for smoke testing
+- Recommendations for future enhancements
+
+### Changed
+
+**Editor Store Architecture**:
+- Added metadata state management (Zustand)
+- Type-safe DocumentMetadata interface
+- Auto-save payload now includes metadata
+- Metadata loads on document initialization
+
+**AI Assistant UX**:
+- Enhanced command dropdown with all 6 core commands
+- Template picker with grouped organization
+- Context preview for characters/locations/events
+- Token usage tracking (explicit, generated, selection)
+- Routing decision display with confidence scores
+- Manual model override capability
+
+**Component Integration**:
+- Editor page now includes:
+  - DocumentMetadataForm (Sheet overlay)
+  - ReadingTimeWidget (left sidebar)
+  - CharacterSceneIndex (left sidebar, tabbed)
+  - Enhanced ChapterSidebar with metadata badges
+- Optimized re-render performance with useMemo dependencies
+
+**Build Performance**:
+- Build time: 57 seconds
+- TypeScript errors: 0
+- All 60+ routes successfully generated
+- Production bundle optimized
+
+### Fixed
+
+**Cursor Insertion Bugs**:
+- Fixed test case with incorrect cursor positions in screenplay editor
+- Verified insertion respects selection start/end boundaries
+- Confirmed no insertion at end-of-document when cursor is elsewhere
+
+**Metadata Persistence**:
+- Ensured metadata saves in autosave payload
+- Fixed reload to properly load metadata from `content.metadata`
+- Badge display conditional on metadata existence
+
+**Real-time Analytics**:
+- Fixed useMemo dependencies for widget updates
+- Ensured character/scene index updates after edits
+- Pacing gauge color transitions smooth
+
+**Security**:
+- Metadata stored within document content (no new RLS policies needed)
+- User-scoped document access maintained
+- No privilege escalation vulnerabilities
+
+### Technical Details
+
+**New Components** (5):
+- `components/editor/document-metadata-form.tsx` (141 lines)
+- `components/editor/reading-time-widget.tsx` (187 lines)
+- `components/editor/character-scene-index.tsx` (326 lines)
+- `__tests__/components/cursor-insertion.test.ts` (257 lines)
+- `docs/EDITOR_E2E_QA.md` (450+ lines)
+
+**Modified Components** (6):
+- `stores/editor-store.ts` - Added metadata state
+- `app/dashboard/editor/[id]/page.tsx` - Integrated widgets
+- `app/api/documents/[id]/autosave/route.ts` - Metadata handling
+- `hooks/use-autosave.ts` - Metadata in payload
+- `components/editor/chapter-sidebar.tsx` - Metadata display
+- `components/editor/ai-assistant.tsx` - Command coverage verified
+
+**API Routes Enhanced**:
+- `/api/documents/[id]/autosave` - Now saves metadata field
+- `/api/ai/generate` - All 6 commands supported
+- `/api/ai/templates` - Custom template storage
+
+**Database Schema**:
+- No new tables (metadata in existing `documents.content` JSONB field)
+- Backward compatible with existing documents
+
+**Dependencies**:
+- No new dependencies added
+- Leveraged existing: TipTap, Zustand, Radix UI, Lucide icons
+
+---
+
 ## [0.4.0] - 2025-10-17
 
 ### Added - World-Building Module

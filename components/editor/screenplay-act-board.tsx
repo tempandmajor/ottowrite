@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { ScreenplayAct, ScreenplaySequence } from '@/types/screenplay'
 import { generateId as generateScreenplayId } from '@/types/screenplay'
+import { trackEvent } from '@/lib/telemetry/track'
 
 type SceneMeta = {
   label: string
@@ -122,6 +123,10 @@ export function ScreenplayActBoard({ acts, onChange, sceneMeta }: ScreenplayActB
         : act
     )
     onChange(nextActs)
+    trackEvent('editor.screenplay.sequence_add', {
+      actId,
+      sequenceCount: nextActs.find((act) => act.id === actId)?.sequences.length ?? 0,
+    })
   }
 
   const handleRenameSequence = (sequenceId: string, nextTitle: string) => {
@@ -134,6 +139,9 @@ export function ScreenplayActBoard({ acts, onChange, sceneMeta }: ScreenplayActB
       ),
     }))
     onChange(nextActs)
+    trackEvent('editor.screenplay.sequence_rename', {
+      sequenceId,
+    })
   }
 
   const handleDeleteSequence = (actId: string, sequenceId: string) => {
@@ -173,6 +181,14 @@ export function ScreenplayActBoard({ acts, onChange, sceneMeta }: ScreenplayActB
     })
 
     onChange(nextActs)
+    const originalSequence = acts
+      .find((act) => act.id === actId)
+      ?.sequences.find((sequence) => sequence.id === sequenceId)
+    trackEvent('editor.screenplay.sequence_delete', {
+      actId,
+      sequenceId,
+      sceneCount: originalSequence?.sceneIds.length ?? 0,
+    })
   }
 
   const getDragPayload = (event: React.DragEvent): DragPayload | null => {
@@ -202,6 +218,12 @@ export function ScreenplayActBoard({ acts, onChange, sceneMeta }: ScreenplayActB
 
     const next = moveSequence(acts, payload, targetActId, targetSequenceId)
     onChange(next)
+    trackEvent('editor.screenplay.sequence_move', {
+      sourceActId: payload.sourceActId,
+      sequenceId: payload.sequenceId,
+      targetActId,
+      targetSequenceId: targetSequenceId ?? null,
+    })
   }
 
   const handleDragStart = (event: React.DragEvent, actId: string, sequenceId: string) => {

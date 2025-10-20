@@ -79,6 +79,7 @@ export type SnapshotAnalysisMetrics = {
   dialoguePercentage: number
   actionPercentage: number
   descriptionPercentage: number
+  passiveVoicePercentage: number
 
   // Vocabulary
   uniqueWords: number

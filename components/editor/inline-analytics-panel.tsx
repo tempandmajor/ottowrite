@@ -14,6 +14,7 @@ import type { DocumentSnapshot } from '@/lib/snapshots/snapshot-manager'
 import type { Chapter } from '@/components/editor/chapter-sidebar'
 import type { ScreenplayElement } from '@/components/editor/screenplay-editor'
 import { computeReadabilityMetrics } from '@/components/analysis/readability-utils'
+import { trackEvent } from '@/lib/telemetry/track'
 
 type InlineAnalyticsPanelProps = {
   documentType: string | undefined
@@ -145,9 +146,9 @@ export function InlineAnalyticsPanel({
   }, [contentHtml, documentType, screenplayElements, structure, wordCount])
 
   const readingEase = snapshotMetrics?.readabilityScore
-  const dialoguePercent = readabilityMetrics?.dialoguePercent ?? snapshotMetrics?.dialoguePercentage
-  const passivePercent = readabilityMetrics?.passiveVoicePercent
-  const avgSentenceLength = readabilityMetrics?.avgSentenceLength ?? snapshotMetrics?.averageWordsPerSentence
+  const dialoguePercent = snapshotMetrics?.dialoguePercentage ?? readabilityMetrics?.dialoguePercent
+  const passivePercent = snapshotMetrics?.passiveVoicePercentage ?? readabilityMetrics?.passiveVoicePercent
+  const avgSentenceLength = snapshotMetrics?.averageWordsPerSentence ?? readabilityMetrics?.avgSentenceLength
 
   const readingEaseDisplay = formatReadingEase(readingEase)
   const passiveDisplay = formatPassiveVoice(passivePercent)
@@ -199,7 +200,15 @@ export function InlineAnalyticsPanel({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setExpanded((prev) => !prev)}
+          onClick={() => {
+            setExpanded((prev) => {
+              const next = !prev
+              trackEvent('editor.analytics_panel.toggle', {
+                expanded: next,
+              })
+              return next
+            })
+          }}
           aria-label={expanded ? 'Collapse analytics panel' : 'Expand analytics panel'}
         >
           {expanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}

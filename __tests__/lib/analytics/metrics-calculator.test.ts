@@ -66,6 +66,8 @@ describe('Analytics Metrics Calculator', () => {
 
       expect(metrics.readabilityScore).toBeGreaterThanOrEqual(0)
       expect(metrics.readabilityScore).toBeLessThanOrEqual(100)
+      expect(metrics.passiveVoicePercentage).toBeGreaterThanOrEqual(0)
+      expect(metrics.passiveVoicePercentage).toBeLessThanOrEqual(100)
     })
 
     it('should calculate reading time', () => {
@@ -95,6 +97,19 @@ describe('Analytics Metrics Calculator', () => {
         expect(item).toHaveProperty('word')
         expect(item).toHaveProperty('count')
       })
+    })
+
+    it('should detect passive voice and dialogue ratios', () => {
+      const html = `
+        <p>"Please leave," she whispered.</p>
+        <p>The letter was written by John before he departed.</p>
+        <p>They are being watched by unseen eyes.</p>
+      `
+      const snapshot = createTestSnapshot('snap-passive', 30, html)
+      const metrics = analyzeSnapshot(snapshot)
+
+      expect(metrics.dialoguePercentage).toBeGreaterThan(0)
+      expect(metrics.passiveVoicePercentage).toBeGreaterThan(0)
     })
   })
 

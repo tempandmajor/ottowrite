@@ -111,29 +111,6 @@ function getWordFrequency(text: string): Map<string, number> {
 /**
  * Detect content type percentages (dialogue, action, description)
  */
-function detectContentTypes(html: string): {
-  dialogue: number
-  action: number
-  description: number
-} {
-  const total = html.length
-
-  // Detect dialogue (content in quotes)
-  const dialogueMatches = html.match(/"[^"]*"/g) || []
-  const dialogueLength = dialogueMatches.join('').length
-
-  // This is a simplified heuristic - in reality you'd want more sophisticated detection
-  const dialogue = (dialogueLength / total) * 100
-  const action = 30 // Placeholder - would need NLP
-  const description = 100 - dialogue - action
-
-  return {
-    dialogue: Math.max(0, dialogue),
-    action: Math.max(0, action),
-    description: Math.max(0, description),
-  }
-}
-
 /**
  * Analyze a single snapshot
  */
@@ -145,14 +122,39 @@ export function analyzeSnapshot(snapshot: DocumentSnapshot): SnapshotAnalysisMet
   const characterCount = text.length
   const sentences = countSentences(text)
   const paragraphs = countParagraphs(text)
+  const sentenceList = text
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 0)
+
+  const passiveSentenceRegex = /\b(?:is|are|was|were|be|been|being|am)\b\s+(?:\w+ed|\w+en)\b/i
+  const passiveSentenceCount = sentenceList.filter((sentence) =>
+    passiveSentenceRegex.test(sentence)
+  ).length
+  const passiveVoicePercentage =
+    sentenceList.length > 0 ? (passiveSentenceCount / sentenceList.length) * 100 : 0
+
+  const dialogueMatches =
+    html.match(/["“”‘’][^"“”‘’]+["“”‘’]/g) ?? []
+  const dialogueWords = dialogueMatches.reduce((total, fragment) => {
+    const cleaned = fragment.replace(/["“”‘’]/g, ' ').trim()
+    return total + cleaned.split(/\s+/).filter(Boolean).length
+  }, 0)
+  const dialoguePercentage = wordCount > 0 ? (dialogueWords / wordCount) * 100 : 0
+
+  const actionSentences = sentenceList.filter((sentence) =>
+    /\b\w+(?:ed|ing)\b/.test(sentence)
+  ).length
+  const nonDialogueShare = Math.max(0, 100 - dialoguePercentage)
+  const actionRatio = sentenceList.length > 0 ? actionSentences / sentenceList.length : 0
+  const actionPercentage = Math.min(nonDialogueShare, actionRatio * nonDialogueShare)
+  const descriptionPercentage = Math.max(0, nonDialogueShare - actionPercentage)
 
   const frequency = getWordFrequency(text)
   const topWords = Array.from(frequency.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 20)
     .map(([word, count]) => ({ word, count }))
-
-  const contentTypes = detectContentTypes(html)
 
   const sceneCount = snapshot.metadata.sceneCount || 0
   const chapterCount = Array.isArray(snapshot.content.structure)
@@ -173,9 +175,10 @@ export function analyzeSnapshot(snapshot: DocumentSnapshot): SnapshotAnalysisMet
     chapterCount,
     averageSceneLength: sceneCount > 0 ? wordCount / sceneCount : 0,
 
-    dialoguePercentage: contentTypes.dialogue,
-    actionPercentage: contentTypes.action,
-    descriptionPercentage: contentTypes.description,
+    dialoguePercentage: Math.min(100, Math.max(0, dialoguePercentage)),
+    actionPercentage: Math.min(100, Math.max(0, actionPercentage)),
+    descriptionPercentage: Math.min(100, Math.max(0, descriptionPercentage)),
+    passiveVoicePercentage: Math.min(100, Math.max(0, passiveVoicePercentage)),
 
     uniqueWords: frequency.size,
     vocabularyRichness: wordCount > 0 ? frequency.size / wordCount : 0,

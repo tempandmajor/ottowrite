@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createBackgroundResponse, extractResponseText } from '@/lib/ai/responses-api-service'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest) {
   try {
     const { supabase, user } = await requireUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -45,10 +47,7 @@ export async function POST(request: NextRequest) {
     } = body ?? {}
 
     if (!query || query.trim().length < 5) {
-      return NextResponse.json(
-        { error: 'Query must be at least 5 characters long.' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Query must be at least 5 characters long', { userId: user.id })
     }
 
     const { data: requestRecord, error: insertError } = await supabase
@@ -64,7 +63,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError || !requestRecord) {
-      throw insertError ?? new Error('Failed to store research request')
+      logger.error('Failed to store research request', {
+        userId: user.id,
+        operation: 'research:create_request',
+      }, insertError ?? undefined)
+      return errorResponses.internalError('Failed to store research request', {
+        details: insertError,
+        userId: user.id,
+      })
     }
 
     let updatedRecord = requestRecord
@@ -108,9 +114,14 @@ export async function POST(request: NextRequest) {
         updatedRecord = updated
       }
 
-      return NextResponse.json({ request: updatedRecord, note })
+      return successResponse({ request: updatedRecord, note })
     } catch (error) {
-      console.error('Research execution failed:', error)
+      logger.error('Research execution failed', {
+        userId: user.id,
+        requestId: requestRecord.id,
+        operation: 'research:execute',
+      }, error instanceof Error ? error : undefined)
+
       const { data: failed } = await supabase
         .from('research_requests')
         .update({ status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' })
@@ -122,14 +133,16 @@ export async function POST(request: NextRequest) {
         updatedRecord = failed
       }
 
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : 'Research failed', request: updatedRecord },
-        { status: 500 }
-      )
+      return errorResponses.internalError('Research failed', {
+        details: { error, request: updatedRecord },
+        userId: user.id,
+      })
     }
   } catch (error) {
-    console.error('Error starting research:', error)
-    return NextResponse.json({ error: 'Failed to start research' }, { status: 500 })
+    logger.error('Error starting research', {
+      operation: 'research:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to start research', { details: error })
   }
 }
 
@@ -137,7 +150,7 @@ export async function GET(request: NextRequest) {
   try {
     const { supabase, user } = await requireUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -154,12 +167,22 @@ export async function GET(request: NextRequest) {
       : await query.limit(50)
 
     if (error) {
-      throw error
+      logger.error('Failed to fetch research notes', {
+        userId: user.id,
+        documentId: documentId ?? undefined,
+        operation: 'research:fetch_notes',
+      }, error)
+      return errorResponses.internalError('Failed to fetch research notes', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ notes: data ?? [] })
+    return successResponse({ notes: data ?? [] })
   } catch (error) {
-    console.error('Error fetching research notes:', error)
-    return NextResponse.json({ error: 'Failed to fetch research notes' }, { status: 500 })
+    logger.error('Error fetching research notes', {
+      operation: 'research:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch research notes', { details: error })
   }
 }

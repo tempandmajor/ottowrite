@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import {
   createBackgroundResponse,
@@ -8,6 +8,8 @@ import {
 import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
 import { checkAIRequestQuota } from '@/lib/account/quota'
 import { reportBackgroundTaskError, addBreadcrumb } from '@/lib/monitoring/error-reporter'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
   try {
     const { supabase, user } = await requireUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -56,13 +58,22 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      throw error
+      logger.error('Failed to fetch background tasks', {
+        userId: user.id,
+        operation: 'background_task:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch background tasks', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ tasks: data ?? [] })
+    return successResponse({ tasks: data ?? [] })
   } catch (error) {
-    console.error('Error fetching background tasks:', error)
-    return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
+    logger.error('Error fetching background tasks', {
+      operation: 'background_task:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch tasks', { details: error })
   }
 }
 
@@ -70,7 +81,7 @@ export async function POST(request: NextRequest) {
   try {
     const { supabase, user } = await requireUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -89,9 +100,9 @@ export async function POST(request: NextRequest) {
     } = body ?? {}
 
     if (!task_type || !prompt || prompt.trim().length < 10) {
-      return NextResponse.json(
-        { error: 'task_type and a prompt of at least 10 characters are required.' },
-        { status: 400 }
+      return errorResponses.badRequest(
+        'task_type and a prompt of at least 10 characters are required',
+        { userId: user.id }
       )
     }
 
@@ -102,7 +113,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+      return errorResponses.notFound('Profile not found', { userId: user.id })
     }
 
     const plan = profile.subscription_tier ?? 'free'
@@ -111,27 +122,35 @@ export async function POST(request: NextRequest) {
     const requestQuota = await checkAIRequestQuota(supabase, user.id, plan, 1)
     if (!requestQuota.allowed) {
       const formattedPlan = plan.charAt(0).toUpperCase() + plan.slice(1)
-      return NextResponse.json(
+      return errorResponses.tooManyRequests(
+        `You have reached the ${formattedPlan} plan limit of ${requestQuota.limit} AI requests this month.`,
+        undefined,
         {
-          error: `You have reached the ${formattedPlan} plan limit of ${requestQuota.limit} AI requests this month.`,
-          limit: requestQuota.limit,
-          used: requestQuota.used,
-          upgradeRequired: true,
-        },
-        { status: 429 }
+          code: 'AI_REQUEST_LIMIT_EXCEEDED',
+          userId: user.id,
+          details: {
+            limit: requestQuota.limit,
+            used: requestQuota.used,
+            upgradeRequired: true,
+          },
+        }
       )
     }
 
     const monthlyLimit = getMonthlyAIWordLimit(plan)
     if (currentUsage >= monthlyLimit) {
-      return NextResponse.json(
+      return errorResponses.tooManyRequests(
+        'Monthly AI word limit exceeded',
+        undefined,
         {
-          error: 'Monthly AI word limit exceeded',
-          limit: monthlyLimit,
-          used: currentUsage,
-          upgradeRequired: true,
-        },
-        { status: 429 }
+          code: 'AI_WORD_LIMIT_EXCEEDED',
+          userId: user.id,
+          details: {
+            limit: monthlyLimit,
+            used: currentUsage,
+            upgradeRequired: true,
+          },
+        }
       )
     }
 
@@ -209,7 +228,10 @@ export async function POST(request: NextRequest) {
         try {
           await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
         } catch (refreshError) {
-          console.warn('refresh_user_plan_usage failed after background task', refreshError)
+          logger.warn('refresh_user_plan_usage failed after background task', {
+            userId: user.id,
+            operation: 'background_task:refresh_usage',
+          }, refreshError instanceof Error ? refreshError : undefined)
         }
       }
 
@@ -228,7 +250,7 @@ export async function POST(request: NextRequest) {
         updatedRecord = updated
       }
 
-      return NextResponse.json({ task: updatedRecord })
+      return successResponse({ task: updatedRecord })
     } catch (error) {
       // Report background task failure to Sentry
       reportBackgroundTaskError(task_type, error instanceof Error ? error : new Error(String(error)), {
@@ -255,17 +277,16 @@ export async function POST(request: NextRequest) {
         updatedRecord = failed
       }
 
-      return NextResponse.json(
-        {
-          error: error instanceof Error ? error.message : 'Failed to execute background task',
-          task: updatedRecord,
-        },
-        { status: 500 }
-      )
+      return errorResponses.internalError('Failed to execute background task', {
+        details: { error, task: updatedRecord },
+        userId: user.id,
+      })
     }
   } catch (error) {
-    console.error('Error creating background task:', error)
-    return NextResponse.json({ error: 'Failed to create background task' }, { status: 500 })
+    logger.error('Error creating background task', {
+      operation: 'background_task:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create background task', { details: error })
   }
 }
 
@@ -273,14 +294,14 @@ export async function PATCH(request: NextRequest) {
   try {
     const { supabase, user } = await requireUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { id } = body ?? {}
 
     if (!id) {
-      return NextResponse.json({ error: 'Task id is required' }, { status: 400 })
+      return errorResponses.badRequest('Task id is required', { userId: user.id })
     }
 
     const { data: task, error } = await supabase
@@ -291,11 +312,11 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error || !task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+      return errorResponses.notFound('Task not found', { userId: user.id })
     }
 
     if (!task.provider_response_id) {
-      return NextResponse.json({ task })
+      return successResponse({ task })
     }
 
     const response = await retrieveBackgroundResponse(task.provider_response_id)
@@ -318,9 +339,11 @@ export async function PATCH(request: NextRequest) {
       .select()
       .single()
 
-    return NextResponse.json({ task: updated ?? task })
+    return successResponse({ task: updated ?? task })
   } catch (error) {
-    console.error('Error refreshing background task:', error)
-    return NextResponse.json({ error: 'Failed to refresh background task' }, { status: 500 })
+    logger.error('Error refreshing background task', {
+      operation: 'background_task:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to refresh background task', { details: error })
   }
 }

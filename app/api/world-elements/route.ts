@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateWorldElement } from '@/lib/ai/world-element'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -13,14 +15,14 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
 
     if (!projectId) {
-      return NextResponse.json({ error: 'project_id is required' }, { status: 400 })
+      return errorResponses.badRequest('project_id is required', { userId: user.id })
     }
 
     const { data, error } = await supabase
@@ -30,12 +32,24 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
 
-    if (error) throw error
+    if (error) {
+      logger.error('Failed to fetch world elements', {
+        userId: user.id,
+        projectId,
+        operation: 'world_elements:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch world elements', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ elements: data ?? [] })
+    return successResponse({ elements: data ?? [] })
   } catch (error) {
-    console.error('Error fetching world elements:', error)
-    return NextResponse.json({ error: 'Failed to fetch world elements' }, { status: 500 })
+    logger.error('Error fetching world elements', {
+      operation: 'world_elements:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch world elements', { details: error })
   }
 }
 
@@ -47,7 +61,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -66,9 +80,9 @@ export async function POST(request: NextRequest) {
     } = body || {}
 
     if (!project_id || !type || (!name && !use_ai)) {
-      return NextResponse.json(
-        { error: 'project_id, type, and name (unless AI generation is requested) are required' },
-        { status: 400 }
+      return errorResponses.badRequest(
+        'project_id, type, and name (unless AI generation is requested) are required',
+        { userId: user.id }
       )
     }
 
@@ -80,7 +94,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (projectError || !project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return errorResponses.notFound('Project not found', { userId: user.id })
     }
 
     let finalName: string | undefined = name
@@ -93,9 +107,9 @@ export async function POST(request: NextRequest) {
     if (use_ai) {
       const prompt = String(ai_prompt ?? '').trim()
       if (!prompt || prompt.length < 10) {
-        return NextResponse.json(
-          { error: 'Please provide a prompt of at least 10 characters for AI generation.' },
-          { status: 400 }
+        return errorResponses.badRequest(
+          'Please provide a prompt of at least 10 characters for AI generation',
+          { userId: user.id }
         )
       }
 
@@ -128,7 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!finalName) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+      return errorResponses.badRequest('Name is required', { userId: user.id })
     }
 
     const { data: element, error: insertError } = await supabase
@@ -149,15 +163,24 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (insertError) throw insertError
+    if (insertError) {
+      logger.error('Failed to create world element', {
+        userId: user.id,
+        projectId: project_id,
+        operation: 'world_elements:create',
+      }, insertError)
+      return errorResponses.internalError('Failed to create world element', {
+        details: insertError,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ element }, { status: 201 })
+    return successResponse({ element }, 201)
   } catch (error) {
-    console.error('Error creating world element:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create world element' },
-      { status: 500 }
-    )
+    logger.error('Error creating world element', {
+      operation: 'world_elements:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create world element', { details: error })
   }
 }
 
@@ -169,14 +192,14 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { id, ...updates } = body || {}
 
     if (!id) {
-      return NextResponse.json({ error: 'id is required' }, { status: 400 })
+      return errorResponses.badRequest('id is required', { userId: user.id })
     }
 
     delete updates.user_id
@@ -192,12 +215,24 @@ export async function PATCH(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      logger.error('Failed to update world element', {
+        userId: user.id,
+        elementId: id,
+        operation: 'world_elements:update',
+      }, error)
+      return errorResponses.internalError('Failed to update world element', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ element })
+    return successResponse({ element })
   } catch (error) {
-    console.error('Error updating world element:', error)
-    return NextResponse.json({ error: 'Failed to update world element' }, { status: 500 })
+    logger.error('Error updating world element', {
+      operation: 'world_elements:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to update world element', { details: error })
   }
 }
 
@@ -209,14 +244,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'id is required' }, { status: 400 })
+      return errorResponses.badRequest('id is required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -225,11 +260,23 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
       .eq('user_id', user.id)
 
-    if (error) throw error
+    if (error) {
+      logger.error('Failed to delete world element', {
+        userId: user.id,
+        elementId: id,
+        operation: 'world_elements:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete world element', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Error deleting world element:', error)
-    return NextResponse.json({ error: 'Failed to delete world element' }, { status: 500 })
+    logger.error('Error deleting world element', {
+      operation: 'world_elements:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete world element', { details: error })
   }
 }

@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { analyzeDialogueVoice } from '@/lib/ai/dialogue-voice'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -13,14 +15,14 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const characterId = searchParams.get('character_id')
 
     if (!characterId) {
-      return NextResponse.json({ error: 'character_id is required' }, { status: 400 })
+      return errorResponses.badRequest('character_id is required', { userId: user.id })
     }
 
     const { data, error } = await supabase
@@ -30,12 +32,24 @@ export async function GET(request: NextRequest) {
       .eq('character_id', characterId)
       .order('created_at', { ascending: false })
 
-    if (error) throw error
+    if (error) {
+      logger.error('Failed to fetch dialogue voice analyses', {
+        userId: user.id,
+        characterId,
+        operation: 'dialogue_voice:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch analyses', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json(data ?? [])
+    return successResponse(data ?? [])
   } catch (error) {
-    console.error('Error fetching dialogue voice analyses:', error)
-    return NextResponse.json({ error: 'Failed to fetch analyses' }, { status: 500 })
+    logger.error('Error fetching dialogue voice analyses', {
+      operation: 'dialogue_voice:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch analyses', { details: error })
   }
 }
 
@@ -47,7 +61,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = (await request.json()) as {
@@ -63,9 +77,9 @@ export async function POST(request: NextRequest) {
     const targetPassage = (body.target_passage ?? '').trim()
 
     if (!characterId || !projectId || dialogueSamples.length === 0 || !targetPassage) {
-      return NextResponse.json(
-        { error: 'character_id, project_id, dialogue_samples, and target_passage are required' },
-        { status: 400 }
+      return errorResponses.badRequest(
+        'character_id, project_id, dialogue_samples, and target_passage are required',
+        { userId: user.id }
       )
     }
 
@@ -78,7 +92,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (characterError || !character) {
-      return NextResponse.json({ error: 'Character not found' }, { status: 404 })
+      return errorResponses.notFound('Character not found', { userId: user.id })
     }
 
     const { data: project, error: projectError } = await supabase
@@ -89,7 +103,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (projectError || !project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return errorResponses.notFound('Project not found', { userId: user.id })
     }
 
     const analysis = await analyzeDialogueVoice({
@@ -116,14 +130,24 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (insertError) throw insertError
+    if (insertError) {
+      logger.error('Failed to store dialogue voice analysis', {
+        userId: user.id,
+        characterId,
+        projectId,
+        operation: 'dialogue_voice:store',
+      }, insertError)
+      return errorResponses.internalError('Failed to store analysis', {
+        details: insertError,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json(record, { status: 201 })
+    return successResponse(record, 201)
   } catch (error) {
-    console.error('Error analyzing dialogue voice:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to analyze dialogue voice' },
-      { status: 500 }
-    )
+    logger.error('Error analyzing dialogue voice', {
+      operation: 'dialogue_voice:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to analyze dialogue voice', { details: error })
   }
 }

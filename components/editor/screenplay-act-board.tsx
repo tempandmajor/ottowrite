@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { GripVertical, Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -101,6 +101,13 @@ export function ScreenplayActBoard({ acts, onChange, sceneMeta }: ScreenplayActB
   const [dragging, setDragging] = useState<DragPayload | null>(null)
   const [editingSequenceId, setEditingSequenceId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editingSequenceId && editInputRef.current) {
+      editInputRef.current.focus()
+    }
+  }, [editingSequenceId])
 
   const sceneCounts = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -308,7 +315,7 @@ export function ScreenplayActBoard({ acts, onChange, sceneMeta }: ScreenplayActB
                             <div className="flex items-center justify-between gap-2">
                               {editingSequenceId === sequence.id ? (
                                 <Input
-                                  autoFocus
+                                  ref={editInputRef}
                                   value={editingTitle}
                                   onChange={(event) => setEditingTitle(event.target.value)}
                                   onBlur={() => {

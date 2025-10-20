@@ -100,7 +100,7 @@ function parseSceneHeading(title: string): {
 /**
  * Strip HTML tags from content
  */
-function stripHtml(html: string): string {
+function _stripHtml(html: string): string {
   return html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -119,7 +119,7 @@ function countWords(text: string): number {
 }
 
 export function CharacterSceneIndex({
-  content,
+  content: _content,
   structure,
   onNavigateToScene,
 }: CharacterIndexProps) {
@@ -185,7 +185,7 @@ export function CharacterSceneIndex({
     )
 
     return { characters, scenes: sceneList }
-  }, [content, structure])
+  }, [structure])
 
   return (
     <Card className="w-full">

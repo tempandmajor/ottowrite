@@ -4,6 +4,7 @@ export type ClientContentSnapshot = {
   html?: string
   structure?: Chapter[]
   anchorIds?: string[]
+  metadata?: Record<string, any>
 }
 
 export async function computeClientContentHash({

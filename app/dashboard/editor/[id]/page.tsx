@@ -565,6 +565,7 @@ export default function EditorPage() {
     setIsDirty,
     setLastSavedAt,
     setLoading,
+    setMetadata,
     setProjectTitle,
     setSceneAnchors,
     setServerContent,
@@ -719,7 +720,7 @@ export default function EditorPage() {
     (nextMetadata: typeof metadata) => {
       setMetadata(nextMetadata)
     },
-    [metadata, setMetadata]
+    [setMetadata]
   )
 
   const handleSceneCreated = useCallback(
@@ -768,22 +769,6 @@ export default function EditorPage() {
       }
     },
     [toast]
-  )
-
-  const handleScreenplayStructureChange = useCallback(
-    (nextActs: ScreenplayAct[]) => {
-      setScreenplayStructure((prev) => {
-        const sanitized = sanitiseScreenplayStructure(nextActs, screenplayScenes)
-        const anchors = flattenScreenplaySceneIds(sanitized)
-        setSceneAnchors(anchors)
-
-        if (screenplayStructuresEqual(prev, sanitized)) {
-          return prev
-        }
-        return cloneScreenplayStructure(sanitized)
-      })
-    },
-    [screenplayScenes, setSceneAnchors]
   )
 
   const insertAIText = (rawText: string) => {
@@ -875,6 +860,17 @@ export default function EditorPage() {
     setTimeout(() => saveDocument(), 100)
   }
 
+  const screenplayContent = useMemo<ScreenplayElement[]>(() => {
+    if (!isScriptType(document?.type)) return []
+    try {
+      const parsed = JSON.parse(content || '[]')
+      return Array.isArray(parsed) ? (parsed as ScreenplayElement[]) : []
+    } catch (error) {
+      console.error('Failed to parse screenplay content', error)
+      return []
+    }
+  }, [content, document?.type])
+
   useEffect(() => {
     if (!document) return
 
@@ -907,21 +903,26 @@ export default function EditorPage() {
     title,
   ])
 
-  const screenplayContent = useMemo<ScreenplayElement[]>(() => {
-    if (!isScriptType(document?.type)) return []
-    try {
-      const parsed = JSON.parse(content || '[]')
-      return Array.isArray(parsed) ? (parsed as ScreenplayElement[]) : []
-    } catch (error) {
-      console.error('Failed to parse screenplay content', error)
-      return []
-    }
-  }, [content, document?.type])
-
   const screenplayScenes = useMemo(() => {
     if (!isScriptType(document?.type)) return [] as ScreenplayElement[]
     return screenplayContent.filter((element) => element.type === 'scene')
   }, [document?.type, screenplayContent])
+
+  const handleScreenplayStructureChange = useCallback(
+    (nextActs: ScreenplayAct[]) => {
+      setScreenplayStructure((prev) => {
+        const sanitized = sanitiseScreenplayStructure(nextActs, screenplayScenes)
+        const anchors = flattenScreenplaySceneIds(sanitized)
+        setSceneAnchors(anchors)
+
+        if (screenplayStructuresEqual(prev, sanitized)) {
+          return prev
+        }
+        return cloneScreenplayStructure(sanitized)
+      })
+    },
+    [screenplayScenes, setSceneAnchors]
+  )
 
   const screenplaySceneMeta = useMemo(() => {
     const meta: Record<string, { label: string; index: number }> = {}

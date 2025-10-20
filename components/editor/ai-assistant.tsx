@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -340,7 +340,7 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
     })
   }
 
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     setLoadingTemplates(true)
     try {
       const res = await fetch('/api/ai/templates', { cache: 'no-store' })
@@ -350,7 +350,7 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
       const data = await res.json()
       if (Array.isArray(data.templates)) {
         setCustomTemplates(
-          data.templates.filter((item): item is PromptTemplate =>
+          data.templates.filter((item: any): item is PromptTemplate =>
             typeof item?.id === 'string' &&
             typeof item?.name === 'string' &&
             typeof item?.command === 'string' &&
@@ -369,7 +369,7 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
     } finally {
       setLoadingTemplates(false)
     }
-  }
+  }, [toast])
 
   const saveTemplates = async (templates: PromptTemplate[]) => {
     try {
@@ -442,9 +442,21 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
     await saveTemplates(nextTemplates)
   }
 
+  const openCreateTemplate = () => {
+    setEditingTemplate(null)
+    setTemplateForm({ name: '', command: 'continue', content: '' })
+    setTemplateDialogOpen(true)
+  }
+
+  const openEditTemplate = (template: PromptTemplate) => {
+    setEditingTemplate(template)
+    setTemplateForm({ name: template.name, command: template.command, content: template.content })
+    setTemplateDialogOpen(true)
+  }
+
   useEffect(() => {
     void loadTemplates()
-  }, [])
+  }, [loadTemplates])
 
   const availableCommands: Array<{ value: CommandOption; label: string }> = [
     { value: 'auto', label: 'Auto detect' },
@@ -897,14 +909,3 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
     </Card>
   )
 }
-  const openCreateTemplate = () => {
-    setEditingTemplate(null)
-    setTemplateForm({ name: '', command: 'continue', content: '' })
-    setTemplateDialogOpen(true)
-  }
-
-  const openEditTemplate = (template: PromptTemplate) => {
-    setEditingTemplate(template)
-    setTemplateForm({ name: template.name, command: template.command, content: template.content })
-    setTemplateDialogOpen(true)
-  }

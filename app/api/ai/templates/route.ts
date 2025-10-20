@@ -69,7 +69,7 @@ export async function PUT(request: Request) {
 
   const sanitized: PromptTemplate[] = templates
     .filter(
-      (item): item is PromptTemplate =>
+      (item: any): item is PromptTemplate =>
         item &&
         typeof item === 'object' &&
         typeof item.id === 'string' &&

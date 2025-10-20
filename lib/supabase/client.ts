@@ -2,6 +2,18 @@ import { createBrowserClient } from '@supabase/ssr'
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 14 // 14 days
 
+/**
+ * Browser Client Connection Configuration
+ *
+ * Browser clients are lightweight and don't need explicit pooling
+ * since the browser manages HTTP/2 connection reuse automatically.
+ *
+ * However, we configure timeouts to prevent hanging requests.
+ */
+const BROWSER_CLIENT_CONFIG = {
+  connect_timeout: parseInt(process.env.NEXT_PUBLIC_DB_CONNECT_TIMEOUT || '10000', 10),
+}
+
 export function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
@@ -25,5 +37,21 @@ export function createClient() {
       path: '/',
       secure: isProduction,
     },
+    db: {
+      schema: 'public',
+    },
+    global: {
+      headers: {
+        'x-connection-timeout': BROWSER_CLIENT_CONFIG.connect_timeout.toString(),
+      },
+    },
   })
+}
+
+/**
+ * Get current browser client configuration
+ * Useful for monitoring and debugging
+ */
+export function getBrowserClientConfig() {
+  return { ...BROWSER_CLIENT_CONFIG }
 }

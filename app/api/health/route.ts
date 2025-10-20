@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getPoolConfig } from '@/lib/supabase/server'
+import { getServiceRolePoolConfig } from '@/lib/supabase/service-role'
 import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
@@ -20,6 +21,10 @@ interface HealthCheck {
   details?: {
     database?: string
     environment?: string
+  }
+  poolConfig?: {
+    server: ReturnType<typeof getPoolConfig>
+    serviceRole: ReturnType<typeof getServiceRolePoolConfig>
   }
 }
 
@@ -102,6 +107,12 @@ export async function GET() {
   }
 
   const duration = Date.now() - startTime
+
+  // Include connection pool configuration for monitoring
+  checks.poolConfig = {
+    server: getPoolConfig(),
+    serviceRole: getServiceRolePoolConfig(),
+  }
 
   // Log health check
   logger.info('Health check completed', {

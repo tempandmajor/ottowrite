@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
   const isoFromUnix = (value?: number | null) =>
     typeof value === 'number' ? new Date(value * 1000).toISOString() : null
 
-  const updateProfile = (
+  const updateProfile = async (
     update: Record<string, unknown>,
     identifiers: {
       userId?: string | null
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       customerId?: string | null
     }
   ) => {
-    let query = supabase.from('user_profiles').update(update)
+    let query = supabase.from('user_profiles').update(update as Record<string, any>)
 
     if (identifiers.userId) {
       query = query.eq('id', identifiers.userId)

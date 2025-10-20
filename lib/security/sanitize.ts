@@ -116,7 +116,7 @@ export function sanitizeURL(
     }
 
     return url
-  } catch (_error) {
+  } catch {
     // Invalid URL
     logger.warn('Invalid URL format', {
       operation: 'sanitize:url',

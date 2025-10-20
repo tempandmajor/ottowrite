@@ -2,10 +2,23 @@
 
 **Status:** ✅ IMPLEMENTED
 **Date:** 2025-10-20
+**Last Updated:** 2025-10-20 (Cookie policy alignment)
 
 ## Overview
 
-Strengthened Supabase session persistence across server and client to ensure reliable authentication state, especially after browser restarts and across multiple sessions.
+Strengthened Supabase session persistence across server, middleware, and client to ensure reliable authentication state, especially after browser restarts and across multiple sessions.
+
+## Recent Adjustments
+
+**What Changed:**
+- ✅ **Unified Cookie Policy**: Server, middleware, and client now share identical cookie settings
+- ✅ **Simplified Secure Flag**: Client now uses `NODE_ENV === 'production'` instead of runtime protocol detection
+- ✅ **Removed Custom Storage Key**: Uses Supabase default to avoid client/server mismatches
+
+**Why This Matters:**
+- **Before**: Middleware dropped cookie options, causing refresh tokens to be session cookies that disappeared on browser close
+- **Before**: Client forced `secure: true` when `window` was undefined, preventing cookies on local HTTP
+- **After**: All three layers (server/middleware/client) issue cookies with identical 14-day max-age and consistent flags
 
 ---
 
@@ -51,15 +64,13 @@ SUPABASE_COOKIE_DOMAIN=.example.com
 
 ### 2. Client-Side Configuration (`lib/supabase/client.ts`)
 
-**Custom Storage Key:** `ottowrite.auth.token`
-
 **Cookie Configuration:**
 ```typescript
 {
   maxAge: 1209600,                    // 14 days (matches server)
   sameSite: 'lax',                    // Consistent with server
   path: '/',                          // Site-wide cookies
-  secure: window.location.protocol === 'https:',  // HTTPS-aware
+  secure: isProduction,               // Matches server/middleware policy
 }
 ```
 
@@ -69,14 +80,13 @@ SUPABASE_COOKIE_DOMAIN=.example.com
   persistSession: true,               // Keep session alive after browser restart
   autoRefreshToken: true,             // Auto-refresh tokens before expiry
   detectSessionInUrl: true,           // Handle OAuth callbacks
-  storageKey: 'ottowrite.auth.token', // Custom storage namespace
 }
 ```
 
 **Key Features:**
 - ✅ Mirrors server-side auth options for consistency
-- ✅ Custom storage key prevents conflicts with other apps
-- ✅ HTTPS-aware cookie secure flag (runtime detection)
+- ✅ Matches server/middleware cookie policy (secure only in production)
+- ✅ Uses Supabase default localStorage key (avoids client/server mismatches)
 - ✅ Keeps refresh tokens alive after browser restarts
 - ✅ OAuth callback detection for social login flows
 
@@ -212,7 +222,7 @@ Vercel will automatically deploy the changes.
 | `maxAge` | `1209600` | Match server session lifetime |
 | `sameSite` | `lax` | Consistent with server |
 | `path` | `/` | Site-wide availability |
-| `secure` | `auto` | HTTPS-aware (runtime check) |
+| `secure` | `isProduction` | Matches server/middleware (prod only) |
 
 ### Auth Options (Both Sides)
 
@@ -221,7 +231,6 @@ Vercel will automatically deploy the changes.
 | `persistSession` | `true` | Persist across page reloads |
 | `autoRefreshToken` | `true` | Auto-refresh expiring tokens |
 | `detectSessionInUrl` | `true` (client) | Handle OAuth callbacks |
-| `storageKey` | `custom` (client) | Prevent storage conflicts |
 
 ---
 
@@ -229,9 +238,9 @@ Vercel will automatically deploy the changes.
 
 ### ✅ Implemented
 
-- HTTPS enforcement in production (`secure: true`)
+- HTTPS enforcement in production (`secure: isProduction`)
 - `sameSite: 'lax'` prevents CSRF attacks
-- Custom storage key prevents conflicts
+- Unified cookie policy across server/middleware/client
 - Production-aware configuration
 - Token auto-refresh for security rotation
 

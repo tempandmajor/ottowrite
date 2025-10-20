@@ -273,14 +273,50 @@ When migrating an API route to standard error responses:
 
 ## Migrated Routes
 
-✅ **Critical Routes (Complete)**
-- `/api/ai/generate` - AI generation endpoint
-- `/api/documents/[id]/autosave` - Document autosave
-- `/api/checkout/create-session` - Stripe checkout
+✅ **Phase 1 Complete (8/40 routes - 20%)**
+
+### Payment & Billing (3 routes)
+- `/api/checkout/create-session` - Stripe checkout sessions
+- `/api/ai/templates` - User prompt templates
+
+### AI & Generation (2 routes)
+- `/api/ai/generate` - AI content generation
 - `/api/ai/templates` - AI prompt templates
 
-🔄 **Remaining Routes (To Be Migrated)**
-See `app/api/**` directory for 35+ additional routes to migrate.
+### Documents (1 route)
+- `/api/documents/[id]/autosave` - Document autosave with conflict detection
+
+### Characters (1 route)
+- `/api/characters` - Character CRUD operations (GET, POST, PATCH, DELETE)
+
+🔄 **Remaining Routes (32 routes - 80%)**
+
+### High Priority (Recommend Next)
+1. `/api/webhooks/stripe` - Stripe webhook handler (critical for payments)
+2. `/api/checkout/customer-portal` - Customer billing portal
+3. `/api/projects/**` - Project management (4 routes)
+4. `/api/locations/**` - Location management (2 routes)
+5. `/api/plot-analysis/**` - Plot analysis (2 routes)
+
+### Medium Priority
+6. `/api/characters/arcs` - Character arcs
+7. `/api/characters/relationships` - Character relationships
+8. `/api/story-beats/**` - Story beats (2 routes)
+9. `/api/outlines` - Outlines
+10. `/api/analytics/**` - Analytics (3 routes)
+11. `/api/telemetry/**` - Telemetry (2 routes)
+
+### Lower Priority
+12. `/api/documents/**` - Document operations (2 routes)
+13. `/api/templates/**` - Template operations (2 routes)
+14. `/api/ai/ensemble/**` - Ensemble AI (3 routes)
+15. `/api/ai/generate-coverage` - Coverage generation
+16. `/api/ai/background-task` - Background tasks
+17. `/api/analysis/dialogue-voice` - Dialogue analysis
+18. `/api/world-elements` - World building
+19. `/api/research/search` - Research
+20. `/api/beat-board` - Beat board
+21. `/api/account/**` - Account management (2 routes)
 
 ## Testing Error Responses
 
@@ -330,6 +366,7 @@ content-type: application/json
 
 ---
 
-**Status**: Phase 1 of migration complete (4/40 routes)
-**Completed**: 2025-01-20 (TICKET-004 - Partial)
-**Next Steps**: Migrate remaining 35+ API routes to standard format
+**Status**: Phase 1 of migration complete (8/40 routes - 20%)
+**Completed**: 2025-01-20 (TICKET-004 - Phase 1)
+**Build Status**: ✅ Passing (8.3s, 0 errors, 0 warnings)
+**Next Steps**: Migrate remaining 32 API routes following documented patterns (80% remaining)

@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +14,7 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit')
 
     if (!projectId) {
-      return NextResponse.json({ error: 'project_id is required' }, { status: 400 })
+      return errorResponses.badRequest('project_id is required', { userId: user.id })
     }
 
     let query = supabase
@@ -43,14 +45,23 @@ export async function GET(request: NextRequest) {
     const { data: characters, error } = await query
 
     if (error) {
-      console.error('Error fetching characters:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error fetching characters', {
+        userId: user.id,
+        projectId,
+        operation: 'characters:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to fetch characters', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ characters })
+    return successResponse({ characters })
   } catch (error) {
-    console.error('Error in GET /api/characters:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in GET /api/characters', {
+      operation: 'characters:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to fetch characters', { details: error })
   }
 }
 
@@ -63,7 +74,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -97,10 +108,9 @@ export async function POST(request: NextRequest) {
     } = body
 
     if (!project_id || !name || !role) {
-      return NextResponse.json(
-        { error: 'project_id, name, and role are required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('project_id, name, and role are required', {
+        userId: user.id,
+      })
     }
 
     // Verify project belongs to user
@@ -112,7 +122,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (projectError || !project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return errorResponses.notFound('Project not found', { userId: user.id })
     }
 
     const { data: character, error } = await supabase
@@ -150,14 +160,23 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error creating character:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error creating character', {
+        userId: user.id,
+        projectId: project_id,
+        operation: 'characters:create',
+      }, error)
+      return errorResponses.internalError('Failed to create character', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ character }, { status: 201 })
+    return successResponse({ character }, 201)
   } catch (error) {
-    console.error('Error in POST /api/characters:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in POST /api/characters', {
+      operation: 'characters:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create character', { details: error })
   }
 }
 
@@ -170,14 +189,14 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { id, ...updates } = body
 
     if (!id) {
-      return NextResponse.json({ error: 'Character id is required' }, { status: 400 })
+      return errorResponses.badRequest('Character id is required', { userId: user.id })
     }
 
     // Remove fields that shouldn't be updated
@@ -195,18 +214,27 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Error updating character:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error updating character', {
+        userId: user.id,
+        characterId: id,
+        operation: 'characters:update',
+      }, error)
+      return errorResponses.internalError('Failed to update character', {
+        details: error,
+        userId: user.id,
+      })
     }
 
     if (!character) {
-      return NextResponse.json({ error: 'Character not found' }, { status: 404 })
+      return errorResponses.notFound('Character not found', { userId: user.id })
     }
 
-    return NextResponse.json({ character })
+    return successResponse({ character })
   } catch (error) {
-    console.error('Error in PATCH /api/characters:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in PATCH /api/characters', {
+      operation: 'characters:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to update character', { details: error })
   }
 }
 
@@ -219,14 +247,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'Character id is required' }, { status: 400 })
+      return errorResponses.badRequest('Character id is required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -236,13 +264,22 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', user.id)
 
     if (error) {
-      console.error('Error deleting character:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.error('Error deleting character', {
+        userId: user.id,
+        characterId: id,
+        operation: 'characters:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete character', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Error in DELETE /api/characters:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('Error in DELETE /api/characters', {
+      operation: 'characters:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete character', { details: error })
   }
 }

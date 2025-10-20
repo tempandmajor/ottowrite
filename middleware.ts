@@ -2,11 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { checkAuthThrottle } from './lib/security/auth-throttle'
 import { getOrGenerateRequestId, REQUEST_ID_HEADER } from './lib/request-id'
+import { applyRateLimit, addRateLimitHeaders } from './lib/security/api-rate-limiter'
 
 export async function middleware(request: NextRequest) {
   // Generate or extract request ID for tracing
   const requestId = getOrGenerateRequestId(request)
-  // Apply authentication throttling to auth routes
+
+  // Apply authentication throttling to auth routes (legacy, now handled by API rate limiter)
   if (request.nextUrl.pathname.startsWith('/auth/')) {
     const throttle = checkAuthThrottle(request)
     if (!throttle.allowed) {
@@ -25,6 +27,16 @@ export async function middleware(request: NextRequest) {
         }
       )
     }
+  }
+
+  // Apply global API rate limiting
+  // Note: userId is not available yet at middleware level, so we use IP-based limiting
+  // Individual routes can apply additional user-specific rate limiting
+  const rateLimitResponse = await applyRateLimit(request)
+  if (rateLimitResponse) {
+    // Add request ID to rate limit response
+    rateLimitResponse.headers.set(REQUEST_ID_HEADER, requestId)
+    return rateLimitResponse
   }
   let supabaseResponse = NextResponse.next({
     request: {
@@ -86,7 +98,10 @@ export async function middleware(request: NextRequest) {
 
     // Just refresh the session, don't do auth checks
     // Auth checks are now handled by the server component layout
-    await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Add rate limit headers to response
+    supabaseResponse = addRateLimitHeaders(supabaseResponse, request, user?.id)
   } catch (error) {
     console.error('Middleware: Error refreshing session:', error)
     // Don't throw - let the request continue to the server component

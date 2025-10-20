@@ -162,9 +162,13 @@ export default function APIDocsPage() {
               </p>
               <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
                 <li>• Claude Sonnet 4.5 (Anthropic)</li>
-                <li>• GPT-5 + Responses API (OpenAI)</li>
+                <li>• GPT-5 via Responses API (OpenAI)</li>
                 <li>• DeepSeek Chat (V3.1-Terminus)</li>
               </ul>
+              <p className="mt-2 text-xs text-muted-foreground">
+                GPT-5 uses OpenAI&apos;s Responses API with verbosity and
+                reasoning_effort controls for optimized performance.
+              </p>
             </div>
           </div>
         </div>

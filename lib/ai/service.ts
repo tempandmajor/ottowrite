@@ -8,6 +8,9 @@ export type AIRequest = {
   prompt: string
   context?: string
   maxTokens?: number
+  // GPT-5 Responses API specific parameters
+  verbosity?: 'low' | 'medium' | 'high'
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high'
 }
 
 export type AIResponse = {
@@ -106,36 +109,44 @@ export async function generateWithClaude(
 }
 
 /**
- * Generate text using GPT-5
+ * Generate text using GPT-5 with Responses API
+ * Uses OpenAI's new Responses API with verbosity and reasoning_effort controls
  */
 export async function generateWithGPT5(
   prompt: string,
   context?: string,
-  maxTokens: number = 2000
+  maxTokens: number = 2000,
+  verbosity: 'low' | 'medium' | 'high' = 'medium',
+  reasoningEffort: 'minimal' | 'low' | 'medium' | 'high' = 'minimal'
 ): Promise<AIResponse> {
   const systemPrompt = context
     ? `You are an AI writing assistant helping authors write better stories. Here's the context:\n\n${context}`
     : 'You are an AI writing assistant helping authors write better stories.'
 
   const client = getOpenAIClient()
-  const completion = await client.chat.completions.create({
+
+  // Use Responses API for GPT-5
+  const response = await (client as any).responses.create({
     model: 'gpt-5',
-    max_tokens: maxTokens,
-    messages: [
+    input: [
       {
         role: 'system',
-        content: systemPrompt,
+        content: [{ type: 'input_text', text: systemPrompt }],
       },
       {
         role: 'user',
-        content: prompt,
+        content: [{ type: 'input_text', text: prompt }],
       },
     ],
+    verbosity,
+    reasoning_effort: reasoningEffort,
+    max_output_tokens: maxTokens,
   })
 
-  const content = completion.choices[0].message.content || ''
-  const inputTokens = completion.usage?.prompt_tokens || 0
-  const outputTokens = completion.usage?.completion_tokens || 0
+  // Extract content from response
+  const content = response.output?.[0]?.content?.[0]?.text || ''
+  const inputTokens = response.usage?.input_tokens || 0
+  const outputTokens = response.usage?.output_tokens || 0
   const totalCost =
     (inputTokens / 1000000) * PRICING['gpt-5'].input +
     (outputTokens / 1000000) * PRICING['gpt-5'].output
@@ -203,13 +214,20 @@ export async function generateWithDeepSeek(
  * Main function to generate text with any AI model
  */
 export async function generateWithAI(request: AIRequest): Promise<AIResponse> {
-  const { model, prompt, context, maxTokens = 2000 } = request
+  const {
+    model,
+    prompt,
+    context,
+    maxTokens = 2000,
+    verbosity = 'medium',
+    reasoningEffort = 'minimal',
+  } = request
 
   switch (model) {
     case 'claude-sonnet-4.5':
       return generateWithClaude(prompt, context, maxTokens)
     case 'gpt-5':
-      return generateWithGPT5(prompt, context, maxTokens)
+      return generateWithGPT5(prompt, context, maxTokens, verbosity, reasoningEffort)
     case 'deepseek-chat':
       return generateWithDeepSeek(prompt, context, maxTokens)
     default:

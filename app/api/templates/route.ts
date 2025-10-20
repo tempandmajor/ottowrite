@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,20 +29,28 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
 
-    if (error) throw error
+    if (error) {
+      logger.error('Template list error', {
+        type: type ?? undefined,
+        category: category ?? undefined,
+        operation: 'templates:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to load templates', {
+        details: error,
+      })
+    }
 
     const templates = (data || []).map((template) => ({
       ...template,
       title: template.title ?? template.name ?? 'Untitled Document',
     }))
 
-    return NextResponse.json(templates)
+    return successResponse({ templates })
   } catch (error) {
-    console.error('Template list error:', error)
-    return NextResponse.json(
-      { error: 'Failed to load templates' },
-      { status: 500 }
-    )
+    logger.error('Template list error', {
+      operation: 'templates:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to load templates', { details: error })
   }
 }
 
@@ -53,7 +63,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -61,10 +71,9 @@ export async function POST(request: NextRequest) {
     const templateTitle = title || name
 
     if (!templateTitle || !type || !category || !content) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Missing required fields: title/name, type, category, content', {
+        userId: user.id,
+      })
     }
 
     let insertPayload: Record<string, unknown> = {
@@ -98,25 +107,31 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('Template creation error:', error)
-      return NextResponse.json(
-        { error: error.message ?? 'Failed to create template' },
-        { status: 400 }
-      )
+      logger.error('Template creation error', {
+        userId: user.id,
+        type,
+        category,
+        operation: 'templates:create',
+      }, error)
+      return errorResponses.badRequest(error.message ?? 'Failed to create template', {
+        userId: user.id,
+      })
     }
 
     try {
       await supabase.rpc('refresh_user_plan_usage', { p_user_id: user.id })
     } catch (refreshError) {
-      console.warn('refresh_user_plan_usage failed after template insert', refreshError)
+      logger.warn('refresh_user_plan_usage failed after template insert', {
+        userId: user.id,
+        operation: 'templates:refresh_usage',
+      }, refreshError instanceof Error ? refreshError : undefined)
     }
 
-    return NextResponse.json({ template })
+    return successResponse({ template })
   } catch (error) {
-    console.error('Template creation error:', error)
-    return NextResponse.json(
-      { error: 'Failed to create template' },
-      { status: 500 }
-    )
+    logger.error('Template creation error', {
+      operation: 'templates:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create template', { details: error })
   }
 }

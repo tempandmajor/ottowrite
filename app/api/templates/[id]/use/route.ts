@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +22,7 @@ export async function POST(
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { id } = await params
@@ -28,10 +30,7 @@ export async function POST(
     const { project_id, title } = body
 
     if (!project_id) {
-      return NextResponse.json(
-        { error: 'Project ID required' },
-        { status: 400 }
-      )
+      return errorResponses.badRequest('Project ID required', { userId: user.id })
     }
 
     // Get the template
@@ -42,10 +41,7 @@ export async function POST(
       .single()
 
     if (fetchError || !template) {
-      return NextResponse.json(
-        { error: 'Template not found' },
-        { status: 404 }
-      )
+      return errorResponses.notFound('Template not found', { userId: user.id })
     }
 
     const templateTitle = title || template.title || template.name
@@ -64,21 +60,34 @@ export async function POST(
       .single()
 
     if (createError) {
-      return NextResponse.json(
-        { error: 'Failed to create document from template' },
-        { status: 500 }
-      )
+      logger.error('Failed to create document from template', {
+        userId: user.id,
+        templateId: id,
+        projectId: project_id,
+        operation: 'templates:use',
+      }, createError)
+      return errorResponses.internalError('Failed to create document from template', {
+        details: createError,
+        userId: user.id,
+      })
     }
 
     // Increment template usage count
-    await supabase.rpc('increment_template_usage', { template_id: id })
+    try {
+      await supabase.rpc('increment_template_usage', { template_id: id })
+    } catch (usageError) {
+      logger.warn('Failed to increment template usage count', {
+        userId: user.id,
+        templateId: id,
+        operation: 'templates:increment_usage',
+      }, usageError instanceof Error ? usageError : undefined)
+    }
 
-    return NextResponse.json(document)
+    return successResponse({ document })
   } catch (error) {
-    console.error('Error using template:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logger.error('Error using template', {
+      operation: 'templates:use',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Internal server error', { details: error })
   }
 }

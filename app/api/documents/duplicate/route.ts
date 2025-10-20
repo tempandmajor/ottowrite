@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,14 +13,14 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
     const { documentId, newTitle } = body
 
     if (!documentId) {
-      return NextResponse.json({ error: 'Document ID required' }, { status: 400 })
+      return errorResponses.badRequest('Document ID required', { userId: user.id })
     }
 
     // Get the original document
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (fetchError || !originalDoc) {
-      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+      return errorResponses.notFound('Document not found', { userId: user.id })
     }
 
     // Create duplicate
@@ -49,15 +51,22 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (createError) {
-      throw createError
+      logger.error('Failed to duplicate document', {
+        userId: user.id,
+        documentId,
+        operation: 'documents:duplicate_bulk',
+      }, createError)
+      return errorResponses.internalError('Failed to duplicate document', {
+        details: createError,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ document: duplicate })
+    return successResponse({ document: duplicate })
   } catch (error) {
-    console.error('Document duplication error:', error)
-    return NextResponse.json(
-      { error: 'Failed to duplicate document' },
-      { status: 500 }
-    )
+    logger.error('Document duplication error', {
+      operation: 'documents:duplicate_bulk',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to duplicate document', { details: error })
   }
 }

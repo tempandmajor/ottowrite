@@ -273,7 +273,7 @@ When migrating an API route to standard error responses:
 
 ## Migrated Routes
 
-✅ **Phase 7 Complete (28/40 routes - 70%)**
+✅ **Phase 8 Complete (32/40 routes - 80%)**
 
 ### Payment & Billing (3 routes) ✅
 - `/api/checkout/create-session` - Stripe checkout sessions
@@ -319,28 +319,25 @@ When migrating an API route to standard error responses:
 - `/api/telemetry/ui` - UI event tracking (POST) ✅
 - `/api/telemetry/autosave-failure` - Autosave failure reporting with Sentry integration (POST) ✅
 
-🔄 **Remaining Routes (12 routes - 30%)**
+### Documents & Templates (4 routes) ✅
+- `/api/documents/[id]/duplicate` - Single document duplication with "(Copy)" suffix (POST) ✅
+- `/api/documents/duplicate` - Bulk document duplication with custom title support (POST) ✅
+- `/api/templates` - Template listing with filtering and creation (GET, POST) ✅
+- `/api/templates/[id]/use` - Create document from template with usage tracking (POST) ✅
 
-### High Priority (Recommend Next)
-1. `/api/documents/[id]/duplicate` - Document duplication
-2. `/api/documents/duplicate` - Bulk document duplication
-3. `/api/templates` - Template management
-4. `/api/templates/[id]/use` - Template usage
+🔄 **Remaining Routes (8 routes - 20%)**
 
-### Medium Priority
-5. `/api/ai/ensemble` - Ensemble AI main
-6. `/api/ai/ensemble/blend` - Ensemble blend
-7. `/api/ai/ensemble/feedback` - Ensemble feedback
-8. `/api/ai/generate-coverage` - Coverage generation
+### High Priority (Recommend Next - Phase 9)
+1. `/api/ai/ensemble` - Ensemble AI main
+2. `/api/ai/ensemble/blend` - Ensemble blend
+3. `/api/ai/ensemble/feedback` - Ensemble feedback
+4. `/api/ai/generate-coverage` - Coverage generation
 
-### Lower Priority
-9. `/api/ai/background-task` - Background tasks
-10. `/api/analysis/dialogue-voice` - Dialogue analysis
-11. `/api/world-elements` - World building
-12. `/api/research/search` - Research
-13. `/api/beat-board` - Beat board
-14. `/api/account/ai-telemetry` - AI telemetry
-15. `/api/account/usage` - Account usage
+### Medium Priority (Phase 10)
+5. `/api/ai/background-task` - Background tasks
+6. `/api/analysis/dialogue-voice` - Dialogue analysis
+7. `/api/world-elements` - World building
+8. `/api/research/search` - Research
 
 ## Testing Error Responses
 
@@ -390,9 +387,9 @@ content-type: application/json
 
 ---
 
-**Status**: Phase 7 of migration complete (28/40 routes - 70% 🎯)
-**Completed**: 2025-01-20 (TICKET-004 - Phase 7)
-**Build Status**: ✅ Passing (11.0s, 0 errors, 0 warnings)
-**Next Steps**: Migrate remaining 12 API routes following documented patterns (30% remaining)
+**Status**: Phase 8 of migration complete (32/40 routes - 80% 🎯)
+**Completed**: 2025-01-20 (TICKET-004 - Phase 8)
+**Build Status**: ✅ Passing (10.6s, 0 errors, 0 warnings)
+**Next Steps**: Migrate remaining 8 API routes following documented patterns (20% remaining)
 
-**Phase 7 Progress**: Added analytics and telemetry routes (5 routes). Analytics job queue supports background processing with priority levels and document ownership verification. Writing sessions track word count metrics with streak calculation, 30-day heatmap generation, and goal progress tracking across daily/weekly/monthly/project periods. Analytics jobs support status polling and cancellation via RPC function. Telemetry routes handle UI event tracking and autosave failure reporting with dual logging (Sentry + database). Performance timer integration for monitoring. Complex aggregation logic for session summaries, goal achievement calculations, and writing analytics.
+**Phase 8 Progress**: Added documents and templates routes (4 routes). Document duplication supports both single and bulk operations with custom title handling and "(Copy)" suffix generation. Template management includes listing with type/category filtering, creation with schema compatibility detection (title vs name columns), and template-to-document conversion with usage tracking. RPC integration for template usage increment and user plan usage refresh. Position-aware duplication with automatic increment. Template usage count tracking for popularity metrics. All routes follow standardized error response patterns with structured logging and proper HTTP status codes.

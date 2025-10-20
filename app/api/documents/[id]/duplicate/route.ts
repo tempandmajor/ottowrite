@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +22,7 @@ export async function POST(
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { id } = await params
@@ -34,10 +36,7 @@ export async function POST(
       .single()
 
     if (fetchError || !originalDoc) {
-      return NextResponse.json(
-        { error: 'Document not found' },
-        { status: 404 }
-      )
+      return errorResponses.notFound('Document not found', { userId: user.id })
     }
 
     // Create duplicate with "(Copy)" suffix
@@ -55,18 +54,22 @@ export async function POST(
       .single()
 
     if (createError) {
-      return NextResponse.json(
-        { error: 'Failed to duplicate document' },
-        { status: 500 }
-      )
+      logger.error('Failed to duplicate document', {
+        userId: user.id,
+        documentId: id,
+        operation: 'documents:duplicate',
+      }, createError)
+      return errorResponses.internalError('Failed to duplicate document', {
+        details: createError,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json(duplicate)
+    return successResponse({ document: duplicate })
   } catch (error) {
-    console.error('Error duplicating document:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logger.error('Error duplicating document', {
+      operation: 'documents:duplicate',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Internal server error', { details: error })
   }
 }

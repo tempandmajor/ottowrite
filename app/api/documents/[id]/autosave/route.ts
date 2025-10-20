@@ -13,6 +13,7 @@ interface RouteParams {
 type AutosavePayload = {
   html?: string
   structure?: unknown
+  metadata?: unknown
   anchorIds?: string[]
   wordCount?: number
   baseHash?: string | null
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const body = (await request.json()) as AutosavePayload
     const html = body.html
     const structure = normalizeStructure(body.structure)
+    const metadata = body.metadata ?? {}
     const anchorIds = normalizeAnchorIds(body.anchorIds)
     const snapshotOnly = Boolean(body.snapshotOnly)
     const baseHash = body.baseHash ?? null
@@ -130,6 +132,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const updatedHtml = typeof html === 'string' ? html : existingHtml
     const updatedStructure = Array.isArray(structure) ? structure : existingStructure
+    const updatedMetadata = metadata ?? existingContent.metadata ?? {}
     const updatedAnchorIds =
       anchorIds.length > 0 ? anchorIds : extractAnchorsFromHtml(updatedHtml)
     const payloadWordCount =
@@ -144,6 +147,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const snapshotPayload = {
       html: updatedHtml,
       structure: updatedStructure,
+      metadata: updatedMetadata,
       anchors: updatedAnchorIds,
       word_count: payloadWordCount,
     }
@@ -205,6 +209,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         ...existingContent,
         html: updatedHtml,
         structure: updatedStructure,
+        metadata: updatedMetadata,
       }
 
       const { error: updateError } = await supabase

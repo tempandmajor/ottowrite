@@ -161,6 +161,7 @@ export function useAutosave({
         body: JSON.stringify({
           html: payloadSnapshot.html,
           structure: payloadSnapshot.structure,
+          metadata: payloadSnapshot.metadata,
           anchorIds: payloadAnchors,
           wordCount: payloadWordCount,
           baseHash: payloadBaseHash,

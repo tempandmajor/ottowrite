@@ -2,11 +2,13 @@ import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 
 import type { Chapter } from '@/components/editor/chapter-sidebar'
+import type { DocumentMetadata } from '@/components/editor/document-metadata-form'
 
 export type EditorDocumentContent = {
   html?: string
   screenplay?: any
   structure?: Chapter[]
+  metadata?: DocumentMetadata
 }
 
 export type EditorDocumentRecord = {
@@ -30,6 +32,7 @@ const createInitialState = () => ({
   title: '',
   content: '',
   structure: [] as Chapter[],
+  metadata: {} as DocumentMetadata,
   sceneAnchors: new Set<string>(),
   activeSceneId: null as string | null,
   loading: true,
@@ -52,6 +55,7 @@ type EditorState = ReturnType<typeof createInitialState> & {
   setTitle: (title: string) => void
   setContent: (content: string | ((prev: string) => string)) => void
   setStructure: (structure: Chapter[]) => void
+  setMetadata: (metadata: DocumentMetadata) => void
   setSceneAnchors: (anchors: Iterable<string>) => void
   setActiveSceneId: (sceneId: string | null) => void
   setLoading: (loading: boolean) => void
@@ -82,6 +86,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       content: typeof content === 'function' ? content(state.content) : content,
     })),
   setStructure: (structure) => set({ structure }),
+  setMetadata: (metadata) => set({ metadata }),
   setSceneAnchors: (anchors) => set({ sceneAnchors: new Set(anchors) }),
   setActiveSceneId: (sceneId) => set({ activeSceneId: sceneId }),
   setLoading: (loading) => set({ loading }),

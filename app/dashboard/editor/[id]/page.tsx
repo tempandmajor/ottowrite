@@ -60,6 +60,7 @@ import { ChapterSidebar } from '@/components/editor/chapter-sidebar'
 import { ConflictResolutionPanel } from '@/components/editor/conflict-resolution-panel'
 import { AutosaveErrorAlert } from '@/components/editor/autosave-error-alert'
 import { UndoRedoControls } from '@/components/editor/undo-redo-controls'
+import { DocumentMetadataForm } from '@/components/editor/document-metadata-form'
 
 // Loading fallback component
 const EditorLoadingFallback = () => (
@@ -128,10 +129,12 @@ export default function EditorPage() {
     sceneAnchors,
     baseHash,
     serverContent,
+    metadata,
     setDocument,
     setTitle,
     setContent,
     setStructure,
+    setMetadata,
     setSceneAnchors,
     setActiveSceneId,
     setLoading,
@@ -275,10 +278,12 @@ export default function EditorPage() {
         const initialStructure = Array.isArray(typedData.content?.structure)
           ? (typedData.content?.structure as Chapter[])
           : []
+        const initialMetadata = typedData.content?.metadata || {}
         const initialAnchors = extractSceneAnchors(initialHtml)
 
         setContent(initialHtml)
         setStructure(cloneStructure(initialStructure))
+        setMetadata(initialMetadata)
         setActiveSceneId(null)
         setSceneAnchors(initialAnchors)
 
@@ -382,7 +387,7 @@ export default function EditorPage() {
       } else {
         const text = content.replace(/<[^>]*>/g, ' ')
         wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length
-        contentData = { html: content, structure: cloneStructure(structure) }
+        contentData = { html: content, structure: cloneStructure(structure), metadata }
       }
 
       const { error } = await supabase
@@ -465,6 +470,13 @@ export default function EditorPage() {
       setActiveSceneId(sceneId)
     },
     [setActiveSceneId]
+  )
+
+  const handleMetadataChange = useCallback(
+    (nextMetadata: typeof metadata) => {
+      setMetadata(nextMetadata)
+    },
+    [setMetadata]
   )
 
   const handleSceneCreated = useCallback(
@@ -648,13 +660,14 @@ export default function EditorPage() {
 
   const autosaveSnapshot = useMemo(() => {
     if (!isProseDocument) {
-      return { html: '', structure: [] }
+      return { html: '', structure: [], metadata: {} }
     }
     return {
       html: content,
       structure,
+      metadata,
     }
-  }, [content, isProseDocument, structure])
+  }, [content, isProseDocument, structure, metadata])
 
   const handleAutosaveConflict = useCallback(
     ({ html, structure, wordCount }: { html: string; structure?: unknown; wordCount?: number }) => {
@@ -885,6 +898,7 @@ export default function EditorPage() {
                 <FileDown className="mr-2 h-4 w-4" />
                 Export
               </Button>
+              <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
               <Button variant="outline" size="sm" onClick={() => setShowAI((prev) => !prev)}>
                 {showAI ? (
                   <>

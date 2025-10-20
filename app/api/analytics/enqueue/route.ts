@@ -4,8 +4,10 @@
  * Endpoint for creating analytics jobs that will be processed by the edge function worker.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 import type { AnalyticsJobInput, JobPriority } from '@/lib/analytics/worker-contract'
 
 export async function POST(req: NextRequest) {
@@ -19,7 +21,7 @@ export async function POST(req: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     // Parse request body
@@ -30,9 +32,9 @@ export async function POST(req: NextRequest) {
 
     // Validate required fields
     if (!jobType || !documentId) {
-      return NextResponse.json(
-        { error: 'Missing required fields: jobType, documentId' },
-        { status: 400 }
+      return errorResponses.badRequest(
+        'Missing required fields: jobType, documentId',
+        { userId: user.id }
       )
     }
 
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (docError || !document) {
-      return NextResponse.json({ error: 'Document not found or access denied' }, { status: 404 })
+      return errorResponses.notFound('Document not found or access denied', { userId: user.id })
     }
 
     // Create analytics job
@@ -71,13 +73,20 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (jobError) {
-      console.error('Failed to create analytics job:', jobError)
-      return NextResponse.json({ error: 'Failed to create job' }, { status: 500 })
+      logger.error('Failed to create analytics job', {
+        userId: user.id,
+        documentId,
+        jobType,
+        operation: 'analytics:enqueue',
+      }, jobError)
+      return errorResponses.internalError('Failed to create job', {
+        details: jobError,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json(
+    return successResponse(
       {
-        success: true,
         job: {
           id: job.id,
           jobType: job.job_type,
@@ -86,13 +95,15 @@ export async function POST(req: NextRequest) {
           createdAt: job.created_at,
         },
       },
-      { status: 201 }
+      201
     )
   } catch (error) {
-    console.error('Analytics enqueue error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
+    logger.error('Analytics enqueue error', {
+      operation: 'analytics:enqueue',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError(
+      error instanceof Error ? error.message : 'Internal server error',
+      { details: error }
     )
   }
 }

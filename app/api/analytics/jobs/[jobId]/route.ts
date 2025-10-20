@@ -4,8 +4,10 @@
  * Get status and results of an analytics job.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
   try {
@@ -19,7 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ jobI
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     // Fetch job
@@ -31,11 +33,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ jobI
       .single()
 
     if (jobError || !job) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+      return errorResponses.notFound('Job not found', { userId: user.id })
     }
 
-    return NextResponse.json({
-      success: true,
+    return successResponse({
       job: {
         id: job.id,
         jobType: job.job_type,
@@ -52,10 +53,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ jobI
       },
     })
   } catch (error) {
-    console.error('Analytics job status error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
+    logger.error('Analytics job status error', {
+      operation: 'analytics:get_job_status',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError(
+      error instanceof Error ? error.message : 'Internal server error',
+      { details: error }
     )
   }
 }
@@ -75,7 +78,7 @@ export async function DELETE(
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     // Cancel job using the database function
@@ -84,16 +87,25 @@ export async function DELETE(
     })
 
     if (cancelError) {
-      console.error('Failed to cancel job:', cancelError)
-      return NextResponse.json({ error: 'Failed to cancel job' }, { status: 500 })
+      logger.error('Failed to cancel analytics job', {
+        userId: user.id,
+        jobId,
+        operation: 'analytics:cancel_job',
+      }, cancelError)
+      return errorResponses.internalError('Failed to cancel job', {
+        details: cancelError,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Analytics job cancel error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
+    logger.error('Analytics job cancel error', {
+      operation: 'analytics:delete_job',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError(
+      error instanceof Error ? error.message : 'Internal server error',
+      { details: error }
     )
   }
 }

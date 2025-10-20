@@ -1,10 +1,11 @@
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
-import { withAPIErrorHandling, APIErrors } from '@/lib/monitoring/api-wrapper'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 import { reportAutosaveError } from '@/lib/monitoring/error-reporter'
 
-export const POST = withAPIErrorHandling(
-  async (request) => {
+export async function POST(request: NextRequest) {
+  try {
     const supabase = await createClient()
 
     const {
@@ -12,7 +13,7 @@ export const POST = withAPIErrorHandling(
     } = await supabase.auth.getUser()
 
     if (!user) {
-      throw APIErrors.unauthorized()
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -41,10 +42,23 @@ export const POST = withAPIErrorHandling(
     })
 
     if (error) {
-      throw new Error(`Failed to log autosave failure: ${error.message}`)
+      logger.error('Failed to log autosave failure', {
+        userId: user.id,
+        documentId: body.document_id,
+        failureType: body.failure_type,
+        operation: 'telemetry:autosave_failure',
+      }, error)
+      return errorResponses.internalError('Failed to log autosave failure', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ success: true })
-  },
-  { operation: 'log_autosave_failure' }
-)
+    return successResponse({ success: true })
+  } catch (error) {
+    logger.error('Error in POST /api/telemetry/autosave-failure', {
+      operation: 'telemetry:autosave_failure',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to log autosave failure', { details: error })
+  }
+}

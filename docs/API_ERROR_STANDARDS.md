@@ -273,7 +273,7 @@ When migrating an API route to standard error responses:
 
 ## Migrated Routes
 
-✅ **Phase 6 Complete (23/40 routes - 57.5%)**
+✅ **Phase 7 Complete (28/40 routes - 70%)**
 
 ### Payment & Billing (3 routes) ✅
 - `/api/checkout/create-session` - Stripe checkout sessions
@@ -310,28 +310,37 @@ When migrating an API route to standard error responses:
 - `/api/story-beats/templates` - Beat templates list with filtering (GET) ✅
 - `/api/outlines` - AI outline generation and management (GET, POST, PATCH, DELETE) ✅
 
-🔄 **Remaining Routes (17 routes - 42.5%)**
+### Analytics (3 routes) ✅
+- `/api/analytics/enqueue` - Create analytics jobs for background processing (POST) ✅
+- `/api/analytics/sessions` - Writing session tracking and goal progress (GET, POST) ✅
+- `/api/analytics/jobs/[jobId]` - Job status retrieval and cancellation (GET, DELETE) ✅
+
+### Telemetry (2 routes) ✅
+- `/api/telemetry/ui` - UI event tracking (POST) ✅
+- `/api/telemetry/autosave-failure` - Autosave failure reporting with Sentry integration (POST) ✅
+
+🔄 **Remaining Routes (12 routes - 30%)**
 
 ### High Priority (Recommend Next)
-1. `/api/analytics/enqueue` - Analytics job queue
-2. `/api/analytics/sessions` - Analytics sessions
-3. `/api/analytics/jobs/[jobId]` - Analytics job status
+1. `/api/documents/[id]/duplicate` - Document duplication
+2. `/api/documents/duplicate` - Bulk document duplication
+3. `/api/templates` - Template management
+4. `/api/templates/[id]/use` - Template usage
 
 ### Medium Priority
-4. `/api/telemetry/ui` - UI telemetry tracking
-5. `/api/telemetry/autosave-failure` - Autosave failure tracking
+5. `/api/ai/ensemble` - Ensemble AI main
+6. `/api/ai/ensemble/blend` - Ensemble blend
+7. `/api/ai/ensemble/feedback` - Ensemble feedback
+8. `/api/ai/generate-coverage` - Coverage generation
 
 ### Lower Priority
-6. `/api/documents/**` - Document operations (2 routes)
-7. `/api/templates/**` - Template operations (2 routes)
-8. `/api/ai/ensemble/**` - Ensemble AI (3 routes)
-9. `/api/ai/generate-coverage` - Coverage generation
-10. `/api/ai/background-task` - Background tasks
-11. `/api/analysis/dialogue-voice` - Dialogue analysis
-12. `/api/world-elements` - World building
-13. `/api/research/search` - Research
-14. `/api/beat-board` - Beat board
-15. `/api/account/**` - Account management (2 routes)
+9. `/api/ai/background-task` - Background tasks
+10. `/api/analysis/dialogue-voice` - Dialogue analysis
+11. `/api/world-elements` - World building
+12. `/api/research/search` - Research
+13. `/api/beat-board` - Beat board
+14. `/api/account/ai-telemetry` - AI telemetry
+15. `/api/account/usage` - Account usage
 
 ## Testing Error Responses
 
@@ -381,9 +390,9 @@ content-type: application/json
 
 ---
 
-**Status**: Phase 6 of migration complete (23/40 routes - 57.5%)
-**Completed**: 2025-01-20 (TICKET-004 - Phase 6)
-**Build Status**: ✅ Passing (10.7s, 0 errors, 0 warnings)
-**Next Steps**: Migrate remaining 17 API routes following documented patterns (42.5% remaining)
+**Status**: Phase 7 of migration complete (28/40 routes - 70% 🎯)
+**Completed**: 2025-01-20 (TICKET-004 - Phase 7)
+**Build Status**: ✅ Passing (11.0s, 0 errors, 0 warnings)
+**Next Steps**: Migrate remaining 12 API routes following documented patterns (30% remaining)
 
-**Phase 6 Progress**: Added story planning routes (story beats, beat templates, outlines). Story beats support both manual creation and template-based initialization via RPC function with template-not-found detection. Beat templates feature type aliasing (series→novel) and array overlap filtering. Outlines route includes AI-powered generation with Claude 4.5, transactional section insertion with rollback on failure, and separate error handling for AI generation vs database operations. All routes properly handle RPC errors and multi-step database transactions.
+**Phase 7 Progress**: Added analytics and telemetry routes (5 routes). Analytics job queue supports background processing with priority levels and document ownership verification. Writing sessions track word count metrics with streak calculation, 30-day heatmap generation, and goal progress tracking across daily/weekly/monthly/project periods. Analytics jobs support status polling and cancellation via RPC function. Telemetry routes handle UI event tracking and autosave failure reporting with dual logging (Sentry + database). Performance timer integration for monitoring. Complex aggregation logic for session summaries, goal achievement calculations, and writing analytics.

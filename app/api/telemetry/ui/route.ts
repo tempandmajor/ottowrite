@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const {
@@ -10,24 +11,24 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     let payload: unknown
     try {
       payload = await request.json()
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+      return errorResponses.badRequest('Invalid JSON body', { userId: user.id })
     }
 
     if (!payload || typeof payload !== 'object') {
-      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
+      return errorResponses.badRequest('Invalid payload', { userId: user.id })
     }
 
     const { event, context } = payload as { event?: unknown; context?: unknown }
 
     if (typeof event !== 'string' || event.trim().length === 0) {
-      return NextResponse.json({ error: 'Event name is required' }, { status: 400 })
+      return errorResponses.badRequest('Event name is required', { userId: user.id })
     }
 
     const metadata =
@@ -41,9 +42,11 @@ export async function POST(request: Request) {
       metadata,
     })
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('UI telemetry logging failed:', error)
-    return NextResponse.json({ error: 'Telemetry failed' }, { status: 500 })
+    logger.error('UI telemetry logging failed', {
+      operation: 'telemetry:ui',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Telemetry failed', { details: error })
   }
 }

@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
 import { PerformanceTimer } from '@/lib/monitoring/performance'
 
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     const { supabase, user } = await requireUser()
     if (!user) {
       timer.end(false)
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
@@ -50,14 +51,35 @@ export async function GET(request: NextRequest) {
       ? await sessionsQuery.eq('project_id', projectId)
       : await sessionsQuery
 
-    if (sessionsError) throw sessionsError
+    if (sessionsError) {
+      logger.error('Error fetching writing sessions', {
+        userId: user.id,
+        projectId: projectId ?? undefined,
+        operation: 'analytics:fetch_sessions',
+      }, sessionsError)
+      timer.end(false)
+      return errorResponses.internalError('Failed to fetch analytics', {
+        details: sessionsError,
+        userId: user.id,
+      })
+    }
 
     const { data: goals, error: goalsError } = await supabase
       .from('writing_goals')
       .select('*')
       .eq('user_id', user.id)
 
-    if (goalsError) throw goalsError
+    if (goalsError) {
+      logger.error('Error fetching writing goals', {
+        userId: user.id,
+        operation: 'analytics:fetch_goals',
+      }, goalsError)
+      timer.end(false)
+      return errorResponses.internalError('Failed to fetch goals', {
+        details: goalsError,
+        userId: user.id,
+      })
+    }
 
     const now = new Date()
     const sevenDaysAgo = new Date(now.getTime() - 7 * DAY_MS)
@@ -154,7 +176,7 @@ export async function GET(request: NextRequest) {
       totalWords,
     })
 
-    return NextResponse.json({
+    return successResponse({
       summary: {
         totalWords,
         wordsThisWeek,
@@ -169,11 +191,10 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     logger.error('Error fetching analytics summary', {
-      operation: 'get_analytics_sessions',
-      component: 'analytics',
+      operation: 'analytics:get_sessions',
     }, error instanceof Error ? error : undefined)
     timer.end(false)
-    return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 })
+    return errorResponses.internalError('Failed to fetch analytics', { details: error })
   }
 }
 
@@ -184,7 +205,7 @@ export async function POST(request: NextRequest) {
     const { supabase, user } = await requireUser()
     if (!user) {
       timer.end(false)
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -216,7 +237,19 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      logger.error('Error recording writing session', {
+        userId: user.id,
+        projectId: project_id ?? undefined,
+        documentId: document_id ?? undefined,
+        operation: 'analytics:record_session',
+      }, error)
+      timer.end(false)
+      return errorResponses.internalError('Failed to record session', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
     logger.analytics({
       event: 'session_recorded',
@@ -236,13 +269,12 @@ export async function POST(request: NextRequest) {
       netWords: net_words,
     })
 
-    return NextResponse.json({ session: data })
+    return successResponse({ session: data })
   } catch (error) {
     logger.error('Error recording session', {
-      operation: 'record_writing_session',
-      component: 'analytics',
+      operation: 'analytics:post_sessions',
     }, error instanceof Error ? error : undefined)
     timer.end(false)
-    return NextResponse.json({ error: 'Failed to record session' }, { status: 500 })
+    return errorResponses.internalError('Failed to record session', { details: error })
   }
 }

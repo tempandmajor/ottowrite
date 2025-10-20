@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -12,7 +14,7 @@ export async function GET() {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { data: tagRows, error } = await supabase
@@ -21,7 +23,16 @@ export async function GET() {
       .eq('user_id', user.id)
       .order('name', { ascending: true })
 
-    if (error) throw error
+    if (error) {
+      logger.error('Failed to fetch project tags', {
+        userId: user.id,
+        operation: 'project_tags:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to load tags', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
     const tagIds = tagRows?.map((tag) => tag.id) ?? []
     let counts: Record<string, number> = {}
@@ -33,7 +44,16 @@ export async function GET() {
         .eq('user_id', user.id)
         .in('tag_id', tagIds)
 
-      if (countError) throw countError
+      if (countError) {
+        logger.error('Failed to fetch tag link counts', {
+          userId: user.id,
+          operation: 'project_tags:fetch_counts',
+        }, countError)
+        return errorResponses.internalError('Failed to load tag counts', {
+          details: countError,
+          userId: user.id,
+        })
+      }
 
       counts = (linkCounts ?? []).reduce<Record<string, number>>((acc, row) => {
         acc[row.tag_id] = (acc[row.tag_id] ?? 0) + 1
@@ -46,10 +66,12 @@ export async function GET() {
       project_count: counts[tag.id] ?? 0,
     }))
 
-    return NextResponse.json({ tags })
+    return successResponse({ tags })
   } catch (error) {
-    console.error('Failed to fetch project tags:', error)
-    return NextResponse.json({ error: 'Failed to load tags' }, { status: 500 })
+    logger.error('Error in GET /api/projects/tags', {
+      operation: 'project_tags:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to load tags', { details: error })
   }
 }
 
@@ -61,7 +83,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -70,7 +92,7 @@ export async function POST(request: NextRequest) {
     const description = typeof body?.description === 'string' ? body.description.trim() : null
 
     if (!name) {
-      return NextResponse.json({ error: 'Tag name is required.' }, { status: 400 })
+      return errorResponses.badRequest('Tag name is required', { userId: user.id })
     }
 
     const { data, error } = await supabase
@@ -86,15 +108,24 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       if (error.code === '23505') {
-        return NextResponse.json({ error: 'A tag with this name already exists.' }, { status: 409 })
+        return errorResponses.conflict('A tag with this name already exists', { userId: user.id })
       }
-      throw error
+      logger.error('Failed to create project tag', {
+        userId: user.id,
+        operation: 'project_tags:create',
+      }, error)
+      return errorResponses.internalError('Failed to create tag', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ tag: data })
+    return successResponse({ tag: data })
   } catch (error) {
-    console.error('Failed to create tag:', error)
-    return NextResponse.json({ error: 'Failed to create tag' }, { status: 500 })
+    logger.error('Error in POST /api/projects/tags', {
+      operation: 'project_tags:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create tag', { details: error })
   }
 }
 
@@ -106,7 +137,7 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -116,13 +147,13 @@ export async function PATCH(request: NextRequest) {
     const description = typeof body?.description === 'string' ? body.description.trim() : undefined
 
     if (!id) {
-      return NextResponse.json({ error: 'Tag id is required.' }, { status: 400 })
+      return errorResponses.badRequest('Tag id is required', { userId: user.id })
     }
 
     const updates: Record<string, unknown> = {}
     if (typeof name !== 'undefined') {
       if (!name) {
-        return NextResponse.json({ error: 'Tag name cannot be empty.' }, { status: 400 })
+        return errorResponses.badRequest('Tag name cannot be empty', { userId: user.id })
       }
       updates.name = name
     }
@@ -134,7 +165,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ error: 'No updates provided.' }, { status: 400 })
+      return errorResponses.badRequest('No updates provided', { userId: user.id })
     }
 
     const { data, error } = await supabase
@@ -147,15 +178,25 @@ export async function PATCH(request: NextRequest) {
 
     if (error) {
       if (error.code === '23505') {
-        return NextResponse.json({ error: 'A tag with this name already exists.' }, { status: 409 })
+        return errorResponses.conflict('A tag with this name already exists', { userId: user.id })
       }
-      throw error
+      logger.error('Failed to update project tag', {
+        userId: user.id,
+        tagId: id,
+        operation: 'project_tags:update',
+      }, error)
+      return errorResponses.internalError('Failed to update tag', {
+        details: error,
+        userId: user.id,
+      })
     }
 
-    return NextResponse.json({ tag: data })
+    return successResponse({ tag: data })
   } catch (error) {
-    console.error('Failed to update tag:', error)
-    return NextResponse.json({ error: 'Failed to update tag' }, { status: 500 })
+    logger.error('Error in PATCH /api/projects/tags', {
+      operation: 'project_tags:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to update tag', { details: error })
   }
 }
 
@@ -167,14 +208,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')?.trim()
 
     if (!id) {
-      return NextResponse.json({ error: 'Tag id is required.' }, { status: 400 })
+      return errorResponses.badRequest('Tag id is required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -183,11 +224,23 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
       .eq('user_id', user.id)
 
-    if (error) throw error
+    if (error) {
+      logger.error('Failed to delete project tag', {
+        userId: user.id,
+        tagId: id,
+        operation: 'project_tags:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete tag', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Failed to delete tag:', error)
-    return NextResponse.json({ error: 'Failed to delete tag' }, { status: 500 })
+    logger.error('Error in DELETE /api/projects/tags', {
+      operation: 'project_tags:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete tag', { details: error })
   }
 }

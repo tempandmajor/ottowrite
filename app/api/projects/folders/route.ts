@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -12,7 +14,7 @@ export async function GET() {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { data, error } = await supabase
@@ -21,12 +23,23 @@ export async function GET() {
       .eq('user_id', user.id)
       .order('created_at', { ascending: true })
 
-    if (error) throw error
+    if (error) {
+      logger.error('Failed to fetch project folders', {
+        userId: user.id,
+        operation: 'project_folders:fetch',
+      }, error)
+      return errorResponses.internalError('Failed to load folders', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ folders: data ?? [] })
+    return successResponse({ folders: data ?? [] })
   } catch (error) {
-    console.error('Failed to fetch project folders:', error)
-    return NextResponse.json({ error: 'Failed to load folders' }, { status: 500 })
+    logger.error('Error in GET /api/projects/folders', {
+      operation: 'project_folders:get',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to load folders', { details: error })
   }
 }
 
@@ -38,7 +51,7 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -47,7 +60,7 @@ export async function POST(request: NextRequest) {
     const parentId = typeof body?.parent_id === 'string' ? body.parent_id.trim() : null
 
     if (!name) {
-      return NextResponse.json({ error: 'Folder name is required.' }, { status: 400 })
+      return errorResponses.badRequest('Folder name is required', { userId: user.id })
     }
 
     if (parentId) {
@@ -59,7 +72,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (!parentFolder) {
-        return NextResponse.json({ error: 'Parent folder not found.' }, { status: 404 })
+        return errorResponses.notFound('Parent folder not found', { userId: user.id })
       }
     }
 
@@ -74,12 +87,23 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      logger.error('Failed to create project folder', {
+        userId: user.id,
+        operation: 'project_folders:create',
+      }, error)
+      return errorResponses.internalError('Failed to create folder', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ folder: data })
+    return successResponse({ folder: data })
   } catch (error) {
-    console.error('Failed to create folder:', error)
-    return NextResponse.json({ error: 'Failed to create folder' }, { status: 500 })
+    logger.error('Error in POST /api/projects/folders', {
+      operation: 'project_folders:post',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to create folder', { details: error })
   }
 }
 
@@ -91,7 +115,7 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const body = await request.json()
@@ -101,13 +125,13 @@ export async function PATCH(request: NextRequest) {
     const parentId = typeof body?.parent_id === 'string' ? body.parent_id.trim() : undefined
 
     if (!id) {
-      return NextResponse.json({ error: 'Folder id is required.' }, { status: 400 })
+      return errorResponses.badRequest('Folder id is required', { userId: user.id })
     }
 
     const updates: Record<string, unknown> = {}
     if (typeof name === 'string') {
       if (!name) {
-        return NextResponse.json({ error: 'Folder name cannot be empty.' }, { status: 400 })
+        return errorResponses.badRequest('Folder name cannot be empty', { userId: user.id })
       }
       updates.name = name
     }
@@ -116,7 +140,7 @@ export async function PATCH(request: NextRequest) {
     }
     if (typeof parentId !== 'undefined') {
       if (parentId === id) {
-        return NextResponse.json({ error: 'Folder cannot be its own parent.' }, { status: 400 })
+        return errorResponses.badRequest('Folder cannot be its own parent', { userId: user.id })
       }
       if (parentId) {
         const { data: parentFolder } = await supabase
@@ -127,7 +151,7 @@ export async function PATCH(request: NextRequest) {
           .single()
 
         if (!parentFolder) {
-          return NextResponse.json({ error: 'Parent folder not found.' }, { status: 404 })
+          return errorResponses.notFound('Parent folder not found', { userId: user.id })
         }
         updates.parent_id = parentId
       } else {
@@ -136,7 +160,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ error: 'No updates provided.' }, { status: 400 })
+      return errorResponses.badRequest('No updates provided', { userId: user.id })
     }
 
     const { data, error } = await supabase
@@ -147,12 +171,24 @@ export async function PATCH(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      logger.error('Failed to update project folder', {
+        userId: user.id,
+        folderId: id,
+        operation: 'project_folders:update',
+      }, error)
+      return errorResponses.internalError('Failed to update folder', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ folder: data })
+    return successResponse({ folder: data })
   } catch (error) {
-    console.error('Failed to update folder:', error)
-    return NextResponse.json({ error: 'Failed to update folder' }, { status: 500 })
+    logger.error('Error in PATCH /api/projects/folders', {
+      operation: 'project_folders:patch',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to update folder', { details: error })
   }
 }
 
@@ -164,14 +200,14 @@ export async function DELETE(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return errorResponses.unauthorized()
     }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')?.trim()
 
     if (!id) {
-      return NextResponse.json({ error: 'Folder id is required.' }, { status: 400 })
+      return errorResponses.badRequest('Folder id is required', { userId: user.id })
     }
 
     const { error } = await supabase
@@ -180,11 +216,23 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
       .eq('user_id', user.id)
 
-    if (error) throw error
+    if (error) {
+      logger.error('Failed to delete project folder', {
+        userId: user.id,
+        folderId: id,
+        operation: 'project_folders:delete',
+      }, error)
+      return errorResponses.internalError('Failed to delete folder', {
+        details: error,
+        userId: user.id,
+      })
+    }
 
-    return NextResponse.json({ success: true })
+    return successResponse({ success: true })
   } catch (error) {
-    console.error('Failed to delete folder:', error)
-    return NextResponse.json({ error: 'Failed to delete folder' }, { status: 500 })
+    logger.error('Error in DELETE /api/projects/folders', {
+      operation: 'project_folders:delete',
+    }, error instanceof Error ? error : undefined)
+    return errorResponses.internalError('Failed to delete folder', { details: error })
   }
 }

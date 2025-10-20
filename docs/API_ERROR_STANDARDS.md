@@ -273,7 +273,7 @@ When migrating an API route to standard error responses:
 
 ## Migrated Routes
 
-✅ **Phase 3 Complete (15/40 routes - 37.5%)**
+✅ **Phase 4 Complete (17/40 routes - 42.5%)**
 
 ### Payment & Billing (3 routes) ✅
 - `/api/checkout/create-session` - Stripe checkout sessions
@@ -292,10 +292,10 @@ When migrating an API route to standard error responses:
 - `/api/characters/arcs` - Character arcs 🔄
 - `/api/characters/relationships` - Character relationships 🔄
 
-### Projects (1 route)
+### Projects (3 routes) ✅
 - `/api/projects/query` - Project query with filtering, search, pagination ✅
-- `/api/projects/folders` - Folder CRUD operations 🔄
-- `/api/projects/tags` - Tag CRUD operations 🔄
+- `/api/projects/folders` - Folder CRUD operations (GET, POST, PATCH, DELETE) ✅
+- `/api/projects/tags` - Tag CRUD operations with project count (GET, POST, PATCH, DELETE) ✅
 
 ### Locations (1 route) ✅
 - `/api/locations` - Location CRUD operations (GET, POST, PATCH, DELETE)
@@ -305,12 +305,12 @@ When migrating an API route to standard error responses:
 - `/api/plot-analysis` - Plot analysis CRUD (GET, POST, DELETE) with AI integration
 - `/api/plot-analysis/issues` - Plot issue management (GET, PATCH, DELETE)
 
-🔄 **Remaining Routes (25 routes - 62.5%)**
+🔄 **Remaining Routes (23 routes - 57.5%)**
 
 ### High Priority (Recommend Next)
-1. `/api/projects/folders` - Project folders (4 methods)
-2. `/api/projects/tags` - Project tags (4 methods)
-3. `/api/characters/arcs` - Character arcs
+1. `/api/characters/arcs` - Character development arcs
+2. `/api/characters/relationships` - Character relationships
+3. `/api/locations/events` - Location events
 4. `/api/characters/relationships` - Character relationships
 5. `/api/locations/events` - Location events
 
@@ -382,9 +382,9 @@ content-type: application/json
 
 ---
 
-**Status**: Phase 3 of migration complete (15/40 routes - 37.5%)
-**Completed**: 2025-01-20 (TICKET-004 - Phase 3)
-**Build Status**: ✅ Passing (8.3s, 0 errors, 0 warnings)
-**Next Steps**: Migrate remaining 25 API routes following documented patterns (62.5% remaining)
+**Status**: Phase 4 of migration complete (17/40 routes - 42.5%)
+**Completed**: 2025-01-20 (TICKET-004 - Phase 4)
+**Build Status**: ✅ Passing (8.4s, 0 errors, 0 warnings)
+**Next Steps**: Migrate remaining 23 API routes following documented patterns (57.5% remaining)
 
-**Phase 3 Progress**: Added plot analysis routes with AI integration (5 analysis types), plot issue management with severity filtering and resolution tracking. Critical features for core writing assistance functionality now fully standardized.
+**Phase 4 Progress**: Added project organization routes (folders & tags). Full CRUD operations for hierarchical folder structure with parent-child relationships, and tag management with project count tracking. Includes uniqueness constraint handling (409 conflict responses) for duplicate tag names.

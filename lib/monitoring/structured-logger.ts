@@ -457,3 +457,24 @@ export const logger = new StructuredLogger()
 
 // Export class for custom instances
 export { StructuredLogger }
+
+/**
+ * Create a logger instance with request ID automatically included
+ *
+ * @param requestId - The request ID to include in all logs
+ * @returns A child logger with request ID in default context
+ *
+ * @example
+ * ```typescript
+ * import { getRequestId } from '@/lib/request-id'
+ * import { withRequestId } from '@/lib/monitoring/structured-logger'
+ *
+ * const requestId = await getRequestId()
+ * const log = withRequestId(requestId)
+ *
+ * log.info('Processing request') // Will include requestId in context
+ * ```
+ */
+export function withRequestId(requestId: string): StructuredLogger {
+  return logger.child({ requestId })
+}

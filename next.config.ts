@@ -6,6 +6,23 @@ const nextConfig: NextConfig = {
   experimental: {},
   output: 'standalone',
   outputFileTracingRoot: path.join(process.cwd()),
+  webpack(config) {
+    const ignoreWarnings = [
+      { module: /@prisma\/instrumentation/, message: /Critical dependency/ },
+      { module: /@opentelemetry\/instrumentation/, message: /Critical dependency/ },
+      { module: /require-in-the-middle/, message: /Critical dependency/ },
+      { module: /@supabase\/realtime-js/, message: /Edge Runtime/ },
+      { module: /@supabase\/supabase-js/, message: /Edge Runtime/ },
+    ]
+
+    if (!config.ignoreWarnings) {
+      config.ignoreWarnings = ignoreWarnings
+    } else if (Array.isArray(config.ignoreWarnings)) {
+      config.ignoreWarnings.push(...ignoreWarnings)
+    }
+
+    return config
+  },
 
   // Security headers
   async headers() {

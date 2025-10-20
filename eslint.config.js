@@ -12,7 +12,16 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 
 export default [{
-  ignores: ['.next/**', 'node_modules/**', 'dist/**', 'storybook-static/**'],
+  ignores: [
+    '.next/**',
+    'node_modules/**',
+    'dist/**',
+    'storybook-static/**',
+    'out/**',
+    'build/**',
+    'coverage/**',
+    'supabase/functions/**',
+  ],
 }, js.configs.recommended, {
   files: ['**/*.{js,jsx,ts,tsx}'],
     languageOptions: {

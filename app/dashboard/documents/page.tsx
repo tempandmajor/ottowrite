@@ -307,7 +307,7 @@ export default function DocumentsPage() {
               <div className="mt-auto flex items-center gap-2 pt-4 border-t">
                 <Button asChild size="sm" className="flex-1">
                   <Link
-                    href={`/dashboard/editor/${doc.id}?workspace=1`}
+                    href={`/workspace/${doc.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     prefetch={false}

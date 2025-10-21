@@ -976,22 +976,45 @@
 ## 🔜 Phase 2: Advanced Writing Tools (Week 9 - Screenplay Tools)
 
 ### FEATURE-033: Screenplay Formatting
-**Status**: 🔜 NOT STARTED
+**Status**: ✅ COMPLETED
 **Priority**: P2 - Medium
 **Track**: Phase 2 Week 9
 **Estimate**: 5 days
+**Completed**: 2025-01-20
 
 **Description**: Industry-standard screenplay formatting.
 
 **Acceptance Criteria**:
-- [ ] Screenplay mode in editor
-- [ ] Auto-formatting (scene headings, dialogue, action)
-- [ ] Character name autocomplete
-- [ ] Transition shortcuts (CUT TO:, FADE IN:)
-- [ ] Industry-standard margins
-- [ ] PDF export with correct formatting
+- [x] Screenplay mode in editor - Full-featured editor with real-time formatting
+- [x] Auto-formatting (scene headings, dialogue, action) - Automatic type detection and formatting
+- [x] Character name autocomplete - Smart suggestions from existing characters
+- [x] Transition shortcuts (CUT TO:, FADE IN:) - Quick insert buttons for 9 common transitions
+- [x] Industry-standard margins - Accurate margins per element type (Final Draft compatible)
+- [x] PDF export with correct formatting - Page break handling, word wrap, proper spacing
+- [x] Fountain format import/export - Plain-text screenplay markup support
 
-**Files**: `components/editor/screenplay-mode.tsx`, `lib/export/screenplay-pdf.ts`
+**Files**:
+- `lib/screenplay/formatter.ts` (339 lines) - Core formatting engine
+- `components/editor/screenplay-mode.tsx` (409 lines) - Screenplay editor UI
+- `lib/export/screenplay-pdf.ts` (322 lines) - PDF generation and Fountain format
+
+**Implementation Details**:
+- 6 element types: scene-heading, action, character, dialogue, parenthetical, transition
+- Industry-standard margins (in inches):
+  - Scene Heading: left 1.5", right 7.5"
+  - Action: left 1.5", right 7.5"
+  - Character: left 3.7", right 7.5"
+  - Dialogue: left 2.5", right 6.0"
+  - Parenthetical: left 3.1", right 5.7"
+  - Transition: left 6.0", right aligned
+- Auto-detection: INT/EXT patterns, ALL CAPS character names, transitions
+- Character extensions: V.O., O.S., CONT'D
+- Keyboard shortcuts: Enter (new element), Tab (change type), Arrow keys (suggestions), Esc (close)
+- Validation: Dialogue must follow character, orphaned parentheticals detection
+- Page count estimation: ~55 lines per page industry standard
+- Fountain support: Import/export plain-text screenplay format
+- PDF generation: Proper page breaks, word wrapping, Courier 12pt font
+
 **Dependencies**: Rich text editor (complete)
 **Blockers**: None
 

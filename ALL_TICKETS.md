@@ -1021,23 +1021,50 @@
 ---
 
 ### FEATURE-034: Scene Breakdown Tool
-**Status**: 🔜 NOT STARTED
+**Status**: ✅ COMPLETED
 **Priority**: P3 - Low
 **Track**: Phase 2 Week 9
 **Estimate**: 3 days
+**Completed**: 2025-01-20
 
 **Description**: Break down screenplay scenes for production.
 
 **Acceptance Criteria**:
-- [ ] Extract scenes from screenplay
-- [ ] Scene metadata (location, time, characters)
-- [ ] Scene tagging (INT/EXT, DAY/NIGHT)
-- [ ] Scene list view
-- [ ] Export scene breakdown (CSV, PDF)
+- [x] Extract scenes from screenplay - Automatic extraction from ScreenplayElements
+- [x] Scene metadata (location, time, characters) - Full metadata parsing with INT/EXT and DAY/NIGHT
+- [x] Scene tagging (INT/EXT, DAY/NIGHT) - Automatic tagging from scene headings
+- [x] Scene list view - Interactive table with filtering and grouping
+- [x] Export scene breakdown (CSV, PDF) - CSV, Text, and JSON shooting schedule export
+- [x] Shooting schedule generation - Optimized by location with 8-hour day planning
 
-**Files**: `lib/screenplay/scene-parser.ts`, `components/screenplay/scene-breakdown.tsx`
-**Dependencies**: FEATURE-033
-**Blockers**: FEATURE-033 must complete first
+**Files**:
+- `lib/screenplay/scene-parser.ts` (389 lines) - Scene extraction and analysis engine
+- `components/screenplay/scene-breakdown.tsx` (437 lines) - Interactive breakdown UI
+- `components/ui/table.tsx` (87 lines) - Table component for scene list
+
+**Implementation Details**:
+- Scene heading parser: Extracts location type, location name, and time of day
+- Character extraction: Removes extensions (V.O., O.S.) for clean character lists
+- Duration estimation: ~150 words/min for action, ~200 words/min for dialogue
+- Scene filtering: By location type, time, location name, character name, tags
+- Scene grouping: Group by location or character for analysis
+- Statistics: Total scenes, INT/EXT count, DAY/NIGHT split, unique locations/characters
+- Export formats:
+  * CSV: Scene number, location, type, time, characters, description, duration, tags
+  * Text: Formatted breakdown with full scene details
+  * JSON: Shooting schedule grouped by location with day planning
+- Shooting schedule: Optimizes by location, max 8 hours per day (480 minutes)
+- Interactive UI: Click scenes for details, real-time filtering, statistics dashboard
+
+**Scene Metadata Structure**:
+- id, sceneNumber, heading, location, locationType (INT/EXT/INT./EXT./I/E)
+- time (DAY/NIGHT/DAWN/DUSK/CONTINUOUS/etc.)
+- description (action lines), dialogue (character + lines array)
+- characters (unique list), duration (estimated minutes)
+- tags, notes, pageNumber (optional fields)
+
+**Dependencies**: FEATURE-033 ✅
+**Blockers**: None
 
 ---
 

@@ -1,14 +1,75 @@
 # OttoWrite - Complete Ticket Registry
 
 **Last Updated**: January 21, 2025
-**Total Tickets**: 88 tickets
-**Completed**: 59 tickets (67%)
+**Total Tickets**: 89 tickets
+**Completed**: 60 tickets (67%)
 **In Progress**: 0 tickets (0%)
 **Not Started**: 29 tickets (33%)
 
 ---
 
 ## 🎯 Active Sprint Tickets
+
+### UX-013: Skip Navigation Link
+**Status**: ✅ COMPLETE
+**Priority**: P1 - High (Accessibility)
+**Track**: User Experience Enhancement - Sprint 1
+**Completed**: January 21, 2025
+**Time Taken**: 30 minutes (1 story point)
+
+**Description**: Add "Skip to main content" link for keyboard and screen reader users to meet WCAG 2.1 AA compliance.
+
+**Acceptance Criteria**:
+- [x] Skip link added as first element in root layout
+- [x] Skip link hidden visually but accessible to screen readers
+- [x] Appears on keyboard focus (Tab key)
+- [x] Links to `id="main-content"` on pages
+- [x] Styled with proper focus states (position absolute, top-left, high z-index)
+- [x] Main content IDs added to all major pages
+- [x] Dashboard already has skip link (verified existing implementation)
+
+**Files Modified**:
+- `app/layout.tsx` (added skip navigation link)
+- `app/page.tsx` (added main-content ID)
+- `app/auth/login/page.tsx` (added main-content ID)
+- `app/auth/signup/page.tsx` (added main-content ID)
+- `app/auth/reset/page.tsx` (added main-content ID)
+
+**Files Verified**:
+- `components/dashboard/dashboard-shell.tsx` (already has skip link and main-content ID)
+
+**Build Status**: ✅ Passing (12.1s, 0 TypeScript errors, 0 ESLint errors)
+
+**Accessibility Impact**:
+- Keyboard users can skip navigation with one Tab press
+- Screen reader users get immediate access to main content
+- WCAG 2.1 Level A Success Criterion 2.4.1 (Bypass Blocks) - COMPLIANT ✅
+- Improved efficiency for assistive technology users
+
+**Technical Implementation**:
+```tsx
+// Skip link (hidden by default, visible on focus)
+<a
+  href="#main-content"
+  className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg"
+>
+  Skip to main content
+</a>
+
+// Main content landmark
+<main id="main-content">
+  {/* Page content */}
+</main>
+```
+
+**Testing**:
+- Tab from any page → Skip link appears
+- Enter on skip link → Jumps to main content
+- Screen reader announces link correctly
+
+**Related**: Part of UX Audit 2025 (Accessibility track), Sprint 1 Ticket 2 of 3
+
+---
 
 ### UX-001: New User Onboarding Flow
 **Status**: ✅ COMPLETE

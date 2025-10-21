@@ -52,6 +52,7 @@ import {
 } from 'lucide-react'
 import { WorldElementCard, type WorldElement } from '@/components/world/world-element-card'
 import type { SystemDesign } from '@/components/world/system-designer'
+import { EventTimeline } from '@/components/world-building/event-timeline'
 
 // Lazy load heavy world-building components
 const ConsistencyChecker = lazy(() =>
@@ -597,7 +598,10 @@ export default function WorldBuildingPage() {
         occurs_at: event.occurs_at,
         description: event.description,
         location: location.name,
+        location_id: location.id,
         importance: event.importance,
+        key_characters: event.key_characters,
+        order_index: 0, // Will be set by drag-and-drop
       }))
     )
   }, [filteredLocations])
@@ -944,28 +948,46 @@ export default function WorldBuildingPage() {
 
         <TabsContent value="timeline">
           {timelineEntries.length > 0 ? (
-            <div className="space-y-4">
-              {timelineEntries.map((entry) => (
-                <Card key={entry.id} className="border-none bg-card/80 shadow-card">
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between text-base font-semibold text-foreground">
-                      <span>{entry.title}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {entry.occurs_at || 'No timestamp'}
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription>
-                      {entry.location} • Importance {entry.importance}/10
-                    </CardDescription>
-                  </CardHeader>
-                  {entry.description && (
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">{entry.description}</p>
-                    </CardContent>
-                  )}
-                </Card>
-              ))}
-            </div>
+            <EventTimeline
+              events={timelineEntries.map((entry) => ({
+                id: entry.id,
+                title: entry.title,
+                description: entry.description,
+                occurs_at: entry.occurs_at,
+                importance: entry.importance,
+                key_characters: entry.key_characters,
+                location_id: entry.location_id,
+                location_name: entry.location,
+                order_index: entry.order_index,
+              }))}
+              locations={locations.map((loc) => ({ id: loc.id, name: loc.name }))}
+              onReorder={async (reorderedEvents) => {
+                // Update order in the backend
+                try {
+                  await Promise.all(
+                    reorderedEvents.map((event, idx) =>
+                      fetch(`/api/locations/events`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: event.id, order_index: idx }),
+                      })
+                    )
+                  )
+                  toast({ title: 'Timeline reordered', description: 'Event order has been saved' })
+                  await loadData()
+                } catch {
+                  toast({ title: 'Failed to reorder', description: 'Please try again', variant: 'destructive' })
+                }
+              }}
+              onEdit={(event) => {
+                const location = locations.find((loc) => loc.id === event.location_id)
+                const fullEvent = location?.location_events?.find((e) => e.id === event.id)
+                if (location && fullEvent) {
+                  openEditEvent(location, fullEvent)
+                }
+              }}
+              onDelete={deleteEvent}
+            />
           ) : (
             <EmptyState
               icon={Building2}

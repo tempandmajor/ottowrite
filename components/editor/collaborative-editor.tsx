@@ -6,6 +6,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,8 @@ import {
   WifiOff,
   Circle,
   AlertCircle,
+  Lock,
+  Zap,
 } from 'lucide-react'
 import { useCollaboration, useActiveCollaborators } from '@/hooks/use-collaboration'
 import { cn } from '@/lib/utils'
@@ -54,6 +57,10 @@ export function CollaborativeEditor({
     cursors,
     presence,
     isConnected,
+    hasAccess,
+    isCheckingAccess,
+    requiresUpgrade,
+    minimumTier,
     insertText,
     deleteText,
     updateCursor,
@@ -202,12 +209,57 @@ export function CollaborativeEditor({
         </div>
 
         {/* Reconnect button */}
-        {showReconnectButton && !isConnected && (
+        {showReconnectButton && !isConnected && hasAccess && (
           <div className="mt-2">
             <Button onClick={handleReconnect} variant="outline" size="sm" className="gap-2">
               <AlertCircle className="h-4 w-4" />
               Reconnect
             </Button>
+          </div>
+        )}
+
+        {/* Access denied / Upgrade prompt */}
+        {!isCheckingAccess && !hasAccess && requiresUpgrade && (
+          <div className="mt-4 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800 rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <Lock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                  Upgrade Required for Real-Time Collaboration
+                </h4>
+                <p className="text-sm text-amber-800 dark:text-amber-200 mb-3">
+                  Real-time collaborative editing is available on the {minimumTier} plan.
+                  Upgrade to work simultaneously with your team, see live cursors, and never worry about conflicts.
+                </p>
+                <div className="flex gap-2">
+                  <Button asChild size="sm" className="gap-2">
+                    <Link href="/pricing">
+                      <Zap className="h-4 w-4" />
+                      Upgrade to {minimumTier}
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/pricing">
+                      Compare Plans
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading state */}
+        {isCheckingAccess && (
+          <div className="mt-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Checking collaboration access...
+              </span>
+            </div>
           </div>
         )}
       </CardHeader>
@@ -252,7 +304,7 @@ export function CollaborativeEditor({
               className
             )}
             placeholder={placeholder}
-            disabled={disabled}
+            disabled={disabled || !hasAccess}
             onInput={handleInput}
             onClick={handleCursorMove}
             onKeyUp={handleCursorMove}

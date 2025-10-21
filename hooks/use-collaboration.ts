@@ -23,6 +23,10 @@ export type CollaborationHookResult = {
   cursors: Map<string, CursorPosition>
   presence: Map<string, UserPresence>
   isConnected: boolean
+  hasAccess: boolean
+  isCheckingAccess: boolean
+  requiresUpgrade: boolean
+  minimumTier?: string
   insertText: (position: number, text: string) => void
   deleteText: (position: number, count: number) => void
   updateCursor: (position: number, selection?: { start: number; end: number }) => void
@@ -48,13 +52,58 @@ export function useCollaboration(options: CollaborationHookOptions): Collaborati
   const [cursors, setCursors] = useState<Map<string, CursorPosition>>(new Map())
   const [presence, setPresence] = useState<Map<string, UserPresence>>(new Map())
   const [isConnected, setIsConnected] = useState(false)
+  const [hasAccess, setHasAccess] = useState(false)
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true)
+  const [requiresUpgrade, setRequiresUpgrade] = useState(false)
+  const [minimumTier, setMinimumTier] = useState<string>()
 
   const clientRef = useRef<CollaborationClient | null>(null)
   const contentLengthRef = useRef(initialContent.length)
 
+  // Check collaboration access
+  useEffect(() => {
+    if (!enabled) {
+      setIsCheckingAccess(false)
+      return
+    }
+
+    let cancelled = false
+
+    async function checkAccess() {
+      try {
+        const response = await fetch('/api/collaboration/access')
+        if (cancelled) return
+
+        const data = await response.json()
+
+        setHasAccess(data.hasAccess)
+        setRequiresUpgrade(data.requiresUpgrade)
+        setMinimumTier(data.minimumTier)
+        setIsCheckingAccess(false)
+
+        if (!data.hasAccess) {
+          console.warn('[Collaboration] Access denied:', data)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('[Collaboration] Failed to check access:', error)
+          setHasAccess(false)
+          setIsCheckingAccess(false)
+          onError?.(error as Error)
+        }
+      }
+    }
+
+    checkAccess()
+
+    return () => {
+      cancelled = true
+    }
+  }, [enabled, onError])
+
   // Initialize collaboration client
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || !hasAccess || isCheckingAccess) return
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -101,7 +150,7 @@ export function useCollaboration(options: CollaborationHookOptions): Collaborati
       client.disconnect().catch(console.error)
       clientRef.current = null
     }
-  }, [documentId, userId, userName, userColor, initialContent, enabled, onError])
+  }, [documentId, userId, userName, userColor, initialContent, enabled, hasAccess, isCheckingAccess, onError])
 
   // Insert text at position
   const insertText = useCallback((position: number, text: string) => {
@@ -173,6 +222,10 @@ export function useCollaboration(options: CollaborationHookOptions): Collaborati
     cursors,
     presence,
     isConnected,
+    hasAccess,
+    isCheckingAccess,
+    requiresUpgrade,
+    minimumTier,
     insertText,
     deleteText,
     updateCursor,

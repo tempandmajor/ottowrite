@@ -3,6 +3,7 @@ import {
   generateWithGPT5,
   generateWithDeepSeek,
 } from '@/lib/ai/service'
+import { calculateQualityScores, type QualityScores } from '@/lib/ai/quality-scorer'
 
 export type EnsembleSuggestion = {
   model: 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-chat' | 'blend'
@@ -12,14 +13,16 @@ export type EnsembleSuggestion = {
     outputTokens: number
     totalCost: number
   }
+  qualityScores?: QualityScores
 }
 
 export async function generateEnsembleSuggestions(params: {
   prompt: string
   context?: string
   maxTokens?: number
+  includeQualityScores?: boolean
 }): Promise<EnsembleSuggestion[]> {
-  const { prompt, context, maxTokens = 900 } = params
+  const { prompt, context, maxTokens = 900, includeQualityScores = true } = params
 
   const [claude, gpt, deepseek] = await Promise.all([
     generateWithClaude(prompt, context, maxTokens),
@@ -27,7 +30,20 @@ export async function generateEnsembleSuggestions(params: {
     generateWithDeepSeek(prompt, context, maxTokens),
   ])
 
-  return [claude, gpt, deepseek]
+  const suggestions = [claude, gpt, deepseek]
+
+  // Add quality scores if requested
+  if (includeQualityScores) {
+    return suggestions.map((suggestion) => ({
+      ...suggestion,
+      qualityScores: calculateQualityScores(suggestion.content, {
+        context,
+        prompt,
+      }),
+    }))
+  }
+
+  return suggestions
 }
 
 type BlendParams = {
@@ -78,5 +94,9 @@ ${context ? `Context excerpt:\n${context}\n\n` : ''}${
     model: 'blend',
     content: result.content,
     usage: result.usage,
+    qualityScores: calculateQualityScores(result.content, {
+      context,
+      prompt,
+    }),
   }
 }

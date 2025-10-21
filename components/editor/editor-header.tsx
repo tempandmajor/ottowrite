@@ -18,13 +18,23 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ArrowLeft, MoreVertical, User, Settings, LogOut, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { BranchManager, type Branch } from './branch-manager'
 
 export type EditorHeaderProps = {
   documentTitle: string
   email: string
+  documentId?: string
+  currentBranchId?: string | null
+  onBranchSwitch?: (branch: Branch) => void
 }
 
-export function EditorHeader({ documentTitle, email }: EditorHeaderProps) {
+export function EditorHeader({
+  documentTitle,
+  email,
+  documentId,
+  currentBranchId,
+  onBranchSwitch
+}: EditorHeaderProps) {
   const router = useRouter()
 
   async function handleSignOut() {
@@ -54,6 +64,15 @@ export function EditorHeader({ documentTitle, email }: EditorHeaderProps) {
             <FileText className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium truncate max-w-[300px]">{documentTitle}</span>
           </div>
+
+          {/* Branch Manager */}
+          {documentId && onBranchSwitch && (
+            <BranchManager
+              documentId={documentId}
+              currentBranchId={currentBranchId || null}
+              onBranchSwitch={onBranchSwitch}
+            />
+          )}
         </div>
 
         {/* Right: User Menu */}

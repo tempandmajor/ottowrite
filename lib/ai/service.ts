@@ -1,5 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
+import {
+  generateWithResponsesAPI,
+  streamWithResponsesAPI,
+  compressResponse,
+  batchGenerate,
+} from './openai-responses'
 
 export type AIModel = 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-chat'
 
@@ -111,6 +117,7 @@ export async function generateWithClaude(
 /**
  * Generate text using GPT-5 with Responses API
  * Uses OpenAI's new Responses API with verbosity and reasoning_effort controls
+ * Now with streaming, caching, and fallback support
  */
 export async function generateWithGPT5(
   prompt: string,
@@ -123,43 +130,15 @@ export async function generateWithGPT5(
     ? `You are an AI writing assistant helping authors write better stories. Here's the context:\n\n${context}`
     : 'You are an AI writing assistant helping authors write better stories.'
 
-  const client = getOpenAIClient()
-
-  // Use Responses API for GPT-5
-  const response = await (client as any).responses.create({
+  // Use enhanced Responses API with caching and fallback
+  return generateWithResponsesAPI(prompt, systemPrompt, {
     model: 'gpt-5',
-    input: [
-      {
-        role: 'system',
-        content: [{ type: 'input_text', text: systemPrompt }],
-      },
-      {
-        role: 'user',
-        content: [{ type: 'input_text', text: prompt }],
-      },
-    ],
+    maxTokens,
     verbosity,
-    reasoning_effort: reasoningEffort,
-    max_output_tokens: maxTokens,
+    reasoningEffort,
+    useCache: true,
+    fallbackToChat: true,
   })
-
-  // Extract content from response
-  const content = response.output?.[0]?.content?.[0]?.text || ''
-  const inputTokens = response.usage?.input_tokens || 0
-  const outputTokens = response.usage?.output_tokens || 0
-  const totalCost =
-    (inputTokens / 1000000) * PRICING['gpt-5'].input +
-    (outputTokens / 1000000) * PRICING['gpt-5'].output
-
-  return {
-    content,
-    usage: {
-      inputTokens,
-      outputTokens,
-      totalCost,
-    },
-    model: 'gpt-5',
-  }
 }
 
 /**
@@ -250,3 +229,96 @@ export function getRecommendedModel(taskType: 'creative' | 'analytical' | 'bulk'
       return 'claude-sonnet-4.5'
   }
 }
+
+/**
+ * Stream text generation for real-time output
+ */
+export async function* streamAIGeneration(
+  model: AIModel,
+  prompt: string,
+  context?: string,
+  maxTokens: number = 2000,
+  verbosity: 'low' | 'medium' | 'high' = 'medium',
+  reasoningEffort: 'minimal' | 'low' | 'medium' | 'high' = 'minimal'
+): AsyncGenerator<string, void, unknown> {
+  const systemPrompt = context
+    ? `You are an AI writing assistant helping authors write better stories. Here's the context:\n\n${context}`
+    : 'You are an AI writing assistant helping authors write better stories.'
+
+  switch (model) {
+    case 'claude-sonnet-4.5':
+      yield* streamWithClaude(prompt, systemPrompt, maxTokens)
+      break
+    case 'gpt-5':
+      yield* streamWithResponsesAPI(prompt, systemPrompt, {
+        model: 'gpt-5',
+        maxTokens,
+        verbosity,
+        reasoningEffort,
+        fallbackToChat: true,
+      })
+      break
+    case 'deepseek-chat':
+      yield* streamWithDeepSeek(prompt, systemPrompt, maxTokens)
+      break
+    default:
+      throw new Error(`Streaming not supported for model: ${model}`)
+  }
+}
+
+/**
+ * Stream text generation with Claude
+ */
+async function* streamWithClaude(
+  prompt: string,
+  systemPrompt: string,
+  maxTokens: number
+): AsyncGenerator<string, void, unknown> {
+  const client = getAnthropicClient()
+
+  const stream = await client.messages.stream({
+    model: 'claude-sonnet-4.5-20250929',
+    max_tokens: maxTokens,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: prompt }],
+  })
+
+  for await (const chunk of stream) {
+    if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+      yield chunk.delta.text
+    }
+  }
+}
+
+/**
+ * Stream text generation with DeepSeek
+ */
+async function* streamWithDeepSeek(
+  prompt: string,
+  systemPrompt: string,
+  maxTokens: number
+): AsyncGenerator<string, void, unknown> {
+  const client = getDeepSeekClient()
+
+  const stream = await client.chat.completions.create({
+    model: 'deepseek-chat',
+    max_tokens: maxTokens,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: prompt },
+    ],
+    stream: true,
+  })
+
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content
+    if (content) {
+      yield content
+    }
+  }
+}
+
+/**
+ * Re-export utility functions
+ */
+export { compressResponse, batchGenerate }

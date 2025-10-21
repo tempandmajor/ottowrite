@@ -8,6 +8,8 @@ import { QuickActions } from '@/components/dashboard/quick-actions'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { EmptyState } from '@/components/dashboard/empty-state'
 import { DashboardLoading } from '@/components/dashboard/loading-state'
+import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard'
+import { GettingStartedChecklist } from '@/components/dashboard/getting-started-checklist'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ArrowUpRight, FileText, PenSquare, Sparkles } from 'lucide-react'
@@ -19,9 +21,18 @@ interface Project {
   created_at: string
 }
 
+interface OnboardingChecklist {
+  created_first_project: boolean
+  added_first_character: boolean
+  wrote_first_100_words: boolean
+  used_ai_assistant: boolean
+}
+
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [showTemplateDialog, setShowTemplateDialog] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [checklistProgress, setChecklistProgress] = useState<OnboardingChecklist | undefined>()
   const [stats, setStats] = useState({
     projectCount: 0,
     documentCount: 0,
@@ -52,7 +63,7 @@ export default function DashboardPage() {
         return
       }
 
-      const [projectsResponse, documentsResponse, aiUsageResponse] = await Promise.all([
+      const [projectsResponse, documentsResponse, aiUsageResponse, profileResponse] = await Promise.all([
         supabase
           .from('projects')
           .select('*', { count: 'exact' })
@@ -67,6 +78,11 @@ export default function DashboardPage() {
           .from('ai_usage')
           .select('words_generated')
           .eq('user_id', user.id),
+        supabase
+          .from('user_profiles')
+          .select('has_completed_onboarding, onboarding_checklist')
+          .eq('id', user.id)
+          .single(),
       ])
 
       if (projectsResponse.error) {
@@ -92,6 +108,16 @@ export default function DashboardPage() {
         totalWordsGenerated,
       })
       setProjects(projectsResponse.data ?? [])
+
+      // Check if user needs onboarding
+      if (profileResponse.data) {
+        const hasCompletedOnboarding = profileResponse.data.has_completed_onboarding ?? false
+        setShowOnboarding(!hasCompletedOnboarding)
+        setChecklistProgress(profileResponse.data.onboarding_checklist as OnboardingChecklist)
+      } else {
+        // No profile found, show onboarding
+        setShowOnboarding(true)
+      }
     } catch (error) {
       console.error('Error loading dashboard:', error)
     } finally {
@@ -103,8 +129,25 @@ export default function DashboardPage() {
     return <DashboardLoading />
   }
 
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false)
+    // Reload dashboard to get updated checklist progress
+    loadDashboard()
+  }
+
   return (
     <div className="space-y-12">
+      {/* Onboarding Wizard - shown for first-time users */}
+      <OnboardingWizard
+        open={showOnboarding}
+        onComplete={handleOnboardingComplete}
+      />
+
+      {/* Getting Started Checklist - shown until all tasks completed */}
+      {!showOnboarding && checklistProgress && (
+        <GettingStartedChecklist initialProgress={checklistProgress} />
+      )}
+
       <section className="flex flex-col gap-6 rounded-3xl bg-gradient-to-r from-muted via-background to-muted p-8 shadow-card md:flex-row md:items-center md:justify-between">
         <div className="space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-wide text-secondary-foreground">

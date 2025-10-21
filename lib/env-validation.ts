@@ -53,6 +53,10 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().optional(), // Fallback for SSR
   SUPABASE_URL: z.string().url().optional().or(z.literal('')), // Fallback for SSR
 
+  // Web Search APIs (for research assistant)
+  BRAVE_SEARCH_API_KEY: z.string().optional(),
+  SERPAPI_API_KEY: z.string().optional(),
+
   // Application Settings
   NEXT_PUBLIC_APP_URL: z.string().url().optional().or(z.literal('')),
   PGPASSWORD: z.string().optional(),

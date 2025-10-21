@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createBackgroundResponse, extractResponseText } from '@/lib/ai/responses-api-service'
+import { searchWeb, extractCitations } from '@/lib/search/search-service'
+import { formatSearchResultsForAI } from '@/lib/search/brave-search'
+import { generateWithAI } from '@/lib/ai/service'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
 
@@ -8,11 +10,13 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const SYSTEM_PROMPT = `You are an AI research assistant with real-time web access. When asked a question you:
-- Perform targeted web searches to gather up-to-date information and cite reputable sources.
-- Summarize findings concisely and structure the response for writers.
-- Provide source references with titles and URLs.
-- Flag uncertain or conflicting information.
-`
+- Analyze the provided web search results to answer the user's question
+- Summarize findings concisely and structure the response for writers
+- Always cite sources using [Title](URL) format
+- Flag uncertain or conflicting information
+- If search results are insufficient, clearly state what additional information would be helpful
+
+Focus on accuracy, relevance, and proper source attribution.`
 
 async function requireUser() {
   const supabase = await createClient()
@@ -76,16 +80,50 @@ export async function POST(request: NextRequest) {
     let updatedRecord = requestRecord
 
     try {
-      const prompt = `${SYSTEM_PROMPT}\n\nUSER QUERY: ${query.trim()}\n\nWRITING CONTEXT: ${context ?? 'Not provided.'}`
-
-      const response = await createBackgroundResponse(prompt, {
-        task_type: 'research',
-        document_id: document_id ?? undefined,
-        project_id: project_id ?? undefined,
+      // Step 1: Perform web search
+      const searchResponse = await searchWeb(query.trim(), user.id, {
+        provider: 'brave',
+        count: 10,
+        saveHistory: true,
+        projectId: project_id || undefined,
+        documentId: document_id || undefined,
+        researchRequestId: requestRecord.id,
       })
 
-      const result = extractResponseText(response)
+      // Step 2: Format search results for AI
+      const braveSearchContext = {
+        query: searchResponse.query,
+        results: searchResponse.results,
+        totalResults: searchResponse.totalResults,
+        searchMetadata: {
+          provider: 'brave' as const,
+          query: searchResponse.query,
+          ...searchResponse.searchMetadata,
+        },
+      }
+      const searchContext = formatSearchResultsForAI(braveSearchContext)
 
+      // Step 3: Generate AI summary using search results
+      const prompt = `USER QUERY: ${query.trim()}
+
+WRITING CONTEXT: ${context || 'Not provided.'}
+
+WEB SEARCH RESULTS:
+${searchContext}
+
+Based on the search results above, provide a comprehensive answer to the user's query. Include relevant citations using [Title](URL) format.`
+
+      const aiResponse = await generateWithAI({
+        model: 'claude-sonnet-4.5',
+        prompt,
+        context: SYSTEM_PROMPT,
+        maxTokens: 2000,
+      })
+
+      // Step 4: Extract citations from search results
+      const citations = extractCitations(searchResponse.results)
+
+      // Step 5: Save research note
       const { data: note } = await supabase
         .from('research_notes')
         .insert({
@@ -94,17 +132,24 @@ export async function POST(request: NextRequest) {
           project_id: project_id ?? null,
           research_request_id: requestRecord.id,
           title: query.trim(),
-          content: result.text,
-          sources: [],
+          content: aiResponse.content,
+          sources: citations,
         })
         .select()
         .single()
 
+      // Step 6: Update request status
       const { data: updated } = await supabase
         .from('research_requests')
         .update({
           status: 'succeeded',
-          response: result,
+          response: {
+            content: aiResponse.content,
+            searchResults: searchResponse.results.slice(0, 5), // Top 5 results
+            totalResults: searchResponse.totalResults,
+            provider: searchResponse.provider,
+          },
+          search_provider: searchResponse.provider,
         })
         .eq('id', requestRecord.id)
         .select()
@@ -114,7 +159,12 @@ export async function POST(request: NextRequest) {
         updatedRecord = updated
       }
 
-      return successResponse({ request: updatedRecord, note })
+      return successResponse({
+        request: updatedRecord,
+        note,
+        searchResults: searchResponse.results,
+        totalResults: searchResponse.totalResults,
+      })
     } catch (error) {
       logger.error('Research execution failed', {
         userId: user.id,

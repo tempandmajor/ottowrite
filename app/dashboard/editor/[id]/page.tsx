@@ -8,6 +8,7 @@ import { type ScreenplayEditorApi, type ScreenplayElement } from '@/components/e
 import type { Chapter } from '@/components/editor/chapter-sidebar'
 import { computeClientContentHash } from '@/lib/client-content-hash'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,8 @@ import { useEditorStore, type EditorDocumentRecord } from '@/stores/editor-store
 import {
   ArrowLeft,
   Save,
+  PanelLeftClose,
+  PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
   FileDown,
@@ -342,6 +345,8 @@ export default function EditorPage() {
     reset: resetEditorState,
   } = useEditorStore()
   const [showAI, setShowAI] = useState(true)
+  const [structureSidebarOpen, setStructureSidebarOpen] = useState(true)
+  const [utilitySidebarOpen, setUtilitySidebarOpen] = useState(true)
   const [showExportModal, setShowExportModal] = useState(false)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
@@ -1095,9 +1100,7 @@ export default function EditorPage() {
       }
     },
     // Track successful save with snapshot hash
-    onSnapshotCreated: async (hash, wordCount) => {
-      console.log('Autosave snapshot created:', { hash, wordCount })
-    },
+    onSnapshotCreated: async () => {},
   })
 
   const autosaveLabelData = useMemo(() => {
@@ -1140,12 +1143,13 @@ export default function EditorPage() {
     return null
   }
 
-  const showStructureSidebar = Boolean(document)
+  const showStructureSidebar = structureSidebarOpen && Boolean(document)
+  const showUtilitySidebar = utilitySidebarOpen && Boolean(document)
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-4 sm:px-6">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center gap-4 px-4 py-4 sm:px-6 xl:px-8">
           <div className="flex flex-1 items-center gap-3">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/dashboard/documents">
@@ -1211,6 +1215,40 @@ export default function EditorPage() {
                 <FileDown className="mr-2 h-4 w-4" />
                 Export
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setStructureSidebarOpen((prev) => !prev)}
+              >
+                {structureSidebarOpen ? (
+                  <>
+                    <PanelLeftClose className="mr-2 h-4 w-4" />
+                    Hide outline
+                  </>
+                ) : (
+                  <>
+                    <PanelLeftOpen className="mr-2 h-4 w-4" />
+                    Show outline
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setUtilitySidebarOpen((prev) => !prev)}
+              >
+                {utilitySidebarOpen ? (
+                  <>
+                    <PanelRightClose className="mr-2 h-4 w-4" />
+                    Hide workspace
+                  </>
+                ) : (
+                  <>
+                    <PanelRightOpen className="mr-2 h-4 w-4" />
+                    Show workspace
+                  </>
+                )}
+              </Button>
               <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
               <Button variant="outline" size="sm" onClick={() => setShowAI((prev) => !prev)}>
                 {showAI ? (
@@ -1264,6 +1302,44 @@ export default function EditorPage() {
                   <DropdownMenuItem
                     onSelect={(event) => {
                       event.preventDefault()
+                      setStructureSidebarOpen((prev) => !prev)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    {structureSidebarOpen ? (
+                      <>
+                        <PanelLeftClose className="h-4 w-4" />
+                        Hide outline
+                      </>
+                    ) : (
+                      <>
+                        <PanelLeftOpen className="h-4 w-4" />
+                        Show outline
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      setUtilitySidebarOpen((prev) => !prev)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    {utilitySidebarOpen ? (
+                      <>
+                        <PanelRightClose className="h-4 w-4" />
+                        Hide workspace
+                      </>
+                    ) : (
+                      <>
+                        <PanelRightOpen className="h-4 w-4" />
+                        Show workspace
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
                       setShowAI((prev) => !prev)
                     }}
                     className="flex items-center gap-2"
@@ -1292,11 +1368,20 @@ export default function EditorPage() {
       </header>
 
       <main
-        className={`mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-6 sm:px-6 lg:gap-8 ${
-          showStructureSidebar
-            ? 'lg:grid lg:grid-cols-[280px_minmax(0,1fr)_320px]'
-            : 'lg:grid lg:grid-cols-[minmax(0,1fr)_320px]'
-        }`}
+        className={cn(
+          'mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:gap-8 xl:px-8',
+          'flex flex-col gap-8 xl:gap-10',
+          (showStructureSidebar || showUtilitySidebar) && 'lg:grid',
+          showStructureSidebar &&
+            showUtilitySidebar &&
+            'lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)_minmax(280px,340px)]',
+          showStructureSidebar &&
+            !showUtilitySidebar &&
+            'lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]',
+          !showStructureSidebar &&
+            showUtilitySidebar &&
+            'lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]'
+        )}
       >
         {showStructureSidebar && document && (
           <div className="space-y-4">
@@ -1358,7 +1443,7 @@ export default function EditorPage() {
           </Card>
 
           <div className="overflow-hidden rounded-3xl border bg-card shadow-card">
-            <div className="p-6">
+            <div className="p-4 sm:p-6 lg:p-8">
               <Suspense fallback={<EditorLoadingFallback />}>
                 {isScriptType(document.type) ? (
                   <ScreenplayEditor
@@ -1425,98 +1510,100 @@ export default function EditorPage() {
           </div>
         </div>
 
-        <div className="space-y-4">
-          <InlineAnalyticsPanel
-            documentType={document.type}
-            contentHtml={isScriptType(document.type) ? '' : content}
-            structure={isScriptType(document.type) ? undefined : structure}
-            screenplayElements={isScriptType(document.type) ? screenplayContent : undefined}
-            wordCount={wordCount}
-          />
-          <Card className="border-none bg-card/80 shadow-card">
-            <CardHeader>
-              <CardTitle>AI assistant</CardTitle>
-              <CardDescription>
-                Brainstorm scenes, punch up dialogue, or fill in missing beats without leaving the editor.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {showAI ? (
-                <div className="max-h-[70vh] overflow-y-auto pr-1">
-                  <Suspense fallback={<div className="text-sm text-muted-foreground">Loading AI assistant...</div>}>
-                    <AIAssistant
-                      documentId={document.id}
-                      currentContent={content}
-                      onInsertText={insertAIText}
-                      getSelection={resolveActiveSelection}
-                    />
-                  </Suspense>
-                </div>
-              ) : (
-                <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
-                  <p>AI panel hidden. Reopen it to access brainstorming and rewriting tools.</p>
-                  <Button variant="outline" size="sm" onClick={() => setShowAI(true)}>
-                    <PanelRightOpen className="mr-2 h-4 w-4" />
-                    Show assistant
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Suspense fallback={null}>
-            <EnsembleGenerator
-              currentContext={content}
-              onInsert={insertAIText}
-              projectId={document.project_id}
-              documentId={document.id}
+        {showUtilitySidebar && (
+          <div className="space-y-4">
+            <InlineAnalyticsPanel
+              documentType={document.type}
+              contentHtml={isScriptType(document.type) ? '' : content}
+              structure={isScriptType(document.type) ? undefined : structure}
+              screenplayElements={isScriptType(document.type) ? screenplayContent : undefined}
+              wordCount={wordCount}
             />
-          </Suspense>
+            <Card className="border-none bg-card/80 shadow-card">
+              <CardHeader>
+                <CardTitle>AI assistant</CardTitle>
+                <CardDescription>
+                  Brainstorm scenes, punch up dialogue, or fill in missing beats without leaving the editor.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {showAI ? (
+                  <div className="max-h-[70vh] overflow-y-auto pr-1">
+                    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading AI assistant...</div>}>
+                      <AIAssistant
+                        documentId={document.id}
+                        currentContent={content}
+                        onInsertText={insertAIText}
+                        getSelection={resolveActiveSelection}
+                      />
+                    </Suspense>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
+                    <p>AI panel hidden. Reopen it to access brainstorming and rewriting tools.</p>
+                    <Button variant="outline" size="sm" onClick={() => setShowAI(true)}>
+                      <PanelRightOpen className="mr-2 h-4 w-4" />
+                      Show assistant
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-          <Suspense fallback={null}>
-            <BackgroundTaskMonitor
-              documentId={document.id}
-              projectId={document.project_id}
-              documentTitle={document.title}
-              documentContent={content}
-            />
-          </Suspense>
-
-          <Suspense fallback={null}>
-            <ResearchPanel
-              documentId={document.id}
-              projectId={document.project_id}
-              context={content}
-            />
-          </Suspense>
-
-          {!isScriptType(document.type) && (
             <Suspense fallback={null}>
-              <ReadingPacingPanel contentHtml={content} structure={structure} wordCount={wordCount} />
+              <EnsembleGenerator
+                currentContext={content}
+                onInsert={insertAIText}
+                projectId={document.project_id}
+                documentId={document.id}
+              />
             </Suspense>
-          )}
 
-          <Suspense fallback={null}>
-            <ReadabilityPanel initialText={content} />
-          </Suspense>
+            <Suspense fallback={null}>
+              <BackgroundTaskMonitor
+                documentId={document.id}
+                projectId={document.project_id}
+                documentTitle={document.title}
+                documentContent={content}
+              />
+            </Suspense>
 
-          <Card className="border-none bg-card/80 shadow-card">
-            <CardHeader>
-              <CardTitle>Document utilities</CardTitle>
-              <CardDescription>Version history, exports, and other tools.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button variant="outline" className="w-full justify-between" onClick={() => setShowVersionHistory(true)}>
-                View version history
-                <History className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" className="w-full justify-between" onClick={handleExportClick}>
-                Export document
-                <FileDown className="h-4 w-4" />
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+            <Suspense fallback={null}>
+              <ResearchPanel
+                documentId={document.id}
+                projectId={document.project_id}
+                context={content}
+              />
+            </Suspense>
+
+            {!isScriptType(document.type) && (
+              <Suspense fallback={null}>
+                <ReadingPacingPanel contentHtml={content} structure={structure} wordCount={wordCount} />
+              </Suspense>
+            )}
+
+            <Suspense fallback={null}>
+              <ReadabilityPanel initialText={content} />
+            </Suspense>
+
+            <Card className="border-none bg-card/80 shadow-card">
+              <CardHeader>
+                <CardTitle>Document utilities</CardTitle>
+                <CardDescription>Version history, exports, and other tools.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button variant="outline" className="w-full justify-between" onClick={() => setShowVersionHistory(true)}>
+                  View version history
+                  <History className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" className="w-full justify-between" onClick={handleExportClick}>
+                  Export document
+                  <FileDown className="h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </main>
 
       {showExportModal && (

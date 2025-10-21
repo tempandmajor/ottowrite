@@ -5,7 +5,7 @@ import {
   normalizeExcerptSource,
   truncateSnapshotContent,
   mapWorldElementToStoryBibleEntry,
-} from '@/app/api/ai/generate/route'
+} from '@/lib/ai/context-helpers'
 
 describe('AI generate route helpers', () => {
   it('maps document snapshot payloads into context excerpts', () => {

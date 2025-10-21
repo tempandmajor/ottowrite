@@ -10,7 +10,6 @@ import {
   DollarSign,
   Zap,
   Star,
-  Clock,
   FileText,
   ArrowUpRight,
   ArrowDownRight,

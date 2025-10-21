@@ -111,7 +111,8 @@ export function TiptapEditor({
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-xl focus:outline-none min-h-[500px] max-w-none px-8 py-6',
+        class:
+          'prose prose-base sm:prose-lg xl:prose-xl focus:outline-none min-h-[500px] max-w-none px-4 sm:px-6 lg:px-8 py-6',
       },
     },
   })

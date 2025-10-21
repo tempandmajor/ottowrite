@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getModelComparison } from '@/lib/analytics/model-analytics'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
@@ -6,7 +5,7 @@ import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient()
     const {

@@ -10,6 +10,8 @@ import {
 // Mock Supabase client
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
+  getPoolConfig: vi.fn(() => ({ maxConnections: 10, idleTimeout: 300 })),
+  getServiceRolePoolConfig: vi.fn(() => ({ maxConnections: 5, idleTimeout: 300 })),
 }))
 
 describe('/api/health - Health Check Endpoints', () => {

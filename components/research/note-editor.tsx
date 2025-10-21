@@ -32,8 +32,6 @@ type ResearchNote = {
 
 type NoteEditorProps = {
   note?: ResearchNote
-  projectId?: string
-  documentId?: string
   onSave: (note: ResearchNote) => Promise<void>
   onCancel?: () => void
 }
@@ -48,7 +46,7 @@ const CATEGORIES: Array<{ value: NoteCategory; label: string }> = [
   { value: 'other', label: 'Other' },
 ]
 
-export function NoteEditor({ note, projectId, documentId, onSave, onCancel }: NoteEditorProps) {
+export function NoteEditor({ note, onSave, onCancel }: NoteEditorProps) {
   const [title, setTitle] = useState(note?.title || '')
   const [content, setContent] = useState(note?.content || '')
   const [tags, setTags] = useState<string[]>(note?.tags || [])

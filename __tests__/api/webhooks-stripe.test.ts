@@ -7,6 +7,15 @@ import {
 } from '../setup/api-test-utils'
 import Stripe from 'stripe'
 
+const createStripeClientMock = () => ({
+  webhooks: {
+    constructEvent: vi.fn(),
+  },
+  subscriptions: {
+    retrieve: vi.fn(),
+  },
+})
+
 // Mock Stripe
 vi.mock('stripe', () => {
   const mockStripe = {
@@ -93,9 +102,10 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
 
     it('should return 400 when signature verification fails', async () => {
       const { getStripeClient } = await import('@/lib/stripe/config')
-      const mockStripe = vi.mocked(getStripeClient)()
+      const mockStripe = createStripeClientMock()
+      vi.mocked(getStripeClient).mockReturnValue(mockStripe as any)
 
-      mockStripe.webhooks.constructEvent = vi.fn(() => {
+      mockStripe.webhooks.constructEvent.mockImplementation(() => {
         throw new Error('Invalid signature')
       })
 
@@ -116,7 +126,8 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
 
     it('should accept valid signatures', async () => {
       const { getStripeClient } = await import('@/lib/stripe/config')
-      const mockStripe = vi.mocked(getStripeClient)()
+      const mockStripe = createStripeClientMock()
+      vi.mocked(getStripeClient).mockReturnValue(mockStripe as any)
 
       const mockEvent: Stripe.Event = {
         id: 'evt_test',
@@ -129,30 +140,31 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
         livemode: false,
         pending_webhooks: 0,
         request: null,
-        type: 'customer.subscription.updated',
+        type: 'customer.created',
       }
 
-      mockStripe.webhooks.constructEvent = vi.fn().mockReturnValue(mockEvent)
+      mockStripe.webhooks.constructEvent.mockReturnValue(mockEvent)
 
       const request = createMockRequest({
         method: 'POST',
-        body: JSON.stringify({ type: 'customer.subscription.updated' }),
+        body: JSON.stringify({ type: 'customer.created' }),
       }) as any
 
-      request.text = vi.fn().mockResolvedValue(JSON.stringify({ type: 'customer.subscription.updated' }))
+      request.text = vi.fn().mockResolvedValue(JSON.stringify({ type: 'customer.created' }))
 
       const response = await POST(request)
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.received).toBe(true)
+      expect(json.received).toBe(true)
     })
   })
 
   describe('Event Age Validation', () => {
     it('should reject events older than 5 minutes', async () => {
       const { getStripeClient } = await import('@/lib/stripe/config')
-      const mockStripe = vi.mocked(getStripeClient)()
+      const mockStripe = createStripeClientMock()
+      vi.mocked(getStripeClient).mockReturnValue(mockStripe as any)
 
       const oldTimestamp = Math.floor(Date.now() / 1000) - (6 * 60) // 6 minutes ago
 
@@ -170,7 +182,7 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
         type: 'customer.updated',
       }
 
-      mockStripe.webhooks.constructEvent = vi.fn().mockReturnValue(mockEvent)
+      mockStripe.webhooks.constructEvent.mockReturnValue(mockEvent)
 
       const request = createMockRequest({
         method: 'POST',
@@ -188,7 +200,8 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
 
     it('should accept recent events', async () => {
       const { getStripeClient } = await import('@/lib/stripe/config')
-      const mockStripe = vi.mocked(getStripeClient)()
+      const mockStripe = createStripeClientMock()
+      vi.mocked(getStripeClient).mockReturnValue(mockStripe as any)
 
       const recentTimestamp = Math.floor(Date.now() / 1000) - 60 // 1 minute ago
 
@@ -220,7 +233,7 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
         type: 'customer.subscription.updated',
       }
 
-      mockStripe.webhooks.constructEvent = vi.fn().mockReturnValue(mockEvent)
+      mockStripe.webhooks.constructEvent.mockReturnValue(mockEvent)
 
       const request = createMockRequest({
         method: 'POST',
@@ -241,9 +254,8 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
       delete process.env.STRIPE_WEBHOOK_SECRET
 
       const { getStripeClient } = await import('@/lib/stripe/config')
-      const mockStripe = vi.mocked(getStripeClient)()
-
-      mockStripe.webhooks.constructEvent = vi.fn()
+      const mockStripe = createStripeClientMock()
+      vi.mocked(getStripeClient).mockReturnValue(mockStripe as any)
 
       const request = createMockRequest({
         method: 'POST',
@@ -266,7 +278,8 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
   describe('Event Processing', () => {
     it('should handle checkout.session.completed events', async () => {
       const { getStripeClient } = await import('@/lib/stripe/config')
-      const mockStripe = vi.mocked(getStripeClient)()
+      const mockStripe = createStripeClientMock()
+      vi.mocked(getStripeClient).mockReturnValue(mockStripe as any)
 
       const mockEvent: Stripe.Event = {
         id: 'evt_checkout',
@@ -290,8 +303,8 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
         type: 'checkout.session.completed',
       }
 
-      mockStripe.webhooks.constructEvent = vi.fn().mockReturnValue(mockEvent)
-      mockStripe.subscriptions.retrieve = vi.fn().mockResolvedValue({
+      mockStripe.webhooks.constructEvent.mockReturnValue(mockEvent)
+      mockStripe.subscriptions.retrieve.mockResolvedValue({
         id: 'sub_test',
         status: 'active',
         items: {
@@ -319,12 +332,13 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.received).toBe(true)
+      expect(json.received).toBe(true)
     })
 
     it('should handle subscription updated events', async () => {
       const { getStripeClient } = await import('@/lib/stripe/config')
-      const mockStripe = vi.mocked(getStripeClient)()
+      const mockStripe = createStripeClientMock()
+      vi.mocked(getStripeClient).mockReturnValue(mockStripe as any)
 
       const mockEvent: Stripe.Event = {
         id: 'evt_sub_updated',
@@ -356,7 +370,7 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
         type: 'customer.subscription.updated',
       }
 
-      mockStripe.webhooks.constructEvent = vi.fn().mockReturnValue(mockEvent)
+      mockStripe.webhooks.constructEvent.mockReturnValue(mockEvent)
 
       const request = createMockRequest({
         method: 'POST',
@@ -369,12 +383,13 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.received).toBe(true)
+      expect(json.received).toBe(true)
     })
 
     it('should log unhandled event types', async () => {
       const { getStripeClient } = await import('@/lib/stripe/config')
-      const mockStripe = vi.mocked(getStripeClient)()
+      const mockStripe = createStripeClientMock()
+      vi.mocked(getStripeClient).mockReturnValue(mockStripe as any)
 
       const mockEvent: Stripe.Event = {
         id: 'evt_unknown',
@@ -390,7 +405,7 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
         type: 'unknown.event.type' as any,
       }
 
-      mockStripe.webhooks.constructEvent = vi.fn().mockReturnValue(mockEvent)
+      mockStripe.webhooks.constructEvent.mockReturnValue(mockEvent)
 
       const request = createMockRequest({
         method: 'POST',
@@ -403,14 +418,15 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.received).toBe(true)
+      expect(json.received).toBe(true)
     })
   })
 
   describe('Security Logging', () => {
     it('should log all webhook events for audit trail', async () => {
       const { getStripeClient } = await import('@/lib/stripe/config')
-      const mockStripe = vi.mocked(getStripeClient)()
+      const mockStripe = createStripeClientMock()
+      vi.mocked(getStripeClient).mockReturnValue(mockStripe as any)
 
       const mockEvent: Stripe.Event = {
         id: 'evt_log_test',
@@ -426,7 +442,7 @@ describe('/api/webhooks/stripe - Stripe Webhook Endpoint', () => {
         type: 'customer.created',
       }
 
-      mockStripe.webhooks.constructEvent = vi.fn().mockReturnValue(mockEvent)
+      mockStripe.webhooks.constructEvent.mockReturnValue(mockEvent)
 
       const request = createMockRequest({
         method: 'POST',

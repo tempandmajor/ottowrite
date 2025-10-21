@@ -48,15 +48,23 @@ export async function POST(request: NextRequest) {
   }
 
   // Security: Check event age to prevent replay attacks
-  const eventAge = Date.now() - (event.created * 1000)
-  if (eventAge > WEBHOOK_SECURITY.MAX_EVENT_AGE_MS) {
-    logger.warn('Webhook event too old', {
-      operation: 'webhook:stripe:event_too_old',
+  if (typeof event.created === 'number') {
+    const eventAge = Date.now() - event.created * 1000
+    if (eventAge > WEBHOOK_SECURITY.MAX_EVENT_AGE_MS) {
+      logger.warn('Webhook event too old', {
+        operation: 'webhook:stripe:event_too_old',
+        eventId: event.id,
+        eventAge,
+        maxAge: WEBHOOK_SECURITY.MAX_EVENT_AGE_MS,
+      })
+      return errorResponses.badRequest('Event too old')
+    }
+  } else {
+    logger.warn('Webhook event missing created timestamp', {
+      operation: 'webhook:stripe:missing_created',
       eventId: event.id,
-      eventAge,
-      maxAge: WEBHOOK_SECURITY.MAX_EVENT_AGE_MS,
+      eventType: event.type,
     })
-    return errorResponses.badRequest('Event too old')
   }
 
   // Security: Log event type for monitoring

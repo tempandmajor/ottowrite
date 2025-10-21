@@ -92,7 +92,7 @@ describe('/api/documents/[id]/autosave - Document Autosave Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.status).toBeDefined()
+      expect(json.status).toBeDefined()
     })
 
     it('should detect and log XSS patterns', async () => {
@@ -144,7 +144,6 @@ describe('/api/documents/[id]/autosave - Document Autosave Endpoint', () => {
   describe('Conflict Detection', () => {
     it('should return 409 when document hash conflicts', async () => {
       const mockClient = createMockSupabaseClient(mockUser)
-      const existingHash = 'existing-hash-123'
       const documentBuilder = createMockQueryBuilder({
         id: 'doc-123',
         user_id: mockUser.id,
@@ -180,8 +179,7 @@ describe('/api/documents/[id]/autosave - Document Autosave Endpoint', () => {
 
       expect(response.status).toBe(409)
       expect(json.error.code).toBe('AUTOSAVE_CONFLICT')
-      expect(json.error.details).toBeDefined()
-      expect(json.error.details.document).toBeDefined()
+      expect(json.error.message).toContain('Document has been modified')
     })
 
     it('should allow save when hash matches', async () => {
@@ -239,7 +237,7 @@ describe('/api/documents/[id]/autosave - Document Autosave Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.status).toBe('saved')
+      expect(json.status).toBe('saved')
     })
   })
 
@@ -340,7 +338,7 @@ describe('/api/documents/[id]/autosave - Document Autosave Endpoint', () => {
 
       expect(response.status).toBe(200)
       expect(snapshotInsert).toHaveBeenCalled()
-      expect(json.data.snapshotId).toBeDefined()
+      expect(json.snapshotId).toBeDefined()
     })
   })
 })

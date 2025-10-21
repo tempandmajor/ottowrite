@@ -3,13 +3,13 @@
  * Verifies if the current user has access to real-time collaboration features
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { canAccessFeature, type SubscriptionTier } from '@/lib/stripe/config'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient()
 

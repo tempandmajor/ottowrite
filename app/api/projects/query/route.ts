@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
 import { validateQuery, validationErrorResponse } from '@/lib/validation/middleware'
-import { projectQuerySchema } from '@/lib/validation/schemas'
+import { projectQuerySchema } from '@/lib/validation/schemas/projects'
 import { detectSQLInjection } from '@/lib/security/sanitize'
 
 export const dynamic = 'force-dynamic'

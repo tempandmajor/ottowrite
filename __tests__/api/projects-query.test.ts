@@ -103,6 +103,7 @@ describe('/api/projects/query - Projects Query Endpoint', () => {
 
     it('should validate type enum values', async () => {
       const mockClient = createMockSupabaseClient(mockUser)
+      mockClient.from = vi.fn(() => createMockQueryBuilder())
       const { createClient } = await import('@/lib/supabase/server')
       vi.mocked(createClient).mockResolvedValue(mockClient as any)
 
@@ -294,8 +295,8 @@ describe('/api/projects/query - Projects Query Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.projects).toHaveLength(2)
-      expect(json.data.pagination).toBeDefined()
+      expect(json.projects).toHaveLength(2)
+      expect(json.pagination).toBeDefined()
     })
 
     it('should filter by project type', async () => {
@@ -342,8 +343,8 @@ describe('/api/projects/query - Projects Query Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.projects).toHaveLength(1)
-      expect(json.data.projects[0].type).toBe('novel')
+      expect(json.projects).toHaveLength(1)
+      expect(json.projects[0].type).toBe('novel')
     })
 
     it('should paginate results correctly', async () => {
@@ -384,9 +385,9 @@ describe('/api/projects/query - Projects Query Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.pagination.total).toBe(25)
-      expect(json.data.pagination.page).toBe(2)
-      expect(json.data.pagination.limit).toBe(10)
+      expect(json.pagination.total).toBe(25)
+      expect(json.pagination.page).toBe(2)
+      expect(json.pagination.limit).toBe(10)
     })
 
     it('should filter by folder', async () => {

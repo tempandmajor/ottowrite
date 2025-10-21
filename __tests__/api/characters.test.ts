@@ -109,7 +109,7 @@ describe('/api/characters - Character CRUD Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.characters).toHaveLength(2)
+      expect(json.characters).toHaveLength(2)
     })
 
     it('should filter by role when provided', async () => {
@@ -141,8 +141,8 @@ describe('/api/characters - Character CRUD Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.characters).toHaveLength(1)
-      expect(json.data.characters[0].role).toBe('protagonist')
+      expect(json.characters).toHaveLength(1)
+      expect(json.characters[0].role).toBe('protagonist')
     })
 
     it('should apply limit when provided', async () => {
@@ -294,8 +294,8 @@ describe('/api/characters - Character CRUD Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(201)
-      expect(json.data.character).toBeDefined()
-      expect(json.data.character.name).toBe('New Character')
+      expect(json.character).toBeDefined()
+      expect(json.character.name).toBe('New Character')
     })
 
     it('should deny access to projects owned by other users', async () => {
@@ -392,7 +392,7 @@ describe('/api/characters - Character CRUD Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.character).toBeDefined()
+      expect(json.character).toBeDefined()
     })
 
     it('should return 404 when character not found', async () => {
@@ -476,7 +476,7 @@ describe('/api/characters - Character CRUD Endpoint', () => {
       const json = await getResponseJSON(response)
 
       expect(response.status).toBe(200)
-      expect(json.data.success).toBe(true)
+      expect(json.success).toBe(true)
     })
   })
 })

@@ -7,7 +7,6 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Loader2,
   TrendingUp,
   Target,
   Flame,

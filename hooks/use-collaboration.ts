@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { CollaborationClient, type CursorPosition, type UserPresence } from '@/lib/collaboration/client'
-import { insertOp, deleteOp, type TextOperation } from '@/lib/collaboration/ot-engine'
+import { insertOp, deleteOp } from '@/lib/collaboration/ot-engine'
 
 export type CollaborationHookOptions = {
   documentId: string

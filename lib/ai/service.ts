@@ -31,7 +31,6 @@ export type AIResponse = {
 
 // Lazy-initialized AI clients (to avoid build-time initialization)
 let anthropic: Anthropic | null = null
-let openai: OpenAI | null = null
 let deepseek: OpenAI | null = null
 
 function getAnthropicClient(): Anthropic {
@@ -41,15 +40,6 @@ function getAnthropicClient(): Anthropic {
     })
   }
   return anthropic
-}
-
-function getOpenAIClient(): OpenAI {
-  if (!openai) {
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY!,
-    })
-  }
-  return openai
 }
 
 function getDeepSeekClient(): OpenAI {

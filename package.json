@@ -72,13 +72,16 @@
     "date-fns": "^4.1.0",
     "diff": "^8.0.2",
     "docx": "^9.5.1",
+    "dompurify": "^3.3.0",
     "eslint": "^9.37.0",
     "eslint-config-next": "^15.5.5",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.23.24",
+    "isomorphic-dompurify": "^2.30.0",
     "jspdf": "^3.0.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.545.0",
+    "markdown-to-jsx": "^7.7.16",
     "next": "^15.5.5",
     "openai": "^6.3.0",
     "postcss": "^8.5.6",
@@ -120,5 +123,8 @@
     "storybook": "^9.1.13",
     "tsx": "^4.20.6",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "prismjs": "^1.29.0"
   }
 }

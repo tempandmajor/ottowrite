@@ -25,6 +25,7 @@ export type DocumentMetadata = {
   povCharacter?: string
   pacingTarget?: 'slow' | 'balanced' | 'fast'
   tone?: string
+  targetWordCount?: number | null
 }
 
 type DocumentMetadataFormProps = {
@@ -113,6 +114,29 @@ export function DocumentMetadataForm({ metadata, onChange }: DocumentMetadataFor
             />
             <p className="text-xs text-muted-foreground">
               The emotional atmosphere and style of this document
+            </p>
+          </div>
+
+          {/* Target Word Count */}
+          <div className="space-y-2">
+            <Label htmlFor="target-word-count">Target Word Count</Label>
+            <Input
+              id="target-word-count"
+              type="number"
+              min={0}
+              step={100}
+              placeholder="e.g., 90000"
+              value={localMetadata.targetWordCount ?? ''}
+              onChange={(event) => {
+                const value = event.target.value.trim()
+                setLocalMetadata({
+                  ...localMetadata,
+                  targetWordCount: value === '' ? null : Math.max(0, Number(value)),
+                })
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Set a goal to track progress while you write (optional)
             </p>
           </div>
 

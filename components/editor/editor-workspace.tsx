@@ -23,6 +23,19 @@ import { useDocumentSnapshots } from '@/hooks/use-document-snapshots'
 import { useUndoRedo } from '@/hooks/use-undo-redo'
 import { useEditorStore, type EditorDocumentRecord } from '@/stores/editor-store'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   ArrowLeft,
   Save,
   PanelLeftClose,
@@ -34,7 +47,7 @@ import {
   Search,
   Sparkles,
   MoreHorizontal,
-  X,
+  UserPlus,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
@@ -70,6 +83,21 @@ import { InlineAnalyticsPanel } from '@/components/editor/inline-analytics-panel
 import type { ScreenplayAct } from '@/types/screenplay'
 import { ReadingTimeWidget } from '@/components/editor/reading-time-widget'
 import { CharacterSceneIndex } from '@/components/editor/character-scene-index'
+
+type RecentDocument = {
+  id: string
+  title: string
+  updatedAt: string
+}
+
+type CommandItem = {
+  id: string
+  label: string
+  description?: string
+  shortcut?: string
+  action: () => void
+  keywords?: string[]
+}
 
 // Loading fallback component
 const EditorLoadingFallback = () => (
@@ -348,7 +376,19 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const isWorkspaceMode = workspaceMode
   const [showAI, setShowAI] = useState(() => !isWorkspaceMode)
   const [structureSidebarOpen, setStructureSidebarOpen] = useState(() => !isWorkspaceMode)
-  const [utilitySidebarOpen, setUtilitySidebarOpen] = useState(() => !isWorkspaceMode)
+  const [leftRailWidth, setLeftRailWidth] = useState(320)
+  const [rightRailWidth, setRightRailWidth] = useState(360)
+  const [focusMode, setFocusMode] = useState(false)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [commandPaletteQuery, setCommandPaletteQuery] = useState('')
+  const [commandPaletteSelection, setCommandPaletteSelection] = useState(0)
+  const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>([])
+  const [recentsLoading, setRecentsLoading] = useState(false)
+  const railsRestoredRef = useRef(false)
+  const previousRailsRef = useRef({ outline: true, ai: true })
+  const recentsFetchedRef = useRef(false)
+  const commandInputRef = useRef<HTMLInputElement | null>(null)
+  const supabaseClient = useMemo(() => createClient(), [])
   const [showExportModal, setShowExportModal] = useState(false)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
@@ -384,10 +424,260 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   useEffect(() => {
     if (isWorkspaceMode) {
       setStructureSidebarOpen(false)
-      setUtilitySidebarOpen(false)
       setShowAI(false)
+      setFocusMode(false)
     }
   }, [isWorkspaceMode])
+
+  useEffect(() => {
+    if (!commandPaletteOpen) return
+    setCommandPaletteQuery('')
+    setCommandPaletteSelection(0)
+    const frame = requestAnimationFrame(() => {
+      commandInputRef.current?.focus()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [commandPaletteOpen])
+
+  useEffect(() => {
+    if (!commandPaletteOpen || !userId || recentsFetchedRef.current) {
+      return
+    }
+    let cancelled = false
+    const loadRecents = async () => {
+      try {
+        setRecentsLoading(true)
+        const { data, error } = await supabaseClient
+          .from('documents')
+          .select('id, title, updated_at')
+          .eq('user_id', userId)
+          .order('updated_at', { ascending: false })
+          .limit(6)
+
+        if (!cancelled) {
+          if (error) {
+            console.warn('Failed to load recent documents for command palette', error)
+          } else if (data) {
+            const mapped = data
+              .filter((doc) => doc.id !== document?.id)
+              .map((doc) => ({
+                id: doc.id,
+                title: doc.title || 'Untitled document',
+                updatedAt: doc.updated_at ?? new Date().toISOString(),
+              }))
+            setRecentDocuments(mapped)
+            recentsFetchedRef.current = true
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setRecentsLoading(false)
+        }
+      }
+    }
+
+    loadRecents()
+    return () => {
+      cancelled = true
+    }
+  }, [commandPaletteOpen, userId, supabaseClient, document?.id])
+
+  useEffect(() => {
+    if (!isWorkspaceMode || !document?.id || railsRestoredRef.current) {
+      return
+    }
+    try {
+      const raw = typeof window !== 'undefined'
+        ? window.localStorage.getItem(`workspace-rails:${document.id}`)
+        : null
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          leftOpen?: boolean
+          rightOpen?: boolean
+          leftWidth?: number
+          rightWidth?: number
+        }
+        if (typeof parsed.leftOpen === 'boolean') {
+          setStructureSidebarOpen(parsed.leftOpen)
+        }
+        if (typeof parsed.rightOpen === 'boolean') {
+          setShowAI(parsed.rightOpen)
+        }
+        if (typeof parsed.leftWidth === 'number' && Number.isFinite(parsed.leftWidth)) {
+          setLeftRailWidth(Math.min(520, Math.max(240, parsed.leftWidth)))
+        }
+        if (typeof parsed.rightWidth === 'number' && Number.isFinite(parsed.rightWidth)) {
+          setRightRailWidth(Math.min(520, Math.max(260, parsed.rightWidth)))
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to restore workspace rail settings', error)
+    } finally {
+      railsRestoredRef.current = true
+    }
+  }, [isWorkspaceMode, document?.id, setStructureSidebarOpen, setShowAI])
+
+  useEffect(() => {
+    if (!isWorkspaceMode || !document?.id || !railsRestoredRef.current) {
+      return
+    }
+    try {
+      const payload = {
+        leftOpen: structureSidebarOpen,
+        rightOpen: showAI,
+        leftWidth: leftRailWidth,
+        rightWidth: rightRailWidth,
+      }
+      window.localStorage.setItem(`workspace-rails:${document.id}`, JSON.stringify(payload))
+    } catch (error) {
+      console.warn('Failed to persist workspace rail settings', error)
+    }
+  }, [isWorkspaceMode, document?.id, structureSidebarOpen, showAI, leftRailWidth, rightRailWidth])
+
+  const clampWidth = useCallback((value: number, min: number, max: number) => {
+    return Math.min(max, Math.max(min, value))
+  }, [])
+
+  const handleLeftResizeStart = useCallback(
+    (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => {
+      if (!structureSidebarOpen) return
+      event.preventDefault()
+      const startX = event.clientX
+      const startWidth = leftRailWidth
+      const onMove = (moveEvent: MouseEvent) => {
+        const delta = moveEvent.clientX - startX
+        setLeftRailWidth(clampWidth(startWidth + delta, 240, 520))
+      }
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+      }
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [structureSidebarOpen, leftRailWidth, clampWidth]
+  )
+
+  const handleRightResizeStart = useCallback(
+    (event: React.MouseEvent<HTMLDivElement | HTMLButtonElement>) => {
+      if (!showAI) return
+      event.preventDefault()
+      const startX = event.clientX
+      const startWidth = rightRailWidth
+      const onMove = (moveEvent: MouseEvent) => {
+        const delta = moveEvent.clientX - startX
+        setRightRailWidth(clampWidth(startWidth - delta, 260, 520))
+      }
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+      }
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [showAI, rightRailWidth, clampWidth]
+  )
+
+  const handleLeftResizeKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement | HTMLButtonElement>) => {
+      if (!structureSidebarOpen) return
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        setLeftRailWidth((current) => clampWidth(current - 20, 240, 520))
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        setLeftRailWidth((current) => clampWidth(current + 20, 240, 520))
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        setStructureSidebarOpen(false)
+      }
+    },
+    [structureSidebarOpen, clampWidth]
+  )
+
+  const handleRightResizeKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement | HTMLButtonElement>) => {
+      if (!showAI) return
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        setRightRailWidth((current) => clampWidth(current + 20, 260, 520))
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        setRightRailWidth((current) => clampWidth(current - 20, 260, 520))
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        setShowAI(false)
+      }
+    },
+    [showAI, clampWidth]
+  )
+
+  const toggleFocusMode = useCallback(() => {
+    setFocusMode((prev) => {
+      if (!prev) {
+        // Entering focus mode: save current rail states (even if already hidden)
+        // This ensures we restore the exact state when exiting focus
+        previousRailsRef.current = {
+          outline: structureSidebarOpen,
+          ai: showAI,
+        }
+        // Hide visible rails
+        if (structureSidebarOpen) {
+          setStructureSidebarOpen(false)
+        }
+        if (showAI) {
+          setShowAI(false)
+        }
+      } else {
+        // Exiting focus mode: restore previous rail states exactly as they were
+        // If AI was already hidden, it stays hidden; if it was visible, it comes back
+        setStructureSidebarOpen(previousRailsRef.current.outline)
+        setShowAI(previousRailsRef.current.ai)
+      }
+      return !prev
+    })
+  }, [structureSidebarOpen, showAI])
+
+  useEffect(() => {
+    if (!isWorkspaceMode) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+      if (event.ctrlKey && event.shiftKey) {
+        switch (key) {
+          case 'f': {
+            event.preventDefault()
+            toggleFocusMode()
+            break
+          }
+          case 'o': {
+            event.preventDefault()
+            setFocusMode(false)
+            setStructureSidebarOpen((prev) => !prev)
+            break
+          }
+          case 'a': {
+            event.preventDefault()
+            setFocusMode(false)
+            setShowAI((prev) => !prev)
+            break
+          }
+          case 'h': {
+            event.preventDefault()
+            setShowVersionHistory(true)
+            break
+          }
+          default:
+        }
+      } else if (event.ctrlKey && key === 'k') {
+        event.preventDefault()
+        setCommandPaletteOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isWorkspaceMode, toggleFocusMode, setStructureSidebarOpen, setShowAI, setShowVersionHistory])
 
   useEffect(() => {
     return () => {
@@ -1141,6 +1431,14 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     ? `Saved ${formatDistanceToNow(lastSavedAt, { addSuffix: true })}`
     : 'Saved'
 
+  const targetWordCount = typeof metadata?.targetWordCount === 'number' && Number.isFinite(metadata.targetWordCount)
+    ? metadata.targetWordCount
+    : null
+  const wordProgress =
+    targetWordCount && targetWordCount > 0
+      ? Math.min(100, Math.round((wordCount / targetWordCount) * 100))
+      : null
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -1219,244 +1517,441 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   )
 
   if (isWorkspaceMode) {
-    const workspaceContentClasses = cn(
-      'flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-12',
-      structureSidebarOpen ? 'lg:pl-[380px]' : '',
-      showAI ? 'lg:pr-[400px]' : ''
-    )
-
-    const workspaceOutlineOverlay = structureSidebarOpen ? (
-      <div
-        className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm"
-        role="button"
-        tabIndex={0}
-        onClick={() => setStructureSidebarOpen(false)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            setStructureSidebarOpen(false)
-          }
-        }}
-      >
-        <div
-          className="absolute left-1/2 top-20 flex h-[calc(100vh-8rem)] w-[min(92vw,420px)] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border bg-card shadow-xl lg:left-8 lg:top-20 lg:h-[calc(100vh-6.5rem)] lg:w-[360px] lg:translate-x-0"
-          role="presentation"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <span className="text-sm font-semibold">Outline</span>
-            <Button variant="ghost" size="icon" onClick={() => setStructureSidebarOpen(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-4 pb-6">
-            {isScriptType(document.type) ? (
-              <ScreenplayActBoard
-                acts={screenplayStructure}
-                onChange={handleScreenplayStructureChange}
-                sceneMeta={screenplaySceneMeta}
-              />
-            ) : (
-              <div className="space-y-4">
-                <ChapterSidebar
-                  chapters={structure}
-                  onChange={handleStructureChange}
-                  activeSceneId={activeSceneId}
-                  onSelectScene={handleSceneSelect}
-                  onCreateScene={handleSceneCreated}
-                  onInsertAnchor={handleInsertAnchor}
-                  missingAnchors={missingAnchors}
-                />
-                <ReadingTimeWidget
-                  content={content}
-                  wordCount={wordCount}
-                  structure={structure}
-                />
-                <CharacterSceneIndex
-                  content={content}
-                  structure={structure}
-                  onNavigateToScene={handleSceneSelect}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    ) : null
-
-    const workspaceAssistantOverlay = showAI ? (
-      <div
-        className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm"
-        role="button"
-        tabIndex={0}
-        onClick={() => setShowAI(false)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            setShowAI(false)
-          }
-        }}
-      >
-        <div
-          className="absolute right-1/2 top-20 flex h-[calc(100vh-8rem)] w-[min(92vw,420px)] translate-x-1/2 flex-col overflow-hidden rounded-2xl border bg-card shadow-xl lg:right-8 lg:top-20 lg:h-[calc(100vh-6.5rem)] lg:w-[380px] lg:translate-x-0"
-          role="presentation"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <span className="text-sm font-semibold">AI Assistant</span>
-            <Button variant="ghost" size="icon" onClick={() => setShowAI(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading AI assistant...</div>}>
-              <AIAssistant
-                documentId={document.id}
-                currentContent={content}
-                onInsertText={insertAIText}
-                getSelection={resolveActiveSelection}
-              />
-            </Suspense>
-          </div>
-        </div>
-      </div>
-    ) : null
-
     return (
       <>
         <div className="flex min-h-screen flex-col bg-background">
-          <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b bg-background px-4 sm:px-6 lg:px-10">
-            <div className="flex flex-1 items-center gap-3">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/dashboard/documents">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to documents
-                </Link>
-              </Button>
-              <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-40 border-b bg-background">
+            <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center gap-4 px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/dashboard/documents">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Documents
+                  </Link>
+                </Button>
+                {document.project_id ? (
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/dashboard/projects/${document.project_id}`}>
+                      Project
+                    </Link>
+                  </Button>
+                ) : null}
+              </div>
+
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full truncate border-none bg-transparent text-xl font-semibold text-foreground outline-none focus-visible:ring-0"
+                  className="w-full truncate border-none bg-transparent text-base font-semibold text-foreground outline-none focus-visible:ring-0 md:text-lg"
                   placeholder="Untitled document"
                 />
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className={isDirty ? 'text-amber-600' : 'text-muted-foreground'}>{savedMessage}</span>
-                  <span className="h-3 w-px bg-border" aria-hidden />
-                  <span className={autosaveClassName}>{autosaveLabel}</span>
-                </div>
+                {!focusMode && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {projectTitle ? (
+                      <>
+                        <Link
+                          href={`/dashboard/projects/${document.project_id}`}
+                          className="text-primary hover:text-primary/80"
+                        >
+                          {projectTitle}
+                        </Link>
+                        <span aria-hidden className="h-3 w-px bg-border" />
+                      </>
+                    ) : null}
+                    <span>
+                      {targetWordCount
+                        ? `${wordCount.toLocaleString()} / ${targetWordCount.toLocaleString()} words${wordProgress !== null ? ` (${wordProgress}% )` : ''}`
+                        : `${wordCount.toLocaleString()} words`}
+                    </span>
+                    <span aria-hidden className="h-3 w-px bg-border" />
+                    <span className={isDirty ? 'text-amber-600' : 'text-muted-foreground'}>
+                      {savedMessage}
+                    </span>
+                    <span aria-hidden className="h-3 w-px bg-border" />
+                    <span className={autosaveClassName}>{autosaveLabel}</span>
+                  </div>
+                )}
               </div>
-            </div>
-            <div className="hidden items-center gap-2 md:flex">
-              <UndoRedoControls
-                canUndo={undoRedoAPI.canUndo}
-                canRedo={undoRedoAPI.canRedo}
-                undoStackSize={undoRedoAPI.undoStackSize}
-                redoStackSize={undoRedoAPI.redoStackSize}
-                onUndo={handleUndo}
-                onRedo={handleRedo}
-                getUndoHistory={undoRedoAPI.getUndoHistory}
-                getRedoHistory={undoRedoAPI.getRedoHistory}
-              />
-              <Button variant="outline" size="sm" onClick={() => setStructureSidebarOpen(true)}>
-                <PanelLeftOpen className="mr-2 h-4 w-4" />
-                Outline
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowAI(true)}>
-                <Sparkles className="mr-2 h-4 w-4" />
-                AI Assistant
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportClick}>
-                <FileDown className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-              <Button size="sm" onClick={saveDocument} disabled={saving}>
-                <Save className="mr-2 h-4 w-4" />
-                {saving ? 'Saving…' : 'Save'}
-              </Button>
-            </div>
-            <div className="flex items-center gap-2 md:hidden">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <MoreHorizontal className="h-4 w-4" />
-                    Actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      setStructureSidebarOpen(true)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <PanelLeftOpen className="h-4 w-4" />
-                    Outline
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      setShowAI(true)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    AI Assistant
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      handleExportClick()
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <FileDown className="h-4 w-4" />
-                    Export document
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={async (event) => {
-                      event.preventDefault()
-                      await saveDocument()
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <Save className="h-4 w-4" />
-                    Save
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+
+              <TooltipProvider delayDuration={150} disableHoverableContent>
+                <div className={cn('hidden items-center gap-2 md:flex transition-opacity', focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100')}>
+                  <UndoRedoControls
+                    canUndo={undoRedoAPI.canUndo}
+                    canRedo={undoRedoAPI.canRedo}
+                    undoStackSize={undoRedoAPI.undoStackSize}
+                    redoStackSize={undoRedoAPI.redoStackSize}
+                    onUndo={handleUndo}
+                    onRedo={handleRedo}
+                    getUndoHistory={undoRedoAPI.getUndoHistory}
+                    getRedoHistory={undoRedoAPI.getRedoHistory}
+                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" disabled>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Share
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Sharing coming soon</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setFocusMode(false)
+                          setStructureSidebarOpen((prev) => !prev)
+                        }}
+                      >
+                        {structureSidebarOpen ? (
+                          <>
+                            <PanelLeftClose className="mr-2 h-4 w-4" />
+                            Hide Outline
+                          </>
+                        ) : (
+                          <>
+                            <PanelLeftOpen className="mr-2 h-4 w-4" />
+                            Show Outline
+                          </>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Toggle outline (Ctrl+Shift+O)</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setFocusMode(false)
+                          setShowAI((prev) => !prev)
+                        }}
+                      >
+                        {showAI ? (
+                          <>
+                            <PanelRightClose className="mr-2 h-4 w-4" />
+                            Hide AI
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Show AI
+                          </>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Toggle AI assistant (Ctrl+Shift+A)</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={() => setShowVersionHistory(true)}>
+                        <History className="mr-2 h-4 w-4" />
+                        History
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Open version history (Ctrl+Shift+H)</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={handleExportClick}>
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Export
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Export document</TooltipContent>
+                  </Tooltip>
+                  <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" onClick={saveDocument} disabled={saving}>
+                        <Save className="mr-2 h-4 w-4" />
+                        {saving ? 'Saving…' : 'Save'}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Save now</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={focusMode ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={toggleFocusMode}
+                      >
+                        {focusMode ? 'Exit Focus' : 'Focus Mode'}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {focusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Enter Focus Mode (Ctrl+Shift+F)'}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
+
+              <div className={cn('md:hidden', focusMode ? 'hidden' : '')}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <MoreHorizontal className="h-4 w-4" />
+                      Actions
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onSelect={(event) => event.preventDefault()} className="flex items-center gap-2" disabled>
+                      <UserPlus className="h-4 w-4" />
+                      Share (soon)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        setFocusMode(false)
+                        setStructureSidebarOpen((prev) => !prev)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      {structureSidebarOpen ? 'Hide outline' : 'Show outline'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        setFocusMode(false)
+                        setShowAI((prev) => !prev)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      {showAI ? 'Hide AI assistant' : 'Show AI assistant'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        toggleFocusMode()
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      {focusMode ? 'Exit focus mode' : 'Focus mode'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        setShowVersionHistory(true)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      Version history
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        handleExportClick()
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      Export
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        setCommandPaletteOpen(true)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      Command palette
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={async (event) => {
+                        event.preventDefault()
+                        await saveDocument()
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      Save now
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </header>
 
-          <main className="relative flex flex-1 overflow-hidden bg-muted/20">
-            <div className={workspaceContentClasses}>
-              <div className="mx-auto flex max-w-[1100px] flex-col gap-6">
-                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="muted" className="capitalize">
-                      {document.type}
-                    </Badge>
-                    <span>{wordCount.toLocaleString()} words</span>
-                  </div>
-                  {projectTitle ? (
-                    <Link
-                      href={`/dashboard/projects/${document.project_id}`}
-                      className="text-xs font-medium text-primary hover:text-primary/80"
-                    >
-                      {projectTitle}
-                    </Link>
-                  ) : null}
-                </div>
-                <div className="overflow-hidden rounded-3xl border bg-card shadow-card">
-                  <div className="p-6 sm:p-8 lg:p-10">
-                    {editorElement}
+          <main className="flex flex-1 overflow-hidden bg-muted/20">
+            <div className="flex h-full w-full overflow-hidden">
+              {structureSidebarOpen && (
+                <>
+                  <aside
+                    aria-label="Document outline"
+                    className="hidden h-full flex-col gap-4 overflow-y-auto border-r bg-muted/10 p-4 lg:flex"
+                    style={{ width: leftRailWidth }}
+                  >
+                    {isScriptType(document.type) ? (
+                      <ScreenplayActBoard
+                        acts={screenplayStructure}
+                        onChange={handleScreenplayStructureChange}
+                        sceneMeta={screenplaySceneMeta}
+                      />
+                    ) : (
+                      <div className="space-y-4">
+                        <ChapterSidebar
+                          chapters={structure}
+                          onChange={handleStructureChange}
+                          activeSceneId={activeSceneId}
+                          onSelectScene={handleSceneSelect}
+                          onCreateScene={handleSceneCreated}
+                          onInsertAnchor={handleInsertAnchor}
+                          missingAnchors={missingAnchors}
+                        />
+                        <ReadingTimeWidget
+                          content={content}
+                          wordCount={wordCount}
+                          structure={structure}
+                        />
+                        <CharacterSceneIndex
+                          content={content}
+                          structure={structure}
+                          onNavigateToScene={handleSceneSelect}
+                        />
+                      </div>
+                    )}
+                  </aside>
+                  <button
+                    type="button"
+                    aria-label="Resize outline panel"
+                    onMouseDown={handleLeftResizeStart}
+                    onKeyDown={handleLeftResizeKeyDown}
+                    className="hidden h-full w-2 cursor-col-resize select-none bg-transparent transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:flex"
+                  />
+                </>
+              )}
+
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <div className="h-full overflow-auto">
+                  <div className="mx-auto flex max-w-[1100px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
+                    {!focusMode && (
+                      <Card className="border-none bg-card/80 shadow-card">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Sparkles className="h-5 w-5 text-primary" />
+                            Writing cockpit
+                          </CardTitle>
+                          <CardDescription>
+                            Stay aligned with your outline, track word count, and jump to plot analysis.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                          <Badge variant="muted" className="capitalize">
+                            {document.type}
+                          </Badge>
+                          <span className="h-4 w-px bg-border" aria-hidden />
+                          <span>{wordCount.toLocaleString()} words</span>
+                          <span className="h-4 w-px bg-border" aria-hidden />
+                          <Button variant="link" className="p-0" asChild>
+                            <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
+                              Open plot analysis
+                            </Link>
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+                    <div className="overflow-hidden rounded-3xl border bg-card shadow-card">
+                      <div className="p-6 sm:p-8 lg:p-10">
+                        {editorElement}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {showAI && !focusMode && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Resize assistant panel"
+                    onMouseDown={handleRightResizeStart}
+                    onKeyDown={handleRightResizeKeyDown}
+                    className="hidden h-full w-2 cursor-col-resize select-none bg-transparent transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:flex"
+                  />
+                  <aside
+                    aria-label="Assistant and analytics"
+                    className="hidden h-full flex-col gap-4 overflow-y-auto border-l bg-muted/10 p-4 lg:flex"
+                    style={{ width: rightRailWidth }}
+                  >
+                    <InlineAnalyticsPanel
+                      documentType={document.type}
+                      contentHtml={isScriptType(document.type) ? '' : content}
+                      structure={isScriptType(document.type) ? undefined : structure}
+                      screenplayElements={isScriptType(document.type) ? screenplayContent : undefined}
+                      wordCount={wordCount}
+                    />
+                    <Card className="border-none bg-card/80 shadow-card">
+                      <CardHeader>
+                        <CardTitle>AI assistant</CardTitle>
+                        <CardDescription>
+                          Brainstorm scenes, punch up dialogue, or fill in missing beats without leaving the editor.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="max-h-[60vh] overflow-y-auto pr-1">
+                          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading AI assistant...</div>}>
+                            <AIAssistant
+                              documentId={document.id}
+                              currentContent={content}
+                              onInsertText={insertAIText}
+                              getSelection={resolveActiveSelection}
+                            />
+                          </Suspense>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Suspense fallback={null}>
+                      <EnsembleGenerator
+                        currentContext={content}
+                        onInsert={insertAIText}
+                        projectId={document.project_id}
+                        documentId={document.id}
+                      />
+                    </Suspense>
+                    <Suspense fallback={null}>
+                      <BackgroundTaskMonitor
+                        documentId={document.id}
+                        projectId={document.project_id}
+                        documentTitle={document.title}
+                        documentContent={content}
+                      />
+                    </Suspense>
+                    <Suspense fallback={null}>
+                      <ResearchPanel
+                        documentId={document.id}
+                        projectId={document.project_id}
+                        context={content}
+                      />
+                    </Suspense>
+                    {!isScriptType(document.type) && (
+                      <Suspense fallback={null}>
+                        <ReadingPacingPanel contentHtml={content} structure={structure} wordCount={wordCount} />
+                      </Suspense>
+                    )}
+                    <Suspense fallback={null}>
+                      <ReadabilityPanel initialText={content} />
+                    </Suspense>
+                    <Card className="border-none bg-card/80 shadow-card">
+                      <CardHeader>
+                        <CardTitle>Document utilities</CardTitle>
+                        <CardDescription>Version history, exports, and other tools.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <Button variant="outline" className="w-full justify-between" onClick={() => setShowVersionHistory(true)}>
+                          View version history
+                          <History className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" className="w-full justify-between" onClick={handleExportClick}>
+                          Export document
+                          <FileDown className="h-4 w-4" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </aside>
+                </>
+              )}
             </div>
-            {workspaceOutlineOverlay}
-            {workspaceAssistantOverlay}
           </main>
         </div>
 
@@ -1487,6 +1982,18 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             />
           </Suspense>
         )}
+
+        <Dialog open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Command palette</DialogTitle>
+              <DialogDescription>Quick actions and navigation are on the way.</DialogDescription>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Use Ctrl+K to open this palette. Future updates will add search, navigation, and AI shortcuts.
+            </p>
+          </DialogContent>
+        </Dialog>
 
         {serverContent && (
           <ConflictResolutionPanel
@@ -1581,9 +2088,9 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     )
   }
 
-  const showStructureSidebar = structureSidebarOpen && Boolean(document)
-  const showUtilitySidebar = utilitySidebarOpen && Boolean(document)
-
+  const showStructureSidebar = structureSidebarOpen && Boolean(document) && !focusMode
+  const showUtilitySidebar = !focusMode // Hide utility sidebar in focus mode
+  
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
@@ -1627,82 +2134,124 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             </div>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3 md:ml-auto md:w-auto md:flex-row md:gap-2">
-            <div className="hidden items-center gap-2 md:flex">
-              {/* Undo/Redo Controls */}
-              <UndoRedoControls
-                canUndo={undoRedoAPI.canUndo}
-                canRedo={undoRedoAPI.canRedo}
-                undoStackSize={undoRedoAPI.undoStackSize}
-                redoStackSize={undoRedoAPI.redoStackSize}
-                onUndo={handleUndo}
-                onRedo={handleRedo}
-                getUndoHistory={undoRedoAPI.getUndoHistory}
-                getRedoHistory={undoRedoAPI.getRedoHistory}
+            <TooltipProvider delayDuration={150} disableHoverableContent>
+              <div className={cn('hidden items-center gap-2 md:flex transition-opacity', focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100')}>
+                <UndoRedoControls
+                  canUndo={undoRedoAPI.canUndo}
+                  canRedo={undoRedoAPI.canRedo}
+                  undoStackSize={undoRedoAPI.undoStackSize}
+                  redoStackSize={undoRedoAPI.redoStackSize}
+                  onUndo={handleUndo}
+                  onRedo={handleRedo}
+                  getUndoHistory={undoRedoAPI.getUndoHistory}
+                  getRedoHistory={undoRedoAPI.getRedoHistory}
               />
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
-                  <Search className="mr-2 h-4 w-4" />
-                  Plot analysis
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowVersionHistory(true)}>
-                <History className="mr-2 h-4 w-4" />
-                History
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportClick}>
-                <FileDown className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setStructureSidebarOpen((prev) => !prev)}
-              >
-                {structureSidebarOpen ? (
-                  <>
-                    <PanelLeftClose className="mr-2 h-4 w-4" />
-                    Hide outline
-                  </>
-                ) : (
-                  <>
-                    <PanelLeftOpen className="mr-2 h-4 w-4" />
-                    Show outline
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setUtilitySidebarOpen((prev) => !prev)}
-              >
-                {utilitySidebarOpen ? (
-                  <>
-                    <PanelRightClose className="mr-2 h-4 w-4" />
-                    Hide workspace
-                  </>
-                ) : (
-                  <>
-                    <PanelRightOpen className="mr-2 h-4 w-4" />
-                    Show workspace
-                  </>
-                )}
-              </Button>
-              <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
-              <Button variant="outline" size="sm" onClick={() => setShowAI((prev) => !prev)}>
-                {showAI ? (
-                  <>
-                    <PanelRightClose className="mr-2 h-4 w-4" />
-                    Hide AI
-                  </>
-                ) : (
-                  <>
-                    <PanelRightOpen className="mr-2 h-4 w-4" />
-                    Show AI
-                  </>
-                )}
-              </Button>
-            </div>
-            <div className="flex items-center gap-2 md:hidden">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
+                        <Search className="mr-2 h-4 w-4" />
+                        Plot analysis
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Open plot analysis</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={() => setShowVersionHistory(true)}>
+                      <History className="mr-2 h-4 w-4" />
+                      History
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Version history (Ctrl+Shift+H)</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={handleExportClick}>
+                      <FileDown className="mr-2 h-4 w-4" />
+                      Export
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Export document</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFocusMode(false)
+                        setStructureSidebarOpen((prev) => !prev)
+                      }}
+                    >
+                      {structureSidebarOpen ? (
+                        <>
+                          <PanelLeftClose className="mr-2 h-4 w-4" />
+                          Hide outline
+                        </>
+                      ) : (
+                        <>
+                          <PanelLeftOpen className="mr-2 h-4 w-4" />
+                          Show outline
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Toggle outline (Ctrl+Shift+O)</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFocusMode(false)
+                        setShowAI((prev) => !prev)
+                      }}
+                    >
+                      {showAI ? (
+                        <>
+                          <PanelRightClose className="mr-2 h-4 w-4" />
+                          Hide AI
+                        </>
+                      ) : (
+                        <>
+                          <PanelRightOpen className="mr-2 h-4 w-4" />
+                          Show AI
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Toggle AI assistant (Ctrl+Shift+A)</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="sm" onClick={saveDocument} disabled={saving}>
+                      <Save className="mr-2 h-4 w-4" />
+                      {saving ? 'Saving…' : 'Save'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Save now</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={focusMode ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={toggleFocusMode}
+                    >
+                      {focusMode ? 'Exit Focus' : 'Focus Mode'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {focusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Enter Focus Mode (Ctrl+Shift+F)'}
+                  </TooltipContent>
+                </Tooltip>
+                <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
+              </div>
+            </TooltipProvider>
+            <div className={cn('flex items-center gap-2 md:hidden', focusMode ? 'hidden' : '')}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="flex items-center gap-2">
@@ -1759,25 +2308,6 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                   <DropdownMenuItem
                     onSelect={(event) => {
                       event.preventDefault()
-                      setUtilitySidebarOpen((prev) => !prev)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    {utilitySidebarOpen ? (
-                      <>
-                        <PanelRightClose className="h-4 w-4" />
-                        Hide workspace
-                      </>
-                    ) : (
-                      <>
-                        <PanelRightOpen className="h-4 w-4" />
-                        Show workspace
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
                       setShowAI((prev) => !prev)
                     }}
                     className="flex items-center gap-2"
@@ -1809,15 +2339,18 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
         className={cn(
           'mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:gap-8 xl:px-8',
           'flex flex-col gap-8 xl:gap-10',
+          // Enable grid layout when sidebars are present
           (showStructureSidebar || showUtilitySidebar) && 'lg:grid',
-          showStructureSidebar &&
-            showUtilitySidebar &&
+          // Focus mode: single column only
+          focusMode && 'lg:grid-cols-[minmax(0,1fr)]',
+          // Both sidebars visible
+          !focusMode && showStructureSidebar && showUtilitySidebar &&
             'lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)_minmax(280px,340px)]',
-          showStructureSidebar &&
-            !showUtilitySidebar &&
+          // Only outline sidebar
+          !focusMode && showStructureSidebar && !showUtilitySidebar &&
             'lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]',
-          !showStructureSidebar &&
-            showUtilitySidebar &&
+          // Only utility sidebar (AI panel)
+          !focusMode && !showStructureSidebar && showUtilitySidebar &&
             'lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]'
         )}
       >

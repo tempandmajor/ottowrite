@@ -1,4 +1,7 @@
 import { logger } from '@/lib/monitoring/structured-logger'
+import createDOMPurify from 'isomorphic-dompurify'
+
+const DOMPurify = createDOMPurify()
 
 /**
  * HTML Sanitization Utilities
@@ -53,7 +56,14 @@ export function sanitizeHTML(
       return sanitized.trim()
     }
 
-    // Remove dangerous patterns
+    // Sanitize with DOMPurify (handles nested tags, attributes, etc.)
+    sanitized = DOMPurify.sanitize(sanitized, {
+      USE_PROFILES: { html: true },
+      // Allow common safe protocols only
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|ftp):|[^a-z]|[a-z+.-]+(?:[^a-z+.-]|$))/i,
+    }) as string
+
+    // Defense in depth: strip any lingering dangerous patterns
     DANGEROUS_PATTERNS.forEach((pattern) => {
       sanitized = sanitized.replace(pattern, '')
     })

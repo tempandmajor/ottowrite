@@ -42,6 +42,8 @@ import {
   MoreHorizontal,
   UserPlus,
   Keyboard,
+  Maximize2,
+  Command,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
@@ -1685,9 +1687,36 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem onSelect={(event) => event.preventDefault()} className="flex items-center gap-2" disabled>
-                      <UserPlus className="h-4 w-4" />
-                      Share (soon)
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        saveDocument()
+                      }}
+                      disabled={saving}
+                      className="flex items-center gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      {saving ? 'Saving...' : 'Save document'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        setCommandPaletteOpen(true)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Command className="h-4 w-4" />
+                      Command palette
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        toggleFocusMode()
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                      {focusMode ? 'Exit focus mode' : 'Focus mode'}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={(event) => {
@@ -1697,7 +1726,17 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       }}
                       className="flex items-center gap-2"
                     >
-                      {structureSidebarOpen ? 'Hide outline' : 'Show outline'}
+                      {structureSidebarOpen ? (
+                        <>
+                          <PanelLeftClose className="h-4 w-4" />
+                          Hide outline
+                        </>
+                      ) : (
+                        <>
+                          <PanelLeftOpen className="h-4 w-4" />
+                          Show outline
+                        </>
+                      )}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={(event) => {
@@ -1707,16 +1746,17 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       }}
                       className="flex items-center gap-2"
                     >
-                      {showAI ? 'Hide AI assistant' : 'Show AI assistant'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={(event) => {
-                        event.preventDefault()
-                        toggleFocusMode()
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      {focusMode ? 'Exit focus mode' : 'Focus mode'}
+                      {showAI ? (
+                        <>
+                          <PanelRightClose className="h-4 w-4" />
+                          Hide AI assistant
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Show AI assistant
+                        </>
+                      )}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={(event) => {
@@ -1725,6 +1765,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       }}
                       className="flex items-center gap-2"
                     >
+                      <History className="h-4 w-4" />
                       Version history
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -1734,16 +1775,12 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       }}
                       className="flex items-center gap-2"
                     >
+                      <FileDown className="h-4 w-4" />
                       Export
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={(event) => {
-                        event.preventDefault()
-                        setCommandPaletteOpen(true)
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      Command palette
+                    <DropdownMenuItem onSelect={(event) => event.preventDefault()} className="flex items-center gap-2" disabled>
+                      <UserPlus className="h-4 w-4" />
+                      Share (soon)
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={async (event) => {
@@ -2259,12 +2296,77 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     Actions
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem asChild>
-                    <Link href={`/dashboard/editor/${document.id}/plot-analysis`} className="flex items-center gap-2">
-                      <Search className="h-4 w-4" />
-                      Plot analysis
-                    </Link>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      saveDocument()
+                    }}
+                    disabled={saving}
+                    className="flex items-center gap-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    {saving ? 'Saving...' : 'Save document'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      setCommandPaletteOpen(true)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <Command className="h-4 w-4" />
+                    Command palette
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      toggleFocusMode()
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                    {focusMode ? 'Exit focus mode' : 'Focus mode'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      setFocusMode(false)
+                      setStructureSidebarOpen((prev) => !prev)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    {structureSidebarOpen ? (
+                      <>
+                        <PanelLeftClose className="h-4 w-4" />
+                        Hide outline
+                      </>
+                    ) : (
+                      <>
+                        <PanelLeftOpen className="h-4 w-4" />
+                        Show outline
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      setFocusMode(false)
+                      setShowAI((prev) => !prev)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    {showAI ? (
+                      <>
+                        <PanelRightClose className="h-4 w-4" />
+                        Hide AI panel
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Show AI panel
+                      </>
+                    )}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={(event) => {
@@ -2286,43 +2388,11 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     <FileDown className="h-4 w-4" />
                     Export document
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      setStructureSidebarOpen((prev) => !prev)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    {structureSidebarOpen ? (
-                      <>
-                        <PanelLeftClose className="h-4 w-4" />
-                        Hide outline
-                      </>
-                    ) : (
-                      <>
-                        <PanelLeftOpen className="h-4 w-4" />
-                        Show outline
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      setShowAI((prev) => !prev)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    {showAI ? (
-                      <>
-                        <PanelRightClose className="h-4 w-4" />
-                        Hide AI panel
-                      </>
-                    ) : (
-                      <>
-                        <PanelRightOpen className="h-4 w-4" />
-                        Show AI panel
-                      </>
-                    )}
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/editor/${document.id}/plot-analysis`} className="flex items-center gap-2">
+                      <Search className="h-4 w-4" />
+                      Plot analysis
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

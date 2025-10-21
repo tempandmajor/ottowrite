@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { type TiptapEditorApi } from '@/components/editor/tiptap-editor'
 import { type ScreenplayEditorApi, type ScreenplayElement } from '@/components/editor/screenplay-editor'
@@ -34,6 +34,7 @@ import {
   Search,
   Sparkles,
   MoreHorizontal,
+  X,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
@@ -344,9 +345,11 @@ export default function EditorPage() {
     setServerContent,
     reset: resetEditorState,
   } = useEditorStore()
-  const [showAI, setShowAI] = useState(true)
-  const [structureSidebarOpen, setStructureSidebarOpen] = useState(true)
-  const [utilitySidebarOpen, setUtilitySidebarOpen] = useState(true)
+  const searchParams = useSearchParams()
+  const isWorkspaceMode = searchParams?.get('workspace') === '1'
+  const [showAI, setShowAI] = useState(() => !isWorkspaceMode)
+  const [structureSidebarOpen, setStructureSidebarOpen] = useState(() => !isWorkspaceMode)
+  const [utilitySidebarOpen, setUtilitySidebarOpen] = useState(() => !isWorkspaceMode)
   const [showExportModal, setShowExportModal] = useState(false)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
@@ -378,6 +381,14 @@ export default function EditorPage() {
       setShowAI(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (isWorkspaceMode) {
+      setStructureSidebarOpen(false)
+      setUtilitySidebarOpen(false)
+      setShowAI(false)
+    }
+  }, [isWorkspaceMode])
 
   useEffect(() => {
     return () => {
@@ -1131,6 +1142,71 @@ export default function EditorPage() {
     ? `Saved ${formatDistanceToNow(lastSavedAt, { addSuffix: true })}`
     : 'Saved'
 
+  const editorElement = (
+    <Suspense fallback={<EditorLoadingFallback />}>
+      {isScriptType(document.type) ? (
+        <ScreenplayEditor
+          content={screenplayContent}
+          onUpdate={(newContent) => setContent(JSON.stringify(newContent))}
+          onReady={(api) => {
+            screenplayApiRef.current = api
+          }}
+        />
+      ) : (
+        <TiptapEditor
+          content={content}
+          onUpdate={setContent}
+          placeholder="Start writing your story..."
+          focusScene={activeSceneInfo}
+          onAnchorsChange={handleAnchorsChange}
+          onSceneFocusResult={handleSceneFocusResult}
+          remoteContent={serverContent}
+          conflictVisible={autosaveStatus === 'conflict'}
+          onReplaceWithServer={async () => {
+            if (!serverContent) return
+            const nextStructure = Array.isArray(serverContent.structure)
+              ? cloneStructure(serverContent.structure)
+              : cloneStructure(structure)
+            setContent(serverContent.html)
+            setStructure(nextStructure)
+            const anchorIds = extractSceneAnchors(serverContent.html)
+            setSceneAnchors(anchorIds)
+            const newHash = await computeClientContentHash({
+              html: serverContent.html,
+              structure: nextStructure,
+              anchorIds,
+            })
+            setBaseHash(newHash)
+            setLastSavedAt(new Date())
+            setDocument((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    content: {
+                      ...(prev.content ?? {}),
+                      html: serverContent.html,
+                      structure: nextStructure,
+                    },
+                    word_count: serverContent.wordCount ?? prev.word_count,
+                  }
+                : prev
+            )
+            setIsDirty(false)
+            setServerContent(null)
+            flushAutosave()
+          }}
+          onCloseConflict={() => {
+            setServerContent(null)
+            flushAutosave()
+          }}
+          onReady={(api) => {
+            tiptapApiRef.current = api
+          }}
+        />
+      )}
+    </Suspense>
+  )
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -1141,6 +1217,369 @@ export default function EditorPage() {
 
   if (!document) {
     return null
+  }
+
+  if (isWorkspaceMode) {
+    const workspaceContentClasses = cn(
+      'flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-12',
+      structureSidebarOpen ? 'lg:pl-[380px]' : '',
+      showAI ? 'lg:pr-[400px]' : ''
+    )
+
+    const workspaceOutlineOverlay = structureSidebarOpen ? (
+      <div
+        className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm"
+        role="button"
+        tabIndex={0}
+        onClick={() => setStructureSidebarOpen(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            setStructureSidebarOpen(false)
+          }
+        }}
+      >
+        <div
+          className="absolute left-1/2 top-20 flex h-[calc(100vh-8rem)] w-[min(92vw,420px)] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border bg-card shadow-xl lg:left-8 lg:top-20 lg:h-[calc(100vh-6.5rem)] lg:w-[360px] lg:translate-x-0"
+          role="presentation"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <span className="text-sm font-semibold">Outline</span>
+            <Button variant="ghost" size="icon" onClick={() => setStructureSidebarOpen(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 pb-6">
+            {isScriptType(document.type) ? (
+              <ScreenplayActBoard
+                acts={screenplayStructure}
+                onChange={handleScreenplayStructureChange}
+                sceneMeta={screenplaySceneMeta}
+              />
+            ) : (
+              <div className="space-y-4">
+                <ChapterSidebar
+                  chapters={structure}
+                  onChange={handleStructureChange}
+                  activeSceneId={activeSceneId}
+                  onSelectScene={handleSceneSelect}
+                  onCreateScene={handleSceneCreated}
+                  onInsertAnchor={handleInsertAnchor}
+                  missingAnchors={missingAnchors}
+                />
+                <ReadingTimeWidget
+                  content={content}
+                  wordCount={wordCount}
+                  structure={structure}
+                />
+                <CharacterSceneIndex
+                  content={content}
+                  structure={structure}
+                  onNavigateToScene={handleSceneSelect}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    ) : null
+
+    const workspaceAssistantOverlay = showAI ? (
+      <div
+        className="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm"
+        role="button"
+        tabIndex={0}
+        onClick={() => setShowAI(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            setShowAI(false)
+          }
+        }}
+      >
+        <div
+          className="absolute right-1/2 top-20 flex h-[calc(100vh-8rem)] w-[min(92vw,420px)] translate-x-1/2 flex-col overflow-hidden rounded-2xl border bg-card shadow-xl lg:right-8 lg:top-20 lg:h-[calc(100vh-6.5rem)] lg:w-[380px] lg:translate-x-0"
+          role="presentation"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <span className="text-sm font-semibold">AI Assistant</span>
+            <Button variant="ghost" size="icon" onClick={() => setShowAI(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <Suspense fallback={<div className="text-sm text-muted-foreground">Loading AI assistant...</div>}>
+              <AIAssistant
+                documentId={document.id}
+                currentContent={content}
+                onInsertText={insertAIText}
+                getSelection={resolveActiveSelection}
+              />
+            </Suspense>
+          </div>
+        </div>
+      </div>
+    ) : null
+
+    return (
+      <>
+        <div className="flex min-h-screen flex-col bg-background">
+          <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b bg-background px-4 sm:px-6 lg:px-10">
+            <div className="flex flex-1 items-center gap-3">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/dashboard/documents">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to documents
+                </Link>
+              </Button>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full truncate border-none bg-transparent text-xl font-semibold text-foreground outline-none focus-visible:ring-0"
+                  placeholder="Untitled document"
+                />
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className={isDirty ? 'text-amber-600' : 'text-muted-foreground'}>{savedMessage}</span>
+                  <span className="h-3 w-px bg-border" aria-hidden />
+                  <span className={autosaveClassName}>{autosaveLabel}</span>
+                </div>
+              </div>
+            </div>
+            <div className="hidden items-center gap-2 md:flex">
+              <UndoRedoControls
+                canUndo={undoRedoAPI.canUndo}
+                canRedo={undoRedoAPI.canRedo}
+                undoStackSize={undoRedoAPI.undoStackSize}
+                redoStackSize={undoRedoAPI.redoStackSize}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                getUndoHistory={undoRedoAPI.getUndoHistory}
+                getRedoHistory={undoRedoAPI.getRedoHistory}
+              />
+              <Button variant="outline" size="sm" onClick={() => setStructureSidebarOpen(true)}>
+                <PanelLeftOpen className="mr-2 h-4 w-4" />
+                Outline
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowAI(true)}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                AI Assistant
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportClick}>
+                <FileDown className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+              <Button size="sm" onClick={saveDocument} disabled={saving}>
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <MoreHorizontal className="h-4 w-4" />
+                    Actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      setStructureSidebarOpen(true)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <PanelLeftOpen className="h-4 w-4" />
+                    Outline
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      setShowAI(true)
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    AI Assistant
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault()
+                      handleExportClick()
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Export document
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={async (event) => {
+                      event.preventDefault()
+                      await saveDocument()
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    Save
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </header>
+
+          <main className="relative flex flex-1 overflow-hidden bg-muted/20">
+            <div className={workspaceContentClasses}>
+              <div className="mx-auto flex max-w-[1100px] flex-col gap-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="muted" className="capitalize">
+                      {document.type}
+                    </Badge>
+                    <span>{wordCount.toLocaleString()} words</span>
+                  </div>
+                  {projectTitle ? (
+                    <Link
+                      href={`/dashboard/projects/${document.project_id}`}
+                      className="text-xs font-medium text-primary hover:text-primary/80"
+                    >
+                      {projectTitle}
+                    </Link>
+                  ) : null}
+                </div>
+                <div className="overflow-hidden rounded-3xl border bg-card shadow-card">
+                  <div className="p-6 sm:p-8 lg:p-10">
+                    {editorElement}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {workspaceOutlineOverlay}
+            {workspaceAssistantOverlay}
+          </main>
+        </div>
+
+        {showExportModal && (
+          <Suspense fallback={null}>
+            <ExportModal
+              open={showExportModal}
+              onOpenChange={setShowExportModal}
+              title={title}
+              content={
+                document.type === 'screenplay' || document.type === 'play'
+                  ? JSON.parse(content || '[]')
+                  : content
+              }
+              isScreenplay={document.type === 'screenplay' || document.type === 'play'}
+              userTier={userTier}
+            />
+          </Suspense>
+        )}
+
+        {showVersionHistory && (
+          <Suspense fallback={null}>
+            <VersionHistory
+              open={showVersionHistory}
+              onOpenChange={setShowVersionHistory}
+              documentId={document.id}
+              onRestoreVersion={handleRestoreVersion}
+            />
+          </Suspense>
+        )}
+
+        {serverContent && (
+          <ConflictResolutionPanel
+            open={true}
+            localContent={content}
+            serverContent={serverContent.html}
+            localWordCount={wordCount}
+            serverWordCount={serverContent.wordCount}
+            onResolve={async (resolvedContent, resolution) => {
+              if (!serverContent) return
+
+              if (resolution === 'merged') {
+                setContent(resolvedContent)
+              } else if (resolution === 'server') {
+                const nextStructure = Array.isArray(serverContent.structure)
+                  ? cloneStructure(serverContent.structure)
+                  : cloneStructure(structure)
+                setContent(serverContent.html)
+                setStructure(nextStructure)
+              }
+
+              const finalContent =
+                resolution === 'server' ? serverContent.html :
+                resolution === 'merged' ? resolvedContent :
+                content
+
+              const finalStructure =
+                resolution === 'server' && Array.isArray(serverContent.structure)
+                  ? cloneStructure(serverContent.structure)
+                  : structure
+
+              const anchorIds = extractSceneAnchors(finalContent)
+              setSceneAnchors(resolution === 'local' ? sceneAnchors : new Set(anchorIds))
+
+              const newHash = await computeClientContentHash({
+                html: finalContent,
+                structure: finalStructure,
+                anchorIds,
+              })
+
+              setBaseHash(newHash)
+              setLastSavedAt(new Date())
+
+              setDocument((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      content: {
+                        ...(prev.content ?? {}),
+                        html: finalContent,
+                        structure: finalStructure,
+                      },
+                      word_count: serverContent.wordCount ?? prev.word_count,
+                    }
+                  : prev
+              )
+
+              setIsDirty(false)
+              setServerContent(null)
+              flushAutosave()
+            }}
+            onRetryWithServer={async () => {
+              if (!serverContent) return
+
+              const nextStructure = Array.isArray(serverContent.structure)
+                ? cloneStructure(serverContent.structure)
+                : cloneStructure(structure)
+              setContent(serverContent.html)
+              setStructure(nextStructure)
+              const anchorIds = extractSceneAnchors(serverContent.html)
+              setSceneAnchors(new Set(anchorIds))
+
+              const newHash = await computeClientContentHash({
+                html: serverContent.html,
+                structure: nextStructure,
+                anchorIds,
+              })
+
+              setBaseHash(newHash)
+              setLastSavedAt(new Date())
+              setIsDirty(false)
+              setServerContent(null)
+              flushAutosave()
+            }}
+            onDismiss={() => {
+              setServerContent(null)
+              flushAutosave()
+            }}
+          />
+        )}
+      </>
+    )
   }
 
   const showStructureSidebar = structureSidebarOpen && Boolean(document)
@@ -1444,68 +1883,7 @@ export default function EditorPage() {
 
           <div className="overflow-hidden rounded-3xl border bg-card shadow-card">
             <div className="p-4 sm:p-6 lg:p-8">
-              <Suspense fallback={<EditorLoadingFallback />}>
-                {isScriptType(document.type) ? (
-                  <ScreenplayEditor
-                    content={screenplayContent}
-                    onUpdate={(newContent) => setContent(JSON.stringify(newContent))}
-                    onReady={(api) => {
-                      screenplayApiRef.current = api
-                    }}
-                  />
-                ) : (
-                  <TiptapEditor
-                    content={content}
-                    onUpdate={setContent}
-                    placeholder="Start writing your story..."
-                    focusScene={activeSceneInfo}
-                    onAnchorsChange={handleAnchorsChange}
-                    onSceneFocusResult={handleSceneFocusResult}
-                    remoteContent={serverContent}
-                    conflictVisible={autosaveStatus === 'conflict'}
-                    onReplaceWithServer={async () => {
-                      if (!serverContent) return
-                      const nextStructure = Array.isArray(serverContent.structure)
-                        ? cloneStructure(serverContent.structure)
-                        : cloneStructure(structure)
-                      setContent(serverContent.html)
-                      setStructure(nextStructure)
-                      const anchorIds = extractSceneAnchors(serverContent.html)
-                      setSceneAnchors(anchorIds)
-                      const newHash = await computeClientContentHash({
-                        html: serverContent.html,
-                        structure: nextStructure,
-                        anchorIds,
-                      })
-                      setBaseHash(newHash)
-                      setLastSavedAt(new Date())
-                      setDocument((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              content: {
-                                ...(prev.content ?? {}),
-                                html: serverContent.html,
-                                structure: nextStructure,
-                              },
-                              word_count: serverContent.wordCount ?? prev.word_count,
-                            }
-                          : prev
-                      )
-                      setIsDirty(false)
-                      setServerContent(null)
-                      flushAutosave()
-                    }}
-                    onCloseConflict={() => {
-                      setServerContent(null)
-                      flushAutosave()
-                    }}
-                    onReady={(api) => {
-                      tiptapApiRef.current = api
-                    }}
-                  />
-                )}
-              </Suspense>
+              {editorElement}
             </div>
           </div>
         </div>

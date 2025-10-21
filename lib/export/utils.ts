@@ -424,7 +424,8 @@ function escapeXml(text: string): string {
 }
 
 /**
- * Export document as EPUB
+ * Export document as EPUB (legacy simple export)
+ * For advanced EPUB export with cover images and metadata, use epub-generator.ts
  */
 export async function exportToEPUB(options: ExportOptions): Promise<void> {
   const { title, content, author } = options

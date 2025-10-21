@@ -192,27 +192,27 @@ export default function DocumentsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header Skeleton */}
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-9 w-48" />
+            <Skeleton className="h-4 w-40" />
           </div>
-          <Skeleton className="h-10 w-32" />
+          <Skeleton className="h-10 w-36" />
         </div>
 
         {/* Search/Filters Skeleton */}
-        <div className="flex gap-2">
+        <div className="flex gap-4">
           <Skeleton className="h-10 flex-1" />
           <Skeleton className="h-10 w-[140px]" />
           <Skeleton className="h-10 w-[160px]" />
         </div>
 
         {/* Cards Skeleton */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, idx) => (
-            <Skeleton key={idx} className="h-44 rounded-lg" />
+            <Skeleton key={idx} className="h-52 rounded-lg" />
           ))}
         </div>
       </div>
@@ -220,23 +220,23 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Documents</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             {documents.length} {documents.length === 1 ? 'document' : 'documents'} · {totalWords.toLocaleString()} words
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={() => setDialogOpen(true)} size="default" className="shrink-0">
           <Plus className="mr-2 h-4 w-4" />
           New Document
         </Button>
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -246,7 +246,7 @@ export default function DocumentsPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}>
             <SelectTrigger className="w-[140px]">
               <Filter className="mr-2 h-4 w-4" />
@@ -278,40 +278,40 @@ export default function DocumentsPage() {
       </div>
 
       {filteredDocuments.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
           {filteredDocuments.map((doc) => (
             <div
               key={doc.id}
-              className="group relative flex flex-col rounded-lg border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-md"
+              className="group relative flex flex-col rounded-lg border bg-card p-5 transition-all hover:border-primary/50 hover:shadow-lg"
             >
               {/* Header */}
-              <div className="mb-3 flex items-start justify-between gap-2">
+              <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold truncate">{doc.title}</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <h3 className="font-semibold leading-snug truncate text-base">{doc.title}</h3>
+                  <p className="text-xs text-muted-foreground mt-1.5">
                     {doc.word_count.toLocaleString()} words
                   </p>
                 </div>
-                <Badge variant="secondary" className="shrink-0 text-xs">
+                <Badge variant="secondary" className="shrink-0 text-xs px-2.5 py-0.5">
                   {documentTypeLabels[doc.type]}
                 </Badge>
               </div>
 
               {/* Metadata */}
-              <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
-                <FileText className="h-3.5 w-3.5" />
+              <div className="mb-5 flex items-center gap-2 text-xs text-muted-foreground">
+                <FileText className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">{doc.project?.name ?? 'No project'}</span>
               </div>
 
               {/* Actions */}
-              <div className="mt-auto flex items-center justify-between gap-2">
+              <div className="mt-auto flex items-center gap-2 pt-4 border-t">
                 <Button asChild size="sm" className="flex-1">
                   <Link href={`/dashboard/editor/${doc.id}`}>Open</Link>
                 </Button>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                   aria-label={`Delete ${doc.title}`}
                   onClick={() => setDeleteId(doc.id)}
                 >
@@ -320,7 +320,7 @@ export default function DocumentsPage() {
               </div>
 
               {/* Last updated footer */}
-              <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+              <div className="mt-3 text-xs text-muted-foreground">
                 Updated {new Date(doc.updated_at).toLocaleDateString()}
               </div>
             </div>

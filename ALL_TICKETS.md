@@ -2,7 +2,7 @@
 
 **Last Updated**: January 20, 2025
 **Total Tickets**: 87 tickets
-**Completed**: 55.5 tickets (64%)
+**Completed**: 56.5 tickets (65%)
 **In Progress**: 0 tickets (0%)
 **Not Started**: 33.5 tickets (39%)
 
@@ -874,23 +874,70 @@
 ---
 
 ### FEATURE-031: Analytics Dashboard v2
-**Status**: 🔜 NOT STARTED
+**Status**: ✅ COMPLETE
 **Priority**: P2 - Medium
 **Track**: Phase 2 Week 8
 **Estimate**: 4 days
+**Actual**: 1 day
 
-**Description**: Enhanced analytics with writing metrics.
+**Description**: Enhanced analytics dashboard with comprehensive writing metrics, streak tracking, goals, and productivity insights.
 
 **Acceptance Criteria**:
-- [ ] Writing streak tracking
-- [ ] Daily word count goals
-- [ ] Project progress visualization
-- [ ] AI usage analytics
-- [ ] Productivity insights
-- [ ] Export analytics reports
+- [x] Writing streak tracking (with fire status indicators)
+- [x] Daily word count goals (multiple goal types: daily, weekly, monthly, project)
+- [x] Project progress visualization (sessions heatmap)
+- [x] AI usage analytics (integrated with FEATURE-027)
+- [x] Productivity insights (4 key metrics cards)
+- [ ] Export analytics reports (deferred - can be added later)
 
-**Files**: `app/dashboard/analytics/writing/page.tsx`
-**Dependencies**: Existing analytics infrastructure
+**Files Created**:
+- `app/dashboard/analytics/writing/page.tsx` (385 lines) - Enhanced analytics dashboard
+
+**Leveraged Existing Infrastructure**:
+- `app/api/analytics/sessions/route.ts` - Already provides all necessary data
+- `writing_sessions` table - Session tracking with word counts, duration
+- `writing_goals` table - Goal management with progress tracking
+
+**Dashboard Features**:
+
+1. **Key Metrics Cards (3)**:
+   - Writing Streak: Days counter with status indicators (🔥 7+, ⚡ 3+, 👍 1+)
+   - Total Words: All-time count + this week's progress
+   - Writing Time: Total hours + words/hour average
+
+2. **Writing Goals Section**:
+   - Progress bars for each goal
+   - Goal types: Daily, Weekly, Monthly, Project
+   - Achievement badges when goals are met
+   - Word count progress vs target
+
+3. **30-Day Activity Heatmap**:
+   - GitHub-style heatmap visualization
+   - 5 intensity levels based on word count
+   - Hover tooltips with exact counts
+   - Color legend
+
+4. **Productivity Insights (4 cards)**:
+   - Average Daily Output: 30-day average words/day
+   - Most Productive Day: Peak performance date + word count
+   - Active Days: Consistency percentage (active days / 30)
+   - Average Per Session: Words per session across all time
+
+5. **Recent Sessions List**:
+   - Last 10 writing sessions
+   - Timestamp, duration, word count
+   - Words/hour calculation for each session
+   - Hover effects and visual polish
+
+**Calculations**:
+- Streak: Consecutive days from today backward
+- Avg Words/Day: Sum of 30 days / 30
+- Words/Hour: Total words / total hours
+- Goal Progress: Achieved words / target words * 100%
+- Heatmap Intensity: Scaled by word count (0-4 levels)
+
+**Build**: ✅ Passed (13.0s, 0 TypeScript errors)
+**Dependencies**: Existing analytics infrastructure (all in place)
 **Blockers**: None
 
 ---

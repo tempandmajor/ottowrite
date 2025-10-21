@@ -1142,6 +1142,18 @@ export default function EditorPage() {
     ? `Saved ${formatDistanceToNow(lastSavedAt, { addSuffix: true })}`
     : 'Saved'
 
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <p className="text-muted-foreground">Loading document...</p>
+      </div>
+    )
+  }
+
+  if (!document) {
+    return null
+  }
+
   const editorElement = (
     <Suspense fallback={<EditorLoadingFallback />}>
       {isScriptType(document.type) ? (
@@ -1206,18 +1218,6 @@ export default function EditorPage() {
       )}
     </Suspense>
   )
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Loading document...</p>
-      </div>
-    )
-  }
-
-  if (!document) {
-    return null
-  }
 
   if (isWorkspaceMode) {
     const workspaceContentClasses = cn(
@@ -1572,7 +1572,7 @@ export default function EditorPage() {
               setServerContent(null)
               flushAutosave()
             }}
-            onDismiss={() => {
+            onCancel={() => {
               setServerContent(null)
               flushAutosave()
             }}

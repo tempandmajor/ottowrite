@@ -35,7 +35,7 @@ import { EmptyState } from '@/components/dashboard/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { BookOpen, Filter, FileText, Plus, Search, Trash2 } from 'lucide-react'
+import { Filter, FileText, Plus, Search, Trash2 } from 'lucide-react'
 
 interface Document {
   id: string
@@ -193,22 +193,26 @@ export default function DocumentsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex justify-between gap-4">
-          <div className="space-y-3">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
             <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-72" />
+            <Skeleton className="h-4 w-32" />
           </div>
-          <Skeleton className="h-10 w-36" />
+          <Skeleton className="h-10 w-32" />
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, idx) => (
-            <Skeleton key={idx} className="h-28 rounded-2xl" />
-          ))}
+
+        {/* Search/Filters Skeleton */}
+        <div className="flex gap-2">
+          <Skeleton className="h-10 flex-1" />
+          <Skeleton className="h-10 w-[140px]" />
+          <Skeleton className="h-10 w-[160px]" />
         </div>
-        <Skeleton className="h-10 w-full" />
-        <div className="grid gap-4 md:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <Skeleton key={idx} className="h-36 rounded-2xl" />
+
+        {/* Cards Skeleton */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-44 rounded-lg" />
           ))}
         </div>
       </div>
@@ -216,46 +220,36 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="space-y-10">
-      <section className="flex flex-col gap-6 rounded-3xl border bg-card/70 p-6 shadow-card md:flex-row md:items-center md:justify-between">
-        <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-wide text-secondary-foreground">
-            <BookOpen className="h-3.5 w-3.5" />
-            Document Library
-          </div>
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Documents</h1>
-            <p className="text-sm text-muted-foreground">
-              Keep drafts, treatments, and scripts organized with smart filters and AI assist.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <span>{documents.length} documents</span>
-            <span className="h-4 w-px bg-border" />
-            <span>{projects.length} projects linked</span>
-            <span className="h-4 w-px bg-border" />
-            <span>{totalWords.toLocaleString()} words tracked</span>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Documents</h1>
+          <p className="text-sm text-muted-foreground">
+            {documents.length} {documents.length === 1 ? 'document' : 'documents'} · {totalWords.toLocaleString()} words
+          </p>
         </div>
-        <Button size="lg" onClick={() => setDialogOpen(true)}>
+        <Button onClick={() => setDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          New document
+          New Document
         </Button>
-      </section>
+      </div>
 
-      <section className="flex flex-col gap-4 rounded-2xl border bg-card/60 p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-1 items-center gap-2 rounded-full border bg-background px-3 py-2 shadow-inner">
-          <Search className="h-4 w-4 text-muted-foreground" />
+      {/* Search and Filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search documents"
-            className="border-none bg-transparent shadow-none focus-visible:ring-0"
+            placeholder="Search documents..."
+            className="pl-9"
           />
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex gap-2">
           <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as typeof typeFilter)}>
-            <SelectTrigger className="min-w-[150px]">
+            <SelectTrigger className="w-[140px]">
+              <Filter className="mr-2 h-4 w-4" />
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
@@ -268,7 +262,7 @@ export default function DocumentsPage() {
             </SelectContent>
           </Select>
           <Select value={projectFilter} onValueChange={(value) => setProjectFilter(value as typeof projectFilter)}>
-            <SelectTrigger className="min-w-[180px]">
+            <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Project" />
             </SelectTrigger>
             <SelectContent>
@@ -281,57 +275,68 @@ export default function DocumentsPage() {
             </SelectContent>
           </Select>
         </div>
-      </section>
+      </div>
 
       {filteredDocuments.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filteredDocuments.map((doc) => (
-            <div key={doc.id} className="flex h-full flex-col justify-between rounded-2xl border bg-card/80 p-6 shadow-card transition hover:shadow-lg">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-foreground">{doc.title}</h3>
-                  <Badge variant="muted" className="capitalize">
-                    {documentTypeLabels[doc.type]}
-                  </Badge>
+            <div
+              key={doc.id}
+              className="group relative flex flex-col rounded-lg border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-md"
+            >
+              {/* Header */}
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold truncate">{doc.title}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {doc.word_count.toLocaleString()} words
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Updated {new Date(doc.updated_at).toLocaleDateString()} · {doc.word_count.toLocaleString()} words
-                </p>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1">
-                    <FileText className="h-3 w-3" />
-                    {doc.project?.name ?? 'Unassigned'}
-                  </span>
-                </div>
+                <Badge variant="secondary" className="shrink-0 text-xs">
+                  {documentTypeLabels[doc.type]}
+                </Badge>
               </div>
-              <div className="mt-6 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Button asChild>
-                    <Link href={`/dashboard/editor/${doc.id}`}>Open</Link>
-                  </Button>
-                  <Button variant="outline" asChild disabled={!doc.project_id}>
-                    <Link href={doc.project_id ? `/dashboard/projects/${doc.project_id}` : '#'}>Project</Link>
-                  </Button>
-                </div>
+
+              {/* Metadata */}
+              <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
+                <FileText className="h-3.5 w-3.5" />
+                <span className="truncate">{doc.project?.name ?? 'No project'}</span>
+              </div>
+
+              {/* Actions */}
+              <div className="mt-auto flex items-center justify-between gap-2">
+                <Button asChild size="sm" className="flex-1">
+                  <Link href={`/dashboard/editor/${doc.id}`}>Open</Link>
+                </Button>
                 <Button
                   variant="ghost"
-                  size="icon"
-                  aria-label={`Delete document ${doc.title}`}
+                  size="sm"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label={`Delete ${doc.title}`}
                   onClick={() => setDeleteId(doc.id)}
                 >
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                  <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                 </Button>
+              </div>
+
+              {/* Last updated footer */}
+              <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                Updated {new Date(doc.updated_at).toLocaleDateString()}
               </div>
             </div>
           ))}
         </div>
       ) : (
         <EmptyState
-          icon={Filter}
-          title="No documents match your filters"
-          description="Try adjusting your filters or start a new draft to fill your library."
-          action={{ label: 'New document', onClick: () => setDialogOpen(true) }}
-          secondaryAction={{ label: 'Clear filters', onClick: () => { setSearch(''); setTypeFilter('all'); setProjectFilter('all') } }}
+          icon={search || typeFilter !== 'all' || projectFilter !== 'all' ? Filter : FileText}
+          title={search || typeFilter !== 'all' || projectFilter !== 'all' ? 'No documents found' : 'No documents yet'}
+          description={search || typeFilter !== 'all' || projectFilter !== 'all' ? 'Try adjusting your search or filters.' : 'Create your first document to get started.'}
+          action={{ label: 'New Document', onClick: () => setDialogOpen(true) }}
+          secondaryAction={
+            search || typeFilter !== 'all' || projectFilter !== 'all'
+              ? { label: 'Clear Filters', onClick: () => { setSearch(''); setTypeFilter('all'); setProjectFilter('all') } }
+              : undefined
+          }
         />
       )}
 

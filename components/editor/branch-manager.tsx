@@ -38,6 +38,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
+import { BranchMergeConflictResolver } from './branch-merge-conflict-resolver'
 
 export type Branch = {
   id: string
@@ -86,6 +87,8 @@ export function BranchManager({
   const [commits, setCommits] = useState<BranchCommit[]>([])
   const [creating, setCreating] = useState(false)
   const [merging, setMerging] = useState(false)
+  const [conflictData, setConflictData] = useState<any>(null)
+  const [showConflictResolver, setShowConflictResolver] = useState(false)
   const { toast } = useToast()
 
   const currentBranch = branches.find((b) => b.id === currentBranchId) || branches.find((b) => b.is_main)
@@ -244,12 +247,16 @@ export function BranchManager({
       const data = await response.json()
 
       if (data.hasConflicts) {
-        toast({
-          title: 'Merge conflicts detected',
-          description: 'Please resolve conflicts before merging',
-          variant: 'destructive',
+        // Open conflict resolution UI
+        setConflictData({
+          conflicts: data.conflicts,
+          sourceBranch: data.sourceBranch,
+          targetBranch: data.targetBranch,
+          sourceBranchId: selectedMergeSource,
+          targetBranchId: currentBranchId,
         })
-        // TODO: Open conflict resolution UI
+        setShowConflictResolver(true)
+        setMergeDialogOpen(false)
         return
       }
 
@@ -288,6 +295,44 @@ export function BranchManager({
         description: 'Failed to load commit history',
         variant: 'destructive',
       })
+    }
+  }
+
+  const handleConflictResolution = async (resolvedContent: any) => {
+    if (!conflictData) return
+
+    setMerging(true)
+    try {
+      const response = await fetch('/api/branches/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceBranchId: conflictData.sourceBranchId,
+          targetBranchId: conflictData.targetBranchId,
+          resolvedContent,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Failed to merge with resolved content')
+
+      toast({
+        title: 'Conflicts resolved',
+        description: 'Branch merged successfully',
+      })
+
+      setShowConflictResolver(false)
+      setConflictData(null)
+      setSelectedMergeSource(null)
+      await loadBranches()
+    } catch (error) {
+      console.error('Error resolving conflicts:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to resolve conflicts',
+        variant: 'destructive',
+      })
+    } finally {
+      setMerging(false)
     }
   }
 
@@ -519,6 +564,21 @@ export function BranchManager({
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {/* Conflict Resolution Dialog */}
+      {conflictData && (
+        <BranchMergeConflictResolver
+          open={showConflictResolver}
+          onClose={() => {
+            setShowConflictResolver(false)
+            setConflictData(null)
+          }}
+          sourceBranchName={conflictData.sourceBranch?.branch_name || 'source'}
+          targetBranchName={conflictData.targetBranch?.branch_name || 'target'}
+          conflicts={conflictData.conflicts || []}
+          onResolve={handleConflictResolution}
+        />
+      )}
     </>
   )
 }

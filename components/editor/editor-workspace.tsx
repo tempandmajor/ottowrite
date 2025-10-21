@@ -48,6 +48,7 @@ import {
   Sparkles,
   MoreHorizontal,
   UserPlus,
+  Keyboard,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
@@ -71,6 +72,7 @@ const ReadingPacingPanel = lazy(() => import('@/components/analysis/reading-paci
 // Lazy load modals that are only shown on demand
 const ExportModal = lazy(() => import('@/components/editor/export-modal').then((mod) => ({ default: mod.ExportModal })))
 const VersionHistory = lazy(() => import('@/components/editor/version-history').then((mod) => ({ default: mod.VersionHistory })))
+const KeyboardShortcutsDialog = lazy(() => import('@/components/editor/keyboard-shortcuts-dialog').then((mod) => ({ default: mod.KeyboardShortcutsDialog })))
 
 // Eagerly load critical components that are always visible
 import { ChapterSidebar } from '@/components/editor/chapter-sidebar'
@@ -391,6 +393,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const supabaseClient = useMemo(() => createClient(), [])
   const [showExportModal, setShowExportModal] = useState(false)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [screenplayStructure, setScreenplayStructure] = useState<ScreenplayAct[]>([])
   const lastSceneFocusMissRef = useRef<string | null>(null)
@@ -664,6 +667,11 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
           case 'h': {
             event.preventDefault()
             setShowVersionHistory(true)
+            break
+          }
+          case '?': {
+            event.preventDefault()
+            setShowKeyboardHelp(true)
             break
           }
           default:
@@ -2544,6 +2552,15 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
         </Suspense>
       )}
 
+      {showKeyboardHelp && (
+        <Suspense fallback={null}>
+          <KeyboardShortcutsDialog
+            open={showKeyboardHelp}
+            onOpenChange={setShowKeyboardHelp}
+          />
+        </Suspense>
+      )}
+
       {/* Conflict Resolution Panel */}
       {serverContent && (
         <ConflictResolutionPanel
@@ -2668,6 +2685,33 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             /* Error will clear on next successful save */
           }}
         />
+      )}
+
+      {/* Keyboard Shortcuts Help Footer */}
+      {!focusMode && (
+        <div className="fixed bottom-4 right-4 z-20">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowKeyboardHelp(true)}
+            className="shadow-lg backdrop-blur-sm bg-background/95 hover:bg-accent"
+          >
+            <Keyboard className="mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">Press </span>
+            <kbd className="mx-1 px-1.5 py-0.5 text-xs font-semibold bg-muted border rounded">
+              Ctrl
+            </kbd>
+            <span className="hidden sm:inline">+</span>
+            <kbd className="mx-1 px-1.5 py-0.5 text-xs font-semibold bg-muted border rounded hidden sm:inline">
+              Shift
+            </kbd>
+            <span className="hidden sm:inline">+</span>
+            <kbd className="mx-1 px-1.5 py-0.5 text-xs font-semibold bg-muted border rounded">
+              ?
+            </kbd>
+            <span className="sm:hidden ml-1">for shortcuts</span>
+          </Button>
+        </div>
       )}
     </div>
   )

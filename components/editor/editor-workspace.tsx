@@ -29,13 +29,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   ArrowLeft,
   Save,
   PanelLeftClose,
@@ -73,6 +66,7 @@ const ReadingPacingPanel = lazy(() => import('@/components/analysis/reading-paci
 const ExportModal = lazy(() => import('@/components/editor/export-modal').then((mod) => ({ default: mod.ExportModal })))
 const VersionHistory = lazy(() => import('@/components/editor/version-history').then((mod) => ({ default: mod.VersionHistory })))
 const KeyboardShortcutsDialog = lazy(() => import('@/components/editor/keyboard-shortcuts-dialog').then((mod) => ({ default: mod.KeyboardShortcutsDialog })))
+const CommandPalette = lazy(() => import('@/components/editor/command-palette').then((mod) => ({ default: mod.CommandPalette })))
 
 // Eagerly load critical components that are always visible
 import { ChapterSidebar } from '@/components/editor/chapter-sidebar'
@@ -90,15 +84,6 @@ type RecentDocument = {
   id: string
   title: string
   updatedAt: string
-}
-
-type CommandItem = {
-  id: string
-  label: string
-  description?: string
-  shortcut?: string
-  action: () => void
-  keywords?: string[]
 }
 
 // Loading fallback component
@@ -382,14 +367,11 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const [rightRailWidth, setRightRailWidth] = useState(360)
   const [focusMode, setFocusMode] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
-  const [commandPaletteQuery, setCommandPaletteQuery] = useState('')
-  const [commandPaletteSelection, setCommandPaletteSelection] = useState(0)
   const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>([])
   const [recentsLoading, setRecentsLoading] = useState(false)
   const railsRestoredRef = useRef(false)
   const previousRailsRef = useRef({ outline: true, ai: true })
   const recentsFetchedRef = useRef(false)
-  const commandInputRef = useRef<HTMLInputElement | null>(null)
   const supabaseClient = useMemo(() => createClient(), [])
   const [showExportModal, setShowExportModal] = useState(false)
   const [showVersionHistory, setShowVersionHistory] = useState(false)
@@ -432,14 +414,11 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     }
   }, [isWorkspaceMode])
 
+  // Reset recents fetched flag when dialog closes
   useEffect(() => {
-    if (!commandPaletteOpen) return
-    setCommandPaletteQuery('')
-    setCommandPaletteSelection(0)
-    const frame = requestAnimationFrame(() => {
-      commandInputRef.current?.focus()
-    })
-    return () => cancelAnimationFrame(frame)
+    if (!commandPaletteOpen) {
+      recentsFetchedRef.current = false
+    }
   }, [commandPaletteOpen])
 
   useEffect(() => {
@@ -1991,17 +1970,30 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
           </Suspense>
         )}
 
-        <Dialog open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Command palette</DialogTitle>
-              <DialogDescription>Quick actions and navigation are on the way.</DialogDescription>
-            </DialogHeader>
-            <p className="text-sm text-muted-foreground">
-              Use Ctrl+K to open this palette. Future updates will add search, navigation, and AI shortcuts.
-            </p>
-          </DialogContent>
-        </Dialog>
+        {commandPaletteOpen && (
+          <Suspense fallback={null}>
+            <CommandPalette
+              open={commandPaletteOpen}
+              onOpenChange={setCommandPaletteOpen}
+              structure={structure}
+              activeSceneId={activeSceneId}
+              recentDocuments={recentDocuments}
+              recentsLoading={recentsLoading}
+              onToggleOutline={() => {
+                setFocusMode(false)
+                setStructureSidebarOpen((prev) => !prev)
+              }}
+              onToggleAI={() => {
+                setFocusMode(false)
+                setShowAI((prev) => !prev)
+              }}
+              onToggleFocus={toggleFocusMode}
+              onShowVersionHistory={() => setShowVersionHistory(true)}
+              onShowExport={handleExportClick}
+              onNavigateToScene={handleSceneSelect}
+            />
+          </Suspense>
+        )}
 
         {serverContent && (
           <ConflictResolutionPanel

@@ -2,9 +2,9 @@
 
 **Last Updated**: January 20, 2025
 **Total Tickets**: 87 tickets
-**Completed**: 56.5 tickets (65%)
+**Completed**: 57 tickets (66%)
 **In Progress**: 0 tickets (0%)
-**Not Started**: 33.5 tickets (39%)
+**Not Started**: 33 tickets (38%)
 
 ---
 
@@ -1342,26 +1342,27 @@
 ---
 
 ### FEATURE-041: PDF Export - Multiple Formats
-**Status**: 🔜 NOT STARTED
+**Status**: ✅ COMPLETE
 **Priority**: P1 - High
 **Track**: Phase 3
-**Estimate**: 5 days
+**Completed**: January 20, 2025
+**Time Taken**: 1 day
 
 **Description**: Export to PDF with multiple formatting options.
 
 **Acceptance Criteria**:
-- [ ] Standard manuscript format
-- [ ] Screenplay format
-- [ ] Novel format
-- [ ] Custom formatting options
-- [ ] Cover page generation
-- [ ] Table of contents
-- [ ] Page numbering
+- [x] Standard manuscript format (Courier 12pt, double-spaced, 1.25" margins)
+- [x] Screenplay format (Courier 12pt, screenplay margins)
+- [x] Novel format (Times 11pt, 1.5x spacing)
+- [x] Custom formatting options (fonts, margins, spacing, indents)
+- [x] Cover page generation (title, author, subtitle, contact, word count)
+- [x] Table of contents (auto-generated with page numbers)
+- [x] Page numbering (arabic/roman, customizable header)
 
-**Files**: `lib/export/pdf-generator.ts`
-**Library**: PDFKit or Puppeteer
-**Dependencies**: None
-**Blockers**: None
+**Files**: `lib/export/pdf-generator.ts` (522 lines), `components/export/pdf-export-dialog.tsx` (330 lines), `components/ui/checkbox.tsx` (27 lines)
+**Library**: jsPDF (client-side PDF generation)
+**Dependencies**: Installed @radix-ui/react-checkbox
+**Build Status**: ✅ Passing (28s, 0 TypeScript errors)
 
 ---
 

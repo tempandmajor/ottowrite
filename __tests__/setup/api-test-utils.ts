@@ -53,7 +53,7 @@ export function createMockSupabaseClient(user: MockUser | null = null): MockSupa
  * Creates a mock query builder for Supabase table operations
  */
 export function createMockQueryBuilder(data: any = null, error: any = null) {
-  const builder = {
+  const builder: any = {
     select: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
@@ -70,13 +70,20 @@ export function createMockQueryBuilder(data: any = null, error: any = null) {
     maybeSingle: vi.fn().mockResolvedValue({ data, error }),
   }
 
-  // Handle array responses (for queries without single())
-  builder.select = vi.fn().mockReturnValue({
-    ...builder,
-    then: (resolve: (value: { data: any; error: any }) => void) => {
-      resolve({ data, error })
-    },
-  })
+  // Make builder thenable (awaitable) for queries that end with eq/filter chains
+  builder.then = (resolve: (value: { data: any; error: any }) => void) => {
+    resolve({ data, error })
+  }
+
+  // Override methods to return builder with then method
+  builder.select = vi.fn().mockReturnValue(builder)
+  builder.insert = vi.fn().mockReturnValue(builder)
+  builder.update = vi.fn().mockReturnValue(builder)
+  builder.delete = vi.fn().mockReturnValue(builder)
+  builder.eq = vi.fn().mockReturnValue(builder)
+  builder.in = vi.fn().mockReturnValue(builder)
+  builder.order = vi.fn().mockReturnValue(builder)
+  builder.limit = vi.fn().mockReturnValue(builder)
 
   return builder
 }

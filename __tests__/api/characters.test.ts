@@ -457,10 +457,7 @@ describe('/api/characters - Character CRUD Endpoint', () => {
 
     it('should delete character successfully', async () => {
       const mockClient = createMockSupabaseClient(mockUser)
-      const characterBuilder = {
-        delete: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({ error: null }),
-      }
+      const characterBuilder = createMockQueryBuilder(null, null)
 
       mockClient.from = vi.fn(() => characterBuilder)
 

@@ -226,12 +226,12 @@ export function NoteEditor({ note, onSave, onCancel }: NoteEditorProps) {
         <div className="flex items-center justify-end gap-2 pt-4">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
-              Cancel
+              Discard Changes
             </Button>
           )}
           <Button onClick={handleSave} disabled={!title.trim() || !content.trim() || saving}>
             <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Saving...' : 'Save Note'}
+            {saving ? 'Saving...' : 'Save Research Note'}
           </Button>
         </div>
       </CardContent>

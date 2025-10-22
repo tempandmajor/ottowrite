@@ -219,7 +219,7 @@ export function OutlineGeneratorDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={generating}>
-            Cancel
+            Close Outline Generator
           </Button>
           <Button onClick={handleGenerate} disabled={generating || !premise.trim()}>
             {generating ? (
@@ -230,7 +230,7 @@ export function OutlineGeneratorDialog({
             ) : (
               <>
                 <Sparkles className="mr-2 h-4 w-4" />
-                Generate Outline
+                Generate Story Outline
               </>
             )}
           </Button>

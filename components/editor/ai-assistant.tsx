@@ -892,15 +892,15 @@ export function AIAssistant({ documentId, currentContent, onInsertText, getSelec
                 className="text-destructive"
                 onClick={() => handleTemplateDelete(editingTemplate.id)}
               >
-                <Trash2 className="mr-2 h-4 w-4" /> Delete template
+                <Trash2 className="mr-2 h-4 w-4" /> Delete Prompt Template
               </Button>
             )}
             <div className="flex items-center gap-2 sm:ml-auto">
               <Button type="button" variant="outline" onClick={handleTemplateDialogClose}>
-                Cancel
+                Close Template Dialog
               </Button>
               <Button type="button" onClick={handleTemplateSubmit}>
-                {editingTemplate ? 'Save changes' : 'Create template'}
+                {editingTemplate ? 'Update Prompt Template' : 'Save New Template'}
               </Button>
             </div>
           </DialogFooter>

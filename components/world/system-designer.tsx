@@ -116,7 +116,7 @@ export function SystemDesigner({ open, onOpenChange, projectId, onSave }: System
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            Close Designer
           </Button>
           <Button onClick={handleGenerate} disabled={loading}>
             {loading ? (
@@ -124,7 +124,7 @@ export function SystemDesigner({ open, onOpenChange, projectId, onSave }: System
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating
               </>
             ) : (
-              'Generate system'
+              'Generate Magic System'
             )}
           </Button>
         </DialogFooter>

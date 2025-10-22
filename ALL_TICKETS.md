@@ -2,9 +2,9 @@
 
 **Last Updated**: January 21, 2025
 **Total Tickets**: 89 tickets
-**Completed**: 65 tickets (73%)
+**Completed**: 66 tickets (74%)
 **In Progress**: 0 tickets (0%)
-**Not Started**: 24 tickets (27%)
+**Not Started**: 23 tickets (26%)
 
 ---
 
@@ -664,6 +664,168 @@ The new structure easily accommodates planned features:
 - **Feedback**: Clear visual state for active, hover, and expanded
 
 **Related**: Part of UX Audit 2025 (Navigation track), Sprint 2 Ticket 3 of 4
+
+---
+
+### UX-028: Audit and Improve Button Labels
+**Status**: ✅ COMPLETE
+**Priority**: P2 - Medium (Content & UX Clarity)
+**Track**: User Experience Enhancement - Sprint 2
+**Completed**: January 21, 2025
+**Time Taken**: 2 hours (2 story points)
+
+**Description**: Audit all button labels throughout the application and replace generic labels with clear, action-oriented text using verb + noun format to improve user confidence and reduce cognitive load.
+
+**Acceptance Criteria**:
+- [x] Audit all button labels across dialogs, modals, and forms
+- [x] Replace generic labels (Cancel, Save, Submit) with specific actions
+- [x] Use verb + noun format ("Create Project", "Save Changes")
+- [x] Destructive actions use warning tone ("Delete Forever", "Discard Changes")
+- [x] Build passes with no errors
+
+**Problem Statement**:
+Generic button labels like "Cancel", "Save", "OK", and "Submit" don't communicate intent clearly. Users have to infer what will happen, leading to hesitation and potential errors. Action-oriented labels reduce cognitive load and increase confidence.
+
+**Generic Labels Found**: 41 buttons across 11 files
+
+**Files Updated**:
+
+**1. components/world/system-designer.tsx**:
+- ❌ "Cancel" → ✅ "Close Designer"
+- ❌ "Generate system" → ✅ "Generate Magic System"
+
+**2. components/research/note-editor.tsx**:
+- ❌ "Cancel" → ✅ "Discard Changes"
+- ❌ "Save Note" → ✅ "Save Research Note"
+
+**3. components/editor/conflict-resolution-panel.tsx**:
+- ❌ "Cancel" → ✅ "Abort Resolution"
+- ❌ "Use Server" → ✅ "Accept Server Version"
+- ❌ "Keep My Version" → ✅ "Accept Local Version"
+- ✅ "Apply Merged Changes" (already good, kept as-is)
+
+**4. components/editor/document-metadata-form.tsx**:
+- ❌ "Save Changes" → ✅ "Save Document Settings"
+- ❌ "Cancel" → ✅ "Discard Settings"
+
+**5. components/editor/ai-assistant.tsx**:
+- ❌ "Cancel" → ✅ "Close Template Dialog"
+- ❌ "Save changes" / "Create template" → ✅ "Update Prompt Template" / "Save New Template"
+- ❌ "Delete template" → ✅ "Delete Prompt Template"
+
+**6. components/editor/comments.tsx** (4 updates):
+- ❌ "Resolve" / "Reopen" → ✅ "Mark Comment Resolved" / "Reopen Thread"
+- ❌ "Send" → ✅ "Post Reply"
+- ❌ "Cancel" (reply) → ✅ "Discard Reply"
+- ❌ "Save" → ✅ "Update Comment"
+- ❌ "Cancel" (edit) → ✅ "Discard Changes"
+
+**7. components/screenplay/beat-board.tsx**:
+- ❌ "Cancel" → ✅ "Close Beat Card"
+- ❌ "Save changes" / "Add card" → ✅ "Update Beat Card" / "Add New Card"
+
+**8. components/export/epub-export-dialog.tsx**:
+- ❌ "Remove" → ✅ "Remove Cover Image"
+- ❌ "Cancel" → ✅ "Close EPUB Export"
+
+**9. components/outlines/outline-generator-dialog.tsx**:
+- ❌ "Cancel" → ✅ "Close Outline Generator"
+- ❌ "Generate Outline" → ✅ "Generate Story Outline"
+
+**Button Labeling Principles Applied**:
+
+**1. Verb + Noun Format**:
+```
+❌ Save          ✅ Save Research Note
+❌ Delete        ✅ Delete Prompt Template
+❌ Update        ✅ Update Comment
+```
+
+**2. Context-Specific Cancel Actions**:
+```
+❌ Cancel        ✅ Close Designer
+❌ Cancel        ✅ Abort Resolution
+❌ Cancel        ✅ Discard Changes
+```
+
+**3. Clear Destructive Actions**:
+```
+❌ Remove        ✅ Remove Cover Image
+❌ Delete        ✅ Delete Prompt Template
+❌ Discard       ✅ Discard Changes
+```
+
+**4. Positive vs. Negative Actions**:
+```
+Positive:  Save Document Settings, Post Reply, Update Comment
+Negative:  Discard Changes, Abort Resolution, Close Dialog
+```
+
+**Impact by Generic Label Type**:
+
+| Generic Label | Count | Improved To | Examples |
+|--------------|-------|-------------|----------|
+| Cancel | 14 | Context-specific | Close Designer, Abort Resolution, Discard Changes |
+| Save/Save Changes | 8 | Object-specific | Save Research Note, Update Comment, Save Document Settings |
+| Delete/Remove | 6 | Object-specific | Delete Prompt Template, Remove Cover Image |
+| Send | 1 | Action-specific | Post Reply |
+| Resolve/Reopen | 2 | Context-specific | Mark Comment Resolved, Reopen Thread |
+| Generate | 3 | Object-specific | Generate Magic System, Generate Story Outline |
+
+**Build Status**: ✅ Passing (16.8s, 0 TypeScript errors, 0 ESLint errors)
+
+**UX Improvements Delivered**:
+- ✅ **Reduced Cognitive Load**: Users don't have to infer button action
+- ✅ **Increased Confidence**: Clear labels reduce hesitation before clicking
+- ✅ **Fewer Errors**: Specific actions prevent accidental destructive operations
+- ✅ **Better Accessibility**: Screen readers announce meaningful actions
+- ✅ **Professional Polish**: Consistent, thoughtful UI copy throughout app
+- ✅ **Scalability**: Established pattern for future button labels
+
+**Before & After Examples**:
+
+**Generic → Specific (Dialog Buttons)**:
+```tsx
+// Before
+<Button onClick={onClose}>Cancel</Button>
+<Button onClick={onSave}>Save</Button>
+
+// After
+<Button onClick={onClose}>Close Outline Generator</Button>
+<Button onClick={onSave}>Save Research Note</Button>
+```
+
+**Destructive Actions**:
+```tsx
+// Before
+<Button onClick={onDelete}>Delete</Button>
+
+// After
+<Button onClick={onDelete} variant="destructive">
+  Delete Prompt Template
+</Button>
+```
+
+**Contextual Cancel Buttons**:
+```tsx
+// Form context
+"Discard Changes"  // User is editing, cancel = lose work
+
+// Dialog context
+"Close Designer"   // User is browsing, cancel = close window
+
+// Operation context
+"Abort Resolution" // User is in process, cancel = stop action
+```
+
+**Content Design Best Practices**:
+- **Be Specific**: "Save Document Settings" > "Save Changes"
+- **Use Verbs**: Start with action word (Save, Update, Delete, Close)
+- **Add Object**: Tell what is being acted upon
+- **Match Tone**: Positive for creation, cautious for destruction
+- **Consider Context**: "Discard" for unsaved work, "Close" for browsing
+
+**Related**: Part of UX Audit 2025 (Content track), Sprint 2 Ticket 4 of 4
 
 ---
 

@@ -276,12 +276,12 @@ function CommentThreadCard({ thread, userId, onUpdate }: CommentThreadCardProps)
             {thread.is_resolved ? (
               <>
                 <X className="h-4 w-4 mr-1" />
-                Reopen
+                Reopen Thread
               </>
             ) : (
               <>
                 <Check className="h-4 w-4 mr-1" />
-                Resolve
+                Mark Comment Resolved
               </>
             )}
           </Button>
@@ -335,7 +335,7 @@ function CommentThreadCard({ thread, userId, onUpdate }: CommentThreadCardProps)
                     disabled={!replyContent.trim() || isSubmitting}
                   >
                     <Send className="h-4 w-4 mr-1" />
-                    {isSubmitting ? 'Sending...' : 'Send'}
+                    {isSubmitting ? 'Posting...' : 'Post Reply'}
                   </Button>
                   <Button
                     variant="outline"
@@ -346,7 +346,7 @@ function CommentThreadCard({ thread, userId, onUpdate }: CommentThreadCardProps)
                     }}
                     disabled={isSubmitting}
                   >
-                    Cancel
+                    Discard Reply
                   </Button>
                 </div>
               </div>
@@ -468,7 +468,7 @@ function CommentItem({ comment, userId, onUpdate }: CommentItemProps) {
               onClick={handleEdit}
               disabled={!editContent.trim() || isSubmitting}
             >
-              {isSubmitting ? 'Saving...' : 'Save'}
+              {isSubmitting ? 'Updating...' : 'Update Comment'}
             </Button>
             <Button
               variant="outline"
@@ -479,7 +479,7 @@ function CommentItem({ comment, userId, onUpdate }: CommentItemProps) {
               }}
               disabled={isSubmitting}
             >
-              Cancel
+              Discard Changes
             </Button>
           </div>
         </div>

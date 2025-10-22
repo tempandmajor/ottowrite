@@ -332,7 +332,7 @@ export function EPUBExportDialog({
                       className="gap-2"
                     >
                       <X className="h-4 w-4" />
-                      Remove
+                      Remove Cover Image
                     </Button>
                   </div>
                 </div>
@@ -449,7 +449,7 @@ export function EPUBExportDialog({
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setOpen(false)} disabled={isExporting}>
-            Cancel
+            Close EPUB Export
           </Button>
           <Button onClick={handleExport} disabled={isExporting || !title.trim()}>
             {isExporting ? (

@@ -288,11 +288,11 @@ export function ConflictResolutionPanel({
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={onCancel}>
               <X className="mr-2 h-4 w-4" />
-              Cancel
+              Abort Resolution
             </Button>
             <Button variant="outline" onClick={() => onResolve(serverContent, 'server')}>
               <Clock className="mr-2 h-4 w-4" />
-              Use Server
+              Accept Server Version
             </Button>
             {mode === 'selective-merge' && conflictChunks.length > 0 && (
               <Button onClick={handleMergeResolve} className="bg-purple-600 hover:bg-purple-700">
@@ -302,7 +302,7 @@ export function ConflictResolutionPanel({
             )}
             <Button onClick={() => onResolve(localContent, 'local')} className="bg-blue-600 hover:bg-blue-700">
               <Check className="mr-2 h-4 w-4" />
-              Keep My Version
+              Accept Local Version
             </Button>
           </div>
         </div>

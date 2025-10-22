@@ -143,10 +143,10 @@ export function DocumentMetadataForm({ metadata, onChange }: DocumentMetadataFor
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <Button onClick={handleSave} className="flex-1">
-              Save Changes
+              Save Document Settings
             </Button>
             <Button onClick={handleCancel} variant="outline" className="flex-1">
-              Cancel
+              Discard Settings
             </Button>
           </div>
         </div>

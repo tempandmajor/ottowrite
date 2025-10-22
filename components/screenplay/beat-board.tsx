@@ -223,9 +223,9 @@ export function BeatBoard({ projectId }: BeatBoardProps) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
+              Close Beat Card
             </Button>
-            <Button onClick={handleSubmit}>{editingCard ? 'Save changes' : 'Add card'}</Button>
+            <Button onClick={handleSubmit}>{editingCard ? 'Update Beat Card' : 'Add New Card'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

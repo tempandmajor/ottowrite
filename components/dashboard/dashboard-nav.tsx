@@ -3,11 +3,47 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { Menu, X, LayoutPanelLeft, Pen, Settings, BookOpenText, BarChart3, PieChart } from 'lucide-react'
+import {
+  Menu,
+  X,
+  LayoutPanelLeft,
+  Folder,
+  FileText,
+  PenTool,
+  BarChart3,
+  Settings,
+  BookOpen,
+  Users,
+  Globe,
+  TrendingUp,
+  PieChart,
+  Target,
+  User,
+  CreditCard,
+  ChevronRight
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
-const routes = [
+type NavItem = {
+  label: string
+  href: string
+  icon: React.ElementType
+}
+
+type NavGroup = {
+  label: string
+  icon: React.ElementType
+  items: NavItem[]
+}
+
+type Route = NavItem | NavGroup
+
+function isNavGroup(route: Route): route is NavGroup {
+  return 'items' in route
+}
+
+const routes: Route[] = [
   {
     label: 'Overview',
     href: '/dashboard',
@@ -16,33 +52,89 @@ const routes = [
   {
     label: 'Projects',
     href: '/dashboard/projects',
-    icon: Pen,
+    icon: Folder,
   },
   {
     label: 'Documents',
     href: '/dashboard/documents',
-    icon: BookOpenText,
+    icon: FileText,
+  },
+  {
+    label: 'Editor Tools',
+    icon: PenTool,
+    items: [
+      {
+        label: 'Outlines',
+        href: '/dashboard/outlines',
+        icon: BookOpen,
+      },
+      {
+        label: 'Characters',
+        href: '/dashboard/characters',
+        icon: Users,
+      },
+      {
+        label: 'World Building',
+        href: '/dashboard/world-building',
+        icon: Globe,
+      },
+    ],
   },
   {
     label: 'Analytics',
-    href: '/dashboard/analytics',
     icon: BarChart3,
-  },
-  {
-    label: 'Usage',
-    href: '/dashboard/account/usage',
-    icon: PieChart,
+    items: [
+      {
+        label: 'Writing Stats',
+        href: '/dashboard/analytics',
+        icon: TrendingUp,
+      },
+      {
+        label: 'AI Usage',
+        href: '/dashboard/account/usage',
+        icon: PieChart,
+      },
+      {
+        label: 'Goals',
+        href: '/dashboard/goals',
+        icon: Target,
+      },
+    ],
   },
   {
     label: 'Settings',
-    href: '/dashboard/settings',
     icon: Settings,
+    items: [
+      {
+        label: 'Profile',
+        href: '/dashboard/settings',
+        icon: User,
+      },
+      {
+        label: 'Account',
+        href: '/dashboard/account',
+        icon: CreditCard,
+      },
+    ],
   },
 ]
 
 export function DashboardNav() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(() => {
+    // Auto-expand groups that contain the current page
+    return routes
+      .filter(isNavGroup)
+      .filter(group => group.items.some(item => pathname.startsWith(item.href)))
+      .map(group => group.label)
+  })
+
+  const toggleGroup = (label: string) => {
+    setExpandedGroups(prev =>
+      prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+    )
+  }
 
   return (
     <>
@@ -75,23 +167,74 @@ export function DashboardNav() {
             </Button>
           </div>
           <ul className="flex flex-1 flex-col gap-1">
-            {routes.map(({ label, href, icon: Icon }) => {
-              const active = pathname === href || pathname.startsWith(`${href}/`)
-              return (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    onClick={() => setOpen(false)}
-                    className={cn(
-                      'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary/60 hover:text-foreground',
-                      active && 'bg-secondary text-secondary-foreground hover:bg-secondary hover:text-secondary-foreground'
+            {routes.map((route) => {
+              if (isNavGroup(route)) {
+                const isExpanded = expandedGroups.includes(route.label)
+                const hasActiveChild = route.items.some(item =>
+                  pathname === item.href || pathname.startsWith(`${item.href}/`)
+                )
+
+                return (
+                  <li key={route.label}>
+                    <button
+                      onClick={() => toggleGroup(route.label)}
+                      className={cn(
+                        'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary/60 hover:text-foreground',
+                        hasActiveChild && 'bg-secondary/40 text-foreground'
+                      )}
+                      aria-expanded={isExpanded}
+                    >
+                      <route.icon className="h-4 w-4" />
+                      <span className="flex-1 text-left">{route.label}</span>
+                      <ChevronRight
+                        className={cn(
+                          'h-4 w-4 transition-transform',
+                          isExpanded && 'rotate-90'
+                        )}
+                      />
+                    </button>
+                    {isExpanded && (
+                      <ul className="ml-4 mt-1 space-y-1 border-l border-border/40 pl-3">
+                        {route.items.map((item) => {
+                          const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+                          return (
+                            <li key={item.href}>
+                              <Link
+                                href={item.href}
+                                onClick={() => setOpen(false)}
+                                className={cn(
+                                  'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors hover:bg-secondary/60 hover:text-foreground',
+                                  active && 'bg-secondary text-secondary-foreground hover:bg-secondary hover:text-secondary-foreground'
+                                )}
+                              >
+                                <item.icon className="h-3.5 w-3.5" />
+                                {item.label}
+                              </Link>
+                            </li>
+                          )
+                        })}
+                      </ul>
                     )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </Link>
-                </li>
-              )
+                  </li>
+                )
+              } else {
+                const active = pathname === route.href || pathname.startsWith(`${route.href}/`)
+                return (
+                  <li key={route.href}>
+                    <Link
+                      href={route.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary/60 hover:text-foreground',
+                        active && 'bg-secondary text-secondary-foreground hover:bg-secondary hover:text-secondary-foreground'
+                      )}
+                    >
+                      <route.icon className="h-4 w-4" />
+                      {route.label}
+                    </Link>
+                  </li>
+                )
+              }
             })}
           </ul>
         </div>

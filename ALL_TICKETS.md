@@ -2,9 +2,9 @@
 
 **Last Updated**: January 21, 2025
 **Total Tickets**: 89 tickets
-**Completed**: 64 tickets (72%)
+**Completed**: 65 tickets (73%)
 **In Progress**: 0 tickets (0%)
-**Not Started**: 25 tickets (28%)
+**Not Started**: 24 tickets (27%)
 
 ---
 
@@ -528,6 +528,142 @@ PRIORITY LEVELS:
 - **Proximity**: More spacing around important elements
 
 **Related**: Part of UX Audit 2025 (Visual Design track), Sprint 2 Ticket 2 of 4
+
+---
+
+### UX-005: Redesign Dashboard Navigation for Scalability
+**Status**: ✅ COMPLETE
+**Priority**: P2 - Medium (Navigation & Scalability)
+**Track**: User Experience Enhancement - Sprint 2
+**Completed**: January 21, 2025
+**Time Taken**: 2 hours (8 story points)
+
+**Description**: Reorganize dashboard navigation to support future feature growth, reduce cognitive load, and improve information architecture through collapsible groups.
+
+**Acceptance Criteria**:
+- [x] Reorganize navigation into logical groups (Editor Tools, Analytics, Settings)
+- [x] Add collapsible groups with expand/collapse functionality
+- [x] Auto-expand groups containing the current page
+- [x] Visual indicators for active groups and items
+- [x] Smooth animations for expand/collapse transitions
+- [x] Mobile-responsive collapsible behavior
+- [x] Build passes with no errors
+
+**Implementation Summary**:
+
+**Previous Navigation Structure** (6 flat items):
+```
+🏠 Overview
+📝 Projects
+📄 Documents
+📊 Analytics
+💰 Usage (buried under Account)
+⚙️ Settings
+```
+
+**New Navigation Structure** (Grouped):
+```
+🏠 Overview
+📁 Projects
+📄 Documents
+✍️ Editor Tools (collapsible)
+   └─ Outlines
+   └─ Characters
+   └─ World Building
+📊 Analytics (collapsible)
+   └─ Writing Stats
+   └─ AI Usage
+   └─ Goals
+⚙️ Settings (collapsible)
+   └─ Profile
+   └─ Account
+```
+
+**Key Features Implemented**:
+
+**1. Type-Safe Route System** (`components/dashboard/dashboard-nav.tsx`):
+- Created `NavItem` type for single navigation items
+- Created `NavGroup` type for collapsible groups with sub-items
+- Type guard `isNavGroup()` to differentiate between item types
+- Routes array supporting both flat items and nested groups
+
+**2. Collapsible Group Functionality**:
+- `expandedGroups` state tracking which groups are open
+- Auto-expand groups containing the current page on mount
+- `toggleGroup()` function to expand/collapse groups
+- ChevronRight icon rotates 90° when expanded
+
+**3. Visual Indicators**:
+- **Active child indicator**: Groups with active children show `bg-secondary/40 text-foreground`
+- **Active item**: Full secondary background for current page
+- **Expand icon**: ChevronRight with smooth rotation animation
+- **Nested styling**: Indented sub-items with left border (`border-l border-border/40`)
+- **Icon sizes**: Parent icons `h-4 w-4`, child icons `h-3.5 w-3.5`
+
+**4. Accessibility Features**:
+- `aria-expanded` attribute on group buttons
+- Semantic `<button>` for collapsible triggers
+- Keyboard-navigable links
+- Mobile menu toggle with proper ARIA labels
+
+**5. Responsive Design**:
+- Mobile: Fixed sidebar with toggle button
+- Desktop: Static sidebar always visible
+- Collapsible groups work seamlessly on all screen sizes
+- Mobile menu auto-closes after navigation
+
+**Route Mapping**:
+
+**Editor Tools Group**:
+- Outlines → `/dashboard/outlines` (new route for all outlines)
+- Characters → `/dashboard/characters` (new route for all characters)
+- World Building → `/dashboard/world-building` (new route)
+
+**Analytics Group**:
+- Writing Stats → `/dashboard/analytics` (existing)
+- AI Usage → `/dashboard/account/usage` (moved from top-level)
+- Goals → `/dashboard/goals` (new route for future feature)
+
+**Settings Group**:
+- Profile → `/dashboard/settings` (existing)
+- Account → `/dashboard/account` (new route)
+
+**Files Modified**:
+- `components/dashboard/dashboard-nav.tsx` (complete refactor with TypeScript types and collapsible logic)
+
+**Build Status**: ✅ Passing (16.7s, 0 TypeScript errors, 0 ESLint errors)
+
+**UX Improvements Delivered**:
+- ✅ **Reduced Cognitive Load**: 6 items → 6 top-level (3 groups + 3 singles) with 9 nested
+- ✅ **Scalability**: Room for future features within existing groups
+- ✅ **Better Organization**: Related features grouped logically (Editor Tools, Analytics, Settings)
+- ✅ **Improved Findability**: AI Usage now under Analytics (more intuitive than Account)
+- ✅ **Progressive Disclosure**: Groups collapsed by default, expand on demand
+- ✅ **Context Awareness**: Auto-expand groups with current page
+- ✅ **Visual Hierarchy**: Indented sub-items clearly show parent-child relationships
+
+**Technical Highlights**:
+- **Type Safety**: Full TypeScript support with union types and type guards
+- **Performance**: Auto-expand calculation only runs on mount
+- **Accessibility**: ARIA attributes for screen readers
+- **Responsive**: Works across all viewport sizes
+- **Maintainable**: Easy to add new items or groups by updating routes array
+
+**Future Extensibility**:
+The new structure easily accommodates planned features:
+- **Editor Tools**: Add "Templates", "Styles", "Macros"
+- **Analytics**: Add "Collaboration Stats", "Export History"
+- **Settings**: Add "Team", "Integrations", "Billing"
+- **New Groups**: Can add "Collaboration", "Publishing", etc.
+
+**Navigation Best Practices Applied**:
+- **Miller's Law**: 7±2 items per level (6 top-level, 2-3 per group)
+- **Information Architecture**: Grouped by function and user mental models
+- **Progressive Disclosure**: Hide complexity, reveal on interaction
+- **Consistency**: Same interaction pattern for all groups
+- **Feedback**: Clear visual state for active, hover, and expanded
+
+**Related**: Part of UX Audit 2025 (Navigation track), Sprint 2 Ticket 3 of 4
 
 ---
 

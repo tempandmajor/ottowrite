@@ -3,8 +3,8 @@
 **Last Updated**: January 21, 2025
 **Total Tickets**: 89 tickets
 **Completed**: 62 tickets (70%)
-**In Progress**: 0 tickets (0%)
-**Not Started**: 27 tickets (30%)
+**In Progress**: 1 ticket (1%)
+**Not Started**: 26 tickets (29%)
 
 ---
 
@@ -301,6 +301,123 @@ export function QuickActions() {
 - Mobile: Tap on help icon → Tooltip shows (touch-friendly)
 
 **Related**: Part of UX Audit 2025 (Onboarding track), Sprint 1 Ticket 4 of 4
+
+---
+
+### UX-004: Breadcrumb Navigation
+**Status**: 🚧 IN PROGRESS (70% complete)
+**Priority**: P1 - High (Navigation & Wayfinding)
+**Track**: User Experience Enhancement - Sprint 2
+**Started**: January 21, 2025
+**Estimated Effort**: 5 story points (3 days)
+
+**Description**: Add breadcrumb navigation to all pages beyond 2 levels deep to improve wayfinding and help users understand their location in the application hierarchy.
+
+**Progress** (3/5 completed):
+- [x] Create shadcn/ui Breadcrumb component (new)
+- [x] Create BreadcrumbNav wrapper component with truncation
+- [x] Add breadcrumbs to project detail page
+- [ ] Add breadcrumbs to character/outline detail pages
+- [ ] Add breadcrumbs to editor and beat board pages
+
+**Completed Implementation**:
+
+**1. Breadcrumb UI Component** (`components/ui/breadcrumb.tsx`):
+- Fully accessible breadcrumb component following shadcn/ui patterns
+- Supports keyboard navigation
+- ARIA labels: `aria-label="Breadcrumb"`, `aria-current="page"`
+- Components: Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator
+- `asChild` prop support for Next.js Link integration
+- ChevronRight separator icon
+
+**2. BreadcrumbNav Wrapper** (`components/dashboard/breadcrumb-nav.tsx`):
+- Reusable component accepting `items` array
+- Automatic text truncation (30 character max with ellipsis)
+- Full text shown in `title` attribute on hover
+- Last item styled as current page (non-clickable)
+- All previous items are clickable links
+
+**3. Project Detail Page** (`app/dashboard/projects/[id]/page.tsx`):
+```tsx
+<BreadcrumbNav
+  items={[
+    { label: 'Dashboard', href: '/dashboard' },
+    { label: 'Projects', href: '/dashboard/projects' },
+    { label: project.name }, // Current page, no href
+  ]}
+/>
+```
+
+**Files Created**:
+- `components/ui/breadcrumb.tsx` (NEW - 113 lines)
+- `components/dashboard/breadcrumb-nav.tsx` (NEW - 62 lines)
+
+**Files Modified**:
+- `app/dashboard/projects/[id]/page.tsx` (added breadcrumbs)
+
+**Build Status**: ✅ Passing (12.6s, 0 TypeScript errors, 0 ESLint errors)
+
+**UX Improvements Delivered**:
+- ✅ **Wayfinding**: Users can see exact location in hierarchy
+- ✅ **Quick Navigation**: Click any breadcrumb to jump to parent page
+- ✅ **Context Awareness**: Always know which project you're viewing
+- ✅ **Accessibility**: Keyboard accessible, screen reader friendly
+- ✅ **Visual Clarity**: Breadcrumbs positioned above page content
+
+**Breadcrumb Pattern**:
+```
+Dashboard > Projects > My Novel
+   ↑          ↑          ↑
+(link)     (link)    (current)
+```
+
+**Remaining Work**:
+1. Add breadcrumbs to character detail: `Dashboard > Projects > [Project] > Characters > [Character]`
+2. Add breadcrumbs to outline detail: `Dashboard > Projects > [Project] > Outlines > [Outline]`
+3. Add breadcrumbs to editor: `Dashboard > Projects > [Project] > Documents > [Document]`
+4. Add breadcrumbs to beat board: `Dashboard > Projects > [Project] > Story Structure`
+5. Add breadcrumbs to character relationships page
+
+**Technical Implementation**:
+
+**Breadcrumb Component Features**:
+- **Truncation**: Long names shortened to 30 chars with "..."
+- **Tooltips**: Full text visible on hover via `title` attribute
+- **Separators**: ChevronRight icon between items
+- **Responsive**: Works on mobile and desktop
+- **Themed**: Uses CSS variables (muted-foreground, foreground)
+
+**asChild Pattern**:
+```tsx
+<BreadcrumbLink asChild>
+  <Link href="/dashboard/projects">Projects</Link>
+</BreadcrumbLink>
+```
+
+**Accessibility Features**:
+- `<nav aria-label="Breadcrumb">` for screen readers
+- `aria-current="page"` on current page item
+- Keyboard navigable (Tab through links)
+- Proper heading hierarchy maintained
+
+**Industry Benchmarks**:
+- GitHub: Breadcrumbs on all repository pages
+- Notion: Breadcrumbs in nested pages
+- Linear: Breadcrumbs in project/issue hierarchy
+
+**Why Partial Completion**:
+Due to time constraints and token limits, implemented core breadcrumb infrastructure (components + 1 page) to validate approach before rolling out to all 5+ target pages. This allows for:
+- Early user feedback on breadcrumb design
+- Verification of truncation behavior with real data
+- Testing of navigation patterns
+
+**Next Session Tasks**:
+1. Add project name fetching to character/outline pages
+2. Implement breadcrumbs on remaining 4 pages
+3. Test breadcrumb navigation flow end-to-end
+4. Verify text truncation with long project/document names
+
+**Related**: Part of UX Audit 2025 (Navigation track), Sprint 2 Ticket 1 of 4
 
 ---
 

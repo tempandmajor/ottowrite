@@ -38,6 +38,7 @@ import { EmptyState } from '@/components/dashboard/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { TemplateDialog } from '@/components/dashboard/template-dialog'
+import { BreadcrumbNav } from '@/components/dashboard/breadcrumb-nav'
 import { useToast } from '@/hooks/use-toast'
 import {
   ArrowLeft,
@@ -271,14 +272,22 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[320px_1fr]">
-      <div className="space-y-6 lg:sticky lg:top-24 lg:h-fit">
-        <Button variant="ghost" size="sm" className="w-fit" asChild>
-          <Link href="/dashboard/projects">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to projects
-          </Link>
-        </Button>
+    <div className="space-y-4">
+      <BreadcrumbNav
+        items={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Projects', href: '/dashboard/projects' },
+          { label: project.name },
+        ]}
+      />
+      <div className="grid gap-8 lg:grid-cols-[320px_1fr]">
+        <div className="space-y-6 lg:sticky lg:top-24 lg:h-fit">
+          <Button variant="ghost" size="sm" className="w-fit" asChild>
+            <Link href="/dashboard/projects">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to projects
+            </Link>
+          </Button>
 
         <section className="rounded-3xl border bg-card/80 p-6 shadow-card">
           <div className="flex items-start justify-between gap-2">
@@ -639,6 +648,7 @@ export default function ProjectDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   )
 }

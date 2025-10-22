@@ -89,7 +89,7 @@ export function BeatCard({ beat, isExpanded, onToggleExpand, onUpdate }: BeatCar
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" aria-label="Open beat menu">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>

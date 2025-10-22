@@ -177,7 +177,7 @@ export function GettingStartedChecklist({ initialProgress }: GettingStartedCheck
                 You&apos;ve completed all getting started tasks. Keep writing!
               </p>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleDismiss}>
+            <Button variant="ghost" size="icon" onClick={handleDismiss} aria-label="Dismiss checklist">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -206,6 +206,8 @@ export function GettingStartedChecklist({ initialProgress }: GettingStartedCheck
               variant="ghost"
               size="icon"
               onClick={() => setIsExpanded(!isExpanded)}
+              aria-label={isExpanded ? "Collapse checklist" : "Expand checklist"}
+              aria-expanded={isExpanded}
             >
               {isExpanded ? (
                 <ChevronUp className="h-4 w-4" />
@@ -213,7 +215,7 @@ export function GettingStartedChecklist({ initialProgress }: GettingStartedCheck
                 <ChevronDown className="h-4 w-4" />
               )}
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleDismiss}>
+            <Button variant="ghost" size="icon" onClick={handleDismiss} aria-label="Close checklist">
               <X className="h-4 w-4" />
             </Button>
           </div>

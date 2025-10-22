@@ -40,7 +40,7 @@ export function SceneCard({ card, onEdit, onDelete }: SceneCardProps) {
           <Badge className={color}>{card.beat_type || 'A'}</Badge>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => onEdit(card)}>
+          <Button variant="ghost" size="icon" onClick={() => onEdit(card)} aria-label="Edit scene">
             <Pencil className="h-4 w-4" />
           </Button>
           <Button
@@ -48,6 +48,7 @@ export function SceneCard({ card, onEdit, onDelete }: SceneCardProps) {
             size="icon"
             onClick={() => onDelete(card)}
             className="text-destructive"
+            aria-label="Delete scene"
           >
             <Trash2 className="h-4 w-4" />
           </Button>

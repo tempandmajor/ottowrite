@@ -183,6 +183,7 @@ export function DashboardNav() {
                         hasActiveChild && 'bg-secondary/40 text-foreground'
                       )}
                       aria-expanded={isExpanded}
+                      aria-label={`${route.label} menu`}
                     >
                       <route.icon className="h-4 w-4" />
                       <span className="flex-1 text-left">{route.label}</span>
@@ -202,6 +203,7 @@ export function DashboardNav() {
                               <Link
                                 href={item.href}
                                 onClick={() => setOpen(false)}
+                                aria-current={active ? "page" : undefined}
                                 className={cn(
                                   'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors hover:bg-secondary/60 hover:text-foreground',
                                   active && 'bg-secondary text-secondary-foreground hover:bg-secondary hover:text-secondary-foreground'
@@ -224,6 +226,7 @@ export function DashboardNav() {
                     <Link
                       href={route.href}
                       onClick={() => setOpen(false)}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
                         'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary/60 hover:text-foreground',
                         active && 'bg-secondary text-secondary-foreground hover:bg-secondary hover:text-secondary-foreground'

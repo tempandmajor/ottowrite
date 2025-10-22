@@ -132,6 +132,7 @@ export function CommentTrigger({ documentId, onCommentCreate }: CommentTriggerPr
               size="sm"
               onClick={handleCancel}
               className="h-6 w-6 p-0"
+              aria-label="Close comment dialog"
             >
               <X className="h-4 w-4" />
             </Button>

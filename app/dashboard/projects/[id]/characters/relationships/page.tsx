@@ -330,7 +330,7 @@ export default function CharacterRelationshipsPage() {
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-60" />
-        <Skeleton className="h-32 rounded-3xl" />
+        <Skeleton className="h-32 rounded-2xl" />
         <div className="grid gap-4 md:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => (
             <Skeleton key={index} className="h-40 rounded-2xl" />
@@ -342,7 +342,7 @@ export default function CharacterRelationshipsPage() {
 
   return (
     <div className="space-y-10">
-      <section className="flex flex-col gap-6 rounded-3xl border bg-card/80 p-6 shadow-card md:flex-row md:items-center md:justify-between">
+      <section className="flex flex-col gap-6 rounded-2xl border bg-card/80 p-6 shadow-card md:flex-row md:items-center md:justify-between">
         <div className="space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-wide text-secondary-foreground">
             <Network className="h-3.5 w-3.5" />
@@ -501,7 +501,7 @@ export default function CharacterRelationshipsPage() {
 
         <TabsContent value="network">
           {filteredRelationships.length > 1 ? (
-            <div className="rounded-3xl border bg-card/70 p-6 shadow-card">
+            <div className="rounded-2xl border bg-card/70 p-6 shadow-card">
               <RelationshipNetwork
                 relationships={filteredRelationships}
                 characters={characters}
@@ -519,7 +519,7 @@ export default function CharacterRelationshipsPage() {
 
         <TabsContent value="timeline">
           {timelineEntries.length > 0 ? (
-            <div className="relative space-y-6 rounded-3xl border bg-card/80 p-6 shadow-card">
+            <div className="relative space-y-6 rounded-2xl border bg-card/80 p-6 shadow-card">
               <div className="absolute left-4 top-10 bottom-10 hidden w-px bg-border lg:block" aria-hidden />
               {timelineEntries.map((entry) => (
                 <div key={entry.id} className="relative flex gap-4 lg:pl-10">

@@ -167,7 +167,7 @@ export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps
 
   return (
     <div className="mx-auto max-w-4xl space-y-10">
-      <section className="rounded-3xl border bg-card/80 p-6 shadow-card">
+      <section className="rounded-2xl border bg-card/80 p-6 shadow-card">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-wide text-secondary-foreground">

@@ -262,7 +262,7 @@ export default function ProjectDetailPage() {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-96 rounded-3xl" />
+        <Skeleton className="h-96 rounded-2xl" />
       </div>
     )
   }
@@ -289,7 +289,7 @@ export default function ProjectDetailPage() {
             </Link>
           </Button>
 
-        <section className="rounded-3xl border bg-card/80 p-6 shadow-card">
+        <section className="rounded-2xl border bg-card/80 p-6 shadow-card">
           <div className="flex items-start justify-between gap-2">
             <div>
               <h1 className="text-2xl font-semibold text-foreground">{project.name}</h1>
@@ -343,7 +343,7 @@ export default function ProjectDetailPage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border bg-card/70 p-6 shadow-sm">
+        <section className="rounded-2xl border bg-card/70 p-6 shadow-sm">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Shortcuts</h2>
           <div className="mt-4 space-y-3 text-sm text-muted-foreground">
             <Button variant="ghost" className="w-full justify-between" asChild>

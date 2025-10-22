@@ -404,15 +404,15 @@ export function CommandPalette({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
-                <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-background border rounded">↑↓</kbd>
+                <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-background border rounded-md">↑↓</kbd>
                 Navigate
               </span>
               <span className="flex items-center gap-1.5">
-                <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-background border rounded">Enter</kbd>
+                <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-background border rounded-md">Enter</kbd>
                 Select
               </span>
               <span className="flex items-center gap-1.5">
-                <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-background border rounded">Esc</kbd>
+                <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-background border rounded-md">Esc</kbd>
                 Close
               </span>
             </div>

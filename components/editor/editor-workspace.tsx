@@ -1875,7 +1875,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                         </CardContent>
                       </Card>
                     )}
-                    <div className="overflow-hidden rounded-3xl border bg-card shadow-card">
+                    <div className="overflow-hidden rounded-2xl border bg-card shadow-card">
                       <div className="p-6 sm:p-8 lg:p-10">
                         {editorElement}
                       </div>
@@ -2483,7 +2483,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             </CardContent>
           </Card>
 
-          <div className="overflow-hidden rounded-3xl border bg-card shadow-card">
+          <div className="overflow-hidden rounded-2xl border bg-card shadow-card">
             <div className="p-4 sm:p-6 lg:p-8">
               {editorElement}
             </div>

@@ -148,7 +148,7 @@ export default function DashboardPage() {
         <GettingStartedChecklist initialProgress={checklistProgress} />
       )}
 
-      <section className="flex flex-col gap-6 rounded-3xl bg-gradient-to-br from-primary/10 via-background to-accent/5 p-10 shadow-lg md:flex-row md:items-center md:justify-between">
+      <section className="flex flex-col gap-6 rounded-2xl bg-gradient-to-br from-primary/10 via-background to-accent/5 p-10 shadow-lg md:flex-row md:items-center md:justify-between">
         <div className="space-y-5">
           <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
             <Sparkles className="h-4 w-4" />

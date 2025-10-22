@@ -179,7 +179,7 @@ export function DashboardNav() {
                     <button
                       onClick={() => toggleGroup(route.label)}
                       className={cn(
-                        'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary/60 hover:text-foreground',
+                        'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary/60 hover:text-foreground',
                         hasActiveChild && 'bg-secondary/40 text-foreground'
                       )}
                       aria-expanded={isExpanded}
@@ -228,7 +228,7 @@ export function DashboardNav() {
                       onClick={() => setOpen(false)}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary/60 hover:text-foreground',
+                        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary/60 hover:text-foreground',
                         active && 'bg-secondary text-secondary-foreground hover:bg-secondary hover:text-secondary-foreground'
                       )}
                     >

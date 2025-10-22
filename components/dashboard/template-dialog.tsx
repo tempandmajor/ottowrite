@@ -243,7 +243,7 @@ export function TemplateDialog({ open, onOpenChange, projectId }: TemplateDialog
                               {template.description || 'No description provided.'}
                             </p>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span className="px-2 py-1 bg-secondary rounded">
+                              <span className="px-2 py-1 bg-secondary rounded-md">
                                 {template.type.replace('_', ' ')}
                               </span>
                               {typeof template.usage_count === 'number' && (

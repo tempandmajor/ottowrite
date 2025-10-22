@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { getSmartTemplateRecommendations } from '@/lib/ai/recommendations-engine';
+import type { AIModel } from '@/lib/ai/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,7 @@ interface RequestBody {
     preferredMedium?: 'film' | 'tv' | 'stage' | 'audio' | 'sequential';
   };
   saveRecommendation?: boolean; // Save to database for tracking
+  model?: AIModel; // Allow model selection (Claude, GPT-5, DeepSeek)
 }
 
 export async function POST(request: NextRequest) {
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: RequestBody = await request.json();
-    const { logline, projectId, additionalContext, saveRecommendation = true } = body;
+    const { logline, projectId, additionalContext, saveRecommendation = true, model } = body;
 
     // Validate input
     if (!logline || logline.trim().length === 0) {
@@ -72,13 +74,15 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       project_id: projectId,
       logline_length: logline.length,
+      model: model || 'claude-sonnet-4.5',
       operation: 'ai:recommend-template',
     });
 
-    // Call AI recommendations engine
+    // Call AI recommendations engine (multi-provider support)
     const recommendations = await getSmartTemplateRecommendations(
       logline,
-      additionalContext
+      additionalContext,
+      model
     );
 
     // Save recommendation to database if requested

@@ -41,7 +41,7 @@ export function useDocumentTree({
 
       const { data, error: fetchError } = await supabase
         .from('documents')
-        .select('id, title, type, is_folder, folder_type, word_count, position, parent_folder_id')
+        .select('id, title, type, is_folder, folder_type, word_count, status, position, parent_folder_id')
         .eq('project_id', projectId)
         .order('position', { ascending: true })
 
@@ -54,6 +54,7 @@ export function useDocumentTree({
         folderType: doc.folder_type as FolderType | undefined,
         documentType: doc.type as DocumentNode['documentType'],
         wordCount: doc.word_count || 0,
+        status: doc.status as DocumentNode['status'],
         position: doc.position || 0,
         parentFolderId: doc.parent_folder_id,
       }))

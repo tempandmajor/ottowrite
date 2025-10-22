@@ -20,11 +20,11 @@ const actions = [
     shortcut: null,
   },
   {
-    title: 'Generate Outline',
-    description: 'Use the AI assistant to shape your next chapter or episode.',
-    href: '/dashboard/outlines?new=true',
+    title: 'Research Notes',
+    description: 'Organize research, references, and worldbuilding details.',
+    href: '/dashboard/research',
     icon: FileText,
-    tooltip: 'Generate a story outline using AI-powered beat sheets and structure templates (Save the Cat, Hero\'s Journey, Three-Act Structure)',
+    tooltip: 'Create and manage research notes with categories, tags, and source references for your writing projects',
     shortcut: null,
   },
   {

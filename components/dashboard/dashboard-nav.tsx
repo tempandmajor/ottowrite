@@ -9,17 +9,11 @@ import {
   LayoutPanelLeft,
   Folder,
   FileText,
-  PenTool,
   BarChart3,
   Settings,
   BookOpen,
-  Users,
-  Globe,
   TrendingUp,
   PieChart,
-  Target,
-  User,
-  CreditCard,
   ChevronRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -60,25 +54,9 @@ const routes: Route[] = [
     icon: FileText,
   },
   {
-    label: 'Editor Tools',
-    icon: PenTool,
-    items: [
-      {
-        label: 'Outlines',
-        href: '/dashboard/outlines',
-        icon: BookOpen,
-      },
-      {
-        label: 'Characters',
-        href: '/dashboard/characters',
-        icon: Users,
-      },
-      {
-        label: 'World Building',
-        href: '/dashboard/world-building',
-        icon: Globe,
-      },
-    ],
+    label: 'Research',
+    href: '/dashboard/research',
+    icon: BookOpen,
   },
   {
     label: 'Analytics',
@@ -94,28 +72,12 @@ const routes: Route[] = [
         href: '/dashboard/account/usage',
         icon: PieChart,
       },
-      {
-        label: 'Goals',
-        href: '/dashboard/goals',
-        icon: Target,
-      },
     ],
   },
   {
     label: 'Settings',
+    href: '/dashboard/settings',
     icon: Settings,
-    items: [
-      {
-        label: 'Profile',
-        href: '/dashboard/settings',
-        icon: User,
-      },
-      {
-        label: 'Account',
-        href: '/dashboard/account',
-        icon: CreditCard,
-      },
-    ],
   },
 ]
 

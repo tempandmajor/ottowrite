@@ -21,6 +21,7 @@ import {
   StickyNote,
   FolderPlus,
   GripVertical,
+  LayoutTemplate,
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -31,8 +32,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { trackEvent } from '@/lib/telemetry/track'
+import { FOLDER_TEMPLATES } from '@/lib/binder/folder-templates'
 import {
   DndContext,
   closestCenter,
@@ -57,6 +65,7 @@ import { CSS } from '@dnd-kit/utilities'
 
 export type DocumentType = 'novel' | 'screenplay' | 'play' | 'short_story'
 export type FolderType = 'manuscript' | 'research' | 'characters' | 'deleted' | 'notes' | 'custom'
+export type DocumentStatus = 'complete' | 'draft' | 'todo' | 'ai_generated'
 
 export interface DocumentNode {
   id: string
@@ -65,6 +74,7 @@ export interface DocumentNode {
   folderType?: FolderType
   documentType?: DocumentType
   wordCount?: number
+  status?: DocumentStatus
   position: number
   parentFolderId?: string | null
   children?: DocumentNode[]
@@ -115,6 +125,45 @@ const DOCUMENT_ICONS: Record<DocumentType, typeof FileText> = {
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
+
+// Format word count for display (e.g., 12345 -> "12.3k")
+function formatWordCount(count?: number): string {
+  if (!count || count === 0) return '0'
+  if (count < 1000) return count.toString()
+  return `${(count / 1000).toFixed(1)}k`
+}
+
+// Get status dot color
+function getStatusColor(status?: DocumentStatus): string {
+  switch (status) {
+    case 'complete':
+      return 'bg-green-500'
+    case 'draft':
+      return 'bg-yellow-500'
+    case 'todo':
+      return 'bg-red-500'
+    case 'ai_generated':
+      return 'bg-blue-500'
+    default:
+      return 'bg-gray-400'
+  }
+}
+
+// Get status label
+function getStatusLabel(status?: DocumentStatus): string {
+  switch (status) {
+    case 'complete':
+      return 'Complete'
+    case 'draft':
+      return 'Draft'
+    case 'todo':
+      return 'To Do'
+    case 'ai_generated':
+      return 'AI Generated'
+    default:
+      return 'Draft'
+  }
+}
 
 function buildTree(nodes: DocumentNode[]): DocumentNode[] {
   const nodeMap = new Map<string, DocumentNode>()
@@ -355,13 +404,39 @@ function TreeNode({
           </button>
         )}
 
-        {/* Word Count Badge */}
-        {!node.isFolder && node.wordCount !== undefined && node.wordCount > 0 && (
-          <span className="shrink-0 text-xs text-muted-foreground">
-            {node.wordCount >= 1000
-              ? `${(node.wordCount / 1000).toFixed(1)}k`
-              : node.wordCount}
-          </span>
+        {/* Status Badge and Word Count - TICKET-007 */}
+        {!node.isFolder && (
+          <div className="flex items-center gap-1.5 ml-auto shrink-0">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5">
+                    {/* Status Dot */}
+                    <div
+                      className={cn('h-2 w-2 rounded-full', getStatusColor(node.status))}
+                      aria-label={`Status: ${getStatusLabel(node.status)}`}
+                    />
+                    {/* Word Count */}
+                    {node.wordCount !== undefined && node.wordCount > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        {formatWordCount(node.wordCount)}
+                      </span>
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-xs space-y-1">
+                    <p>
+                      <strong>Status:</strong> {getStatusLabel(node.status)}
+                    </p>
+                    <p>
+                      <strong>Word Count:</strong> {node.wordCount?.toLocaleString() || 0}
+                    </p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         )}
 
         {/* Context Menu */}
@@ -455,6 +530,7 @@ export function DocumentTree({
 }: DocumentTreeProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
     // Load from localStorage
     if (typeof window !== 'undefined') {
@@ -561,6 +637,41 @@ export function DocumentTree({
     [onCreateFolder, projectId]
   )
 
+  const handleApplyTemplate = useCallback(
+    async (templateId: string) => {
+      setIsApplyingTemplate(true)
+      try {
+        const response = await fetch(`/api/projects/${projectId}/apply-template`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templateId }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to apply template')
+        }
+
+        const result = await response.json()
+        trackEvent('editor.binder.template_apply', {
+          templateId,
+          templateName: result.templateName,
+          foldersCreated: result.foldersCreated,
+          projectId,
+        })
+
+        // Reload the page to show new folders (or trigger a refetch)
+        window.location.reload()
+      } catch (error) {
+        console.error('Failed to apply template:', error)
+        alert('Failed to apply template. Please try again.')
+      } finally {
+        setIsApplyingTemplate(false)
+      }
+    },
+    [projectId]
+  )
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string)
   }, [])
@@ -642,24 +753,52 @@ export function DocumentTree({
         <div className="border-b p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Binder</h2>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <Plus className="h-4 w-4" />
-                  <span className="sr-only">New</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleCreateDocument()}>
-                  <FileText className="mr-2 h-4 w-4" />
-                  New Document
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleCreateFolder()}>
-                  <FolderPlus className="mr-2 h-4 w-4" />
-                  New Folder
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              {/* Templates Dropdown - TICKET-005 */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={isApplyingTemplate}>
+                    <LayoutTemplate className="h-4 w-4 mr-1" />
+                    Templates
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  {FOLDER_TEMPLATES.map((template) => (
+                    <DropdownMenuItem
+                      key={template.id}
+                      onClick={() => handleApplyTemplate(template.id)}
+                      disabled={isApplyingTemplate}
+                    >
+                      <span className="mr-2">{template.icon}</span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{template.name}</span>
+                        <span className="text-xs text-muted-foreground">{template.description}</span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* New Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Plus className="h-4 w-4" />
+                    <span className="sr-only">New</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleCreateDocument()}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    New Document
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleCreateFolder()}>
+                    <FolderPlus className="mr-2 h-4 w-4" />
+                    New Folder
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           {/* Search */}

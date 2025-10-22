@@ -46,6 +46,7 @@ const collectAnchorsFromEditor = (editor: Editor): Set<string> => {
 export type TiptapEditorApi = {
   insertHtmlAtCursor: (html: string) => void
   getSelectedText: () => string
+  editor: Editor | null
 }
 
 interface TiptapEditorProps {
@@ -284,6 +285,7 @@ export function TiptapEditor({
           return ''
         }
       },
+      editor,
     }
 
     onReady(api)

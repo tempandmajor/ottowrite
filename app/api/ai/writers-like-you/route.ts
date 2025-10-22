@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { getCollaborativeRecommendations, UserProfile } from '@/lib/ai/recommendations-engine';
+import type { AIModel } from '@/lib/ai/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
+    const model = (searchParams.get('model') as AIModel) || 'deepseek-chat'; // DeepSeek is cost-effective for recommendations
 
     // Get or create user writing profile
     const { data: profile, error: profileError } = await supabase
@@ -124,10 +126,11 @@ export async function GET(request: NextRequest) {
       operation: 'ai:writers-like-you',
     });
 
-    // Get collaborative recommendations
+    // Get collaborative recommendations (multi-provider support)
     const recommendations = await getCollaborativeRecommendations(
       userProfile,
-      currentProject
+      currentProject,
+      model
     );
 
     // Get actual template usage stats from database

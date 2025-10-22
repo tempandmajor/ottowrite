@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { generateContextAwarePlaceholder } from '@/lib/ai/recommendations-engine';
+import type { AIModel } from '@/lib/ai/service';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,7 @@ interface RequestBody {
     location?: string;
   };
   useCache?: boolean; // Check cache first
+  model?: AIModel; // Multi-provider support (GPT-5 for creative suggestions)
 }
 
 export async function POST(request: NextRequest) {
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: RequestBody = await request.json();
-    const { projectId, elementType, context, useCache = true } = body;
+    const { projectId, elementType, context, useCache = true, model } = body;
 
     // Validate input
     if (!projectId) {
@@ -157,7 +159,8 @@ export async function POST(request: NextRequest) {
     // Generate placeholder using AI
     const placeholder = await generateContextAwarePlaceholder(
       elementType,
-      enhancedContext
+      enhancedContext,
+      model
     );
 
     // Save to database for future caching

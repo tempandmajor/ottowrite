@@ -13,6 +13,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +29,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft,
   Save,
@@ -40,6 +42,7 @@ import {
   Search,
   Sparkles,
   MoreHorizontal,
+  MoreVertical,
   UserPlus,
   Keyboard,
   Maximize2,
@@ -84,6 +87,9 @@ import { CharacterSceneIndex } from '@/components/editor/character-scene-index'
 import { BreadcrumbNav } from '@/components/dashboard/breadcrumb-nav'
 import { DocumentTree } from '@/components/editor/document-tree'
 import { useDocumentTree } from '@/hooks/use-document-tree'
+import { StatusBar } from '@/components/editor/status-bar'
+import { useEditorStatus } from '@/hooks/use-editor-status'
+import { isScriptType as checkIsScriptType } from '@/lib/document-types'
 
 type RecentDocument = {
   id: string
@@ -110,7 +116,9 @@ const cloneStructure = (chapters: Chapter[]): Chapter[] =>
     })),
   }))
 
-const isScriptType = (type?: string) => type === 'screenplay' || type === 'play'
+// Use centralized type checking from lib/document-types.ts
+// This now supports all script formats: film, TV, stage, etc.
+const isScriptType = (type?: string) => type ? checkIsScriptType(type as any) : false
 
 const generateClientId = () =>
   typeof globalThis !== 'undefined' &&
@@ -1282,6 +1290,13 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
       .filter((w) => w.length > 0).length
   }, [document, content, screenplayContent])
 
+  // Initialize editor status tracking for status bar
+  const editorStatus = useEditorStatus({
+    editor: tiptapApiRef.current?.editor ?? null,
+    documentId: document?.id ?? '',
+    initialWordCount: wordCount,
+  })
+
   useEffect(() => {
     if (!document || !isScriptType(document.type)) return
     setScreenplayStructure((prev) => {
@@ -1597,6 +1612,22 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
 
               <TooltipProvider delayDuration={150} disableHoverableContent>
                 <div className={cn('hidden items-center gap-2 md:flex transition-opacity', focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100')}>
+                  {/* Command Palette - High frequency */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCommandPaletteOpen(true)}
+                      >
+                        <Search className="h-4 w-4" />
+                        <span className="sr-only">Command palette</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Command palette (Ctrl+K)</TooltipContent>
+                  </Tooltip>
+
+                  {/* Undo/Redo - High frequency */}
                   <UndoRedoControls
                     canUndo={undoRedoAPI.canUndo}
                     canRedo={undoRedoAPI.canRedo}
@@ -1607,19 +1638,14 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     getUndoHistory={undoRedoAPI.getUndoHistory}
                     getRedoHistory={undoRedoAPI.getRedoHistory}
                   />
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" disabled>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Share
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Sharing coming soon</TooltipContent>
-                  </Tooltip>
+
+                  <Separator orientation="vertical" className="h-6" />
+
+                  {/* Panel Toggles - Icon buttons only */}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         onClick={() => {
                           setFocusMode(false)
@@ -1627,64 +1653,84 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                         }}
                       >
                         {structureSidebarOpen ? (
-                          <>
-                            <PanelLeftClose className="mr-2 h-4 w-4" />
-                            Hide Outline
-                          </>
+                          <PanelLeftClose className="h-4 w-4" />
                         ) : (
-                          <>
-                            <PanelLeftOpen className="mr-2 h-4 w-4" />
-                            Show Outline
-                          </>
+                          <PanelLeftOpen className="h-4 w-4" />
                         )}
+                        <span className="sr-only">Toggle outline</span>
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Toggle outline (Ctrl+Shift+O)</TooltipContent>
                   </Tooltip>
+
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         onClick={() => {
                           setFocusMode(false)
                           setShowAI((prev) => !prev)
                         }}
                       >
-                        {showAI ? (
-                          <>
-                            <PanelRightClose className="mr-2 h-4 w-4" />
-                            Hide AI
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="mr-2 h-4 w-4" />
-                            Show AI
-                          </>
-                        )}
+                        <Sparkles className="h-4 w-4" />
+                        <span className="sr-only">Toggle AI</span>
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Toggle AI assistant (Ctrl+Shift+A)</TooltipContent>
                   </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" onClick={() => setShowVersionHistory(true)}>
+
+                  <Separator orientation="vertical" className="h-6" />
+
+                  {/* More Menu - Secondary actions */}
+                  <DropdownMenu>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">More options</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>More options</TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault()
+                          setShowVersionHistory(true)
+                        }}
+                      >
                         <History className="mr-2 h-4 w-4" />
-                        History
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Open version history (Ctrl+Shift+H)</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" onClick={handleExportClick}>
+                        Version History
+                        <span className="ml-auto text-xs text-muted-foreground">Ctrl+Shift+H</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault()
+                          handleExportClick()
+                        }}
+                      >
                         <FileDown className="mr-2 h-4 w-4" />
-                        Export
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Export document</TooltipContent>
-                  </Tooltip>
+                        Export...
+                        <span className="ml-auto text-xs text-muted-foreground">Ctrl+E</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem disabled>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Share
+                        <span className="ml-auto text-xs text-muted-foreground">Coming soon</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Metadata - Inline component */}
                   <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
+
+                  <Separator orientation="vertical" className="h-6" />
+
+                  {/* Primary Actions */}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button size="sm" onClick={saveDocument} disabled={saving}>
@@ -1692,8 +1738,9 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                         {saving ? 'Saving…' : 'Save'}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Save now</TooltipContent>
+                    <TooltipContent>Save now (Ctrl+S)</TooltipContent>
                   </Tooltip>
+
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -1701,7 +1748,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                         size="sm"
                         onClick={toggleFocusMode}
                       >
-                        {focusMode ? 'Exit Focus' : 'Focus Mode'}
+                        {focusMode ? 'Exit Focus' : 'Focus'}
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -1731,6 +1778,32 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       <Save className="h-4 w-4" />
                       {saving ? 'Saving...' : 'Save document'}
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        handleUndo()
+                      }}
+                      disabled={!undoRedoAPI.canUndo}
+                      className="flex items-center gap-2"
+                    >
+                      <History className="h-4 w-4" />
+                      Undo
+                      <span className="ml-auto text-xs text-muted-foreground">Ctrl+Z</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        handleRedo()
+                      }}
+                      disabled={!undoRedoAPI.canRedo}
+                      className="flex items-center gap-2"
+                    >
+                      <History className="h-4 w-4 scale-x-[-1]" />
+                      Redo
+                      <span className="ml-auto text-xs text-muted-foreground">Ctrl+Y</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onSelect={(event) => {
                         event.preventDefault()
@@ -1740,6 +1813,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     >
                       <Command className="h-4 w-4" />
                       Command palette
+                      <span className="ml-auto text-xs text-muted-foreground">Ctrl+K</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={(event) => {
@@ -1912,6 +1986,16 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       <div className="p-6 sm:p-8 lg:p-10">
                         {editorElement}
                       </div>
+                      {!focusMode && (
+                        <StatusBar
+                          cursorPosition={editorStatus.cursorPosition}
+                          selection={editorStatus.selection}
+                          sessionWordCount={editorStatus.sessionWordCount}
+                          totalWordCount={wordCount}
+                          targetWordCount={metadata?.targetWordCount ?? undefined}
+                          readingTime={Math.max(1, Math.ceil(wordCount / 225))}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>

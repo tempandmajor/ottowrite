@@ -50,7 +50,10 @@ import {
   X,
 } from 'lucide-react'
 
-type ProjectType = 'novel' | 'series' | 'screenplay' | 'play' | 'short_story'
+import type { DocumentType } from '@/lib/document-types'
+import { getDocumentTypeLabel, getDocumentTypeGroups, getActiveDocumentTypes } from '@/lib/document-types'
+
+type ProjectType = DocumentType
 
 type ProjectFolder = {
   id: string
@@ -96,13 +99,8 @@ type Pagination = {
   limit: number
 }
 
-const projectTypeLabels: Record<ProjectType, string> = {
-  novel: 'Novel',
-  series: 'Series',
-  screenplay: 'Screenplay',
-  play: 'Play',
-  short_story: 'Short Story',
-}
+// Project type labels are now handled by getDocumentTypeLabel() from lib/document-types.ts
+// This provides labels for all 20+ document types
 
 const resolveErrorMessage = (error: unknown, fallback: string) => {
   if (error && typeof error === 'object' && 'message' in error) {
@@ -469,9 +467,9 @@ export default function ProjectsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All types</SelectItem>
-            {Object.entries(projectTypeLabels).map(([key, label]) => (
-              <SelectItem key={key} value={key}>
-                {label}
+            {getActiveDocumentTypes().map((type) => (
+              <SelectItem key={type} value={type}>
+                {getDocumentTypeLabel(type)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -561,7 +559,7 @@ export default function ProjectsPage() {
                       {project.name}
                     </Link>
                     <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
-                      {projectTypeLabels[project.type]}
+                      {getDocumentTypeLabel(project.type)}
                     </p>
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => setDeleteId(project.id)}>
@@ -639,10 +637,17 @@ export default function ProjectsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(projectTypeLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
+                  {getDocumentTypeGroups().map((group) => (
+                    <div key={group.category}>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                        {group.icon} {group.label}
+                      </div>
+                      {group.types.map((typeInfo) => (
+                        <SelectItem key={typeInfo.type} value={typeInfo.type}>
+                          {typeInfo.icon} {typeInfo.label}
+                        </SelectItem>
+                      ))}
+                    </div>
                   ))}
                 </SelectContent>
               </Select>

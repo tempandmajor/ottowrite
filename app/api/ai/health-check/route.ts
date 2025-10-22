@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { analyzeTemplateHealth } from '@/lib/ai/recommendations-engine';
+import type { AIModel } from '@/lib/ai/service';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,7 @@ interface RequestBody {
     actBreaks?: Array<{ act: string; startPage: number; endPage: number }>;
     genre?: string;
   };
+  model?: AIModel; // Multi-provider support
 }
 
 export async function POST(request: NextRequest) {
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: RequestBody = await request.json();
-    const { projectId, documentId, content, templateType, metadata } = body;
+    const { projectId, documentId, content, templateType, metadata, model } = body;
 
     // Validate input
     if (!projectId) {
@@ -111,8 +113,8 @@ export async function POST(request: NextRequest) {
       operation: 'ai:health-check',
     });
 
-    // Call AI health check engine
-    const healthCheck = await analyzeTemplateHealth(content, templateType, metadata);
+    // Call AI health check engine (multi-provider support)
+    const healthCheck = await analyzeTemplateHealth(content, templateType, metadata, model);
 
     // Save health check to database
     const { data: savedCheck, error: insertError } = await supabase

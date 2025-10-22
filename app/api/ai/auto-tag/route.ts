@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { generateAutoTags } from '@/lib/ai/recommendations-engine';
+import type { AIModel } from '@/lib/ai/service';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,7 @@ interface RequestBody {
   content: string;
   logline?: string;
   regenerate?: boolean; // Force regenerate even if tags exist
+  model?: AIModel; // Multi-provider support
 }
 
 export async function POST(request: NextRequest) {
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: RequestBody = await request.json();
-    const { projectId, content, logline, regenerate = false } = body;
+    const { projectId, content, logline, regenerate = false, model } = body;
 
     // Validate input
     if (!projectId) {
@@ -106,7 +108,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Call AI auto-tagging engine
-    const autoTags = await generateAutoTags(content, effectiveLogline);
+    const autoTags = await generateAutoTags(content, effectiveLogline, model);
 
     // Upsert tags to database (replace existing tags for this project)
     const { data: savedTags, error: upsertError } = await supabase

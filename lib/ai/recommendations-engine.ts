@@ -7,13 +7,44 @@
  * 3. Auto-Tagging - AI detects genre, tone, influences
  * 4. Collaborative Filtering - "Writers like you used..."
  * 5. Context-Aware Placeholders - AI generates scene descriptions
+ *
+ * Uses multi-provider AI service (Claude, GPT-5, DeepSeek)
  */
 
-import OpenAI from 'openai';
+import { generateWithClaude, generateWithGPT5, generateWithDeepSeek, type AIModel } from '@/lib/ai/service';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Default model for AI-native features (Claude Sonnet 4.5 for quality)
+const DEFAULT_AI_MODEL: AIModel = 'claude-sonnet-4.5';
+
+/**
+ * Generate AI response using the specified model (or default)
+ * Automatically handles JSON parsing from response
+ */
+async function generateAIResponse(
+  systemPrompt: string,
+  userPrompt: string,
+  model: AIModel = DEFAULT_AI_MODEL,
+  maxTokens: number = 2000
+): Promise<any> {
+  const combinedPrompt = `${systemPrompt}\n\n${userPrompt}\n\nRespond with valid JSON only.`;
+
+  let response;
+  switch (model) {
+    case 'claude-sonnet-4.5':
+      response = await generateWithClaude(combinedPrompt, undefined, maxTokens);
+      break;
+    case 'gpt-5':
+      response = await generateWithGPT5(combinedPrompt, undefined, maxTokens, 'medium', 'minimal');
+      break;
+    case 'deepseek-chat':
+      response = await generateWithDeepSeek(combinedPrompt, undefined, maxTokens);
+      break;
+    default:
+      response = await generateWithClaude(combinedPrompt, undefined, maxTokens);
+  }
+
+  return JSON.parse(response.content);
+}
 
 // ============================================================================
 // 1. SMART TEMPLATE RECOMMENDATIONS
@@ -34,7 +65,8 @@ export async function getSmartTemplateRecommendations(
   additionalContext?: {
     targetLength?: 'short' | 'feature' | 'series' | 'stage';
     preferredMedium?: 'film' | 'tv' | 'stage' | 'audio' | 'sequential';
-  }
+  },
+  model: AIModel = DEFAULT_AI_MODEL
 ): Promise<{
   primary: TemplateRecommendation;
   alternatives: TemplateRecommendation[];
@@ -84,17 +116,7 @@ ${additionalContext ? `\nContext: ${JSON.stringify(additionalContext)}` : ''}
 
 Analyze this logline and recommend the best template type.`;
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4-turbo-preview',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-    temperature: 0.7,
-    response_format: { type: 'json_object' },
-  });
-
-  return JSON.parse(completion.choices[0].message.content || '{}');
+  return generateAIResponse(systemPrompt, userPrompt, model, 2000);
 }
 
 // ============================================================================
@@ -138,7 +160,8 @@ export async function analyzeTemplateHealth(
     totalPages?: number;
     actBreaks?: { act: string; startPage: number; endPage: number }[];
     genre?: string;
-  }
+  },
+  model: AIModel = DEFAULT_AI_MODEL
 ): Promise<TemplateHealthCheck> {
   const systemPrompt = `You are a professional script doctor analyzing screenplay structure and pacing.
 
@@ -194,17 +217,7 @@ ${content.substring(0, 8000)} ${content.length > 8000 ? '...(truncated)' : ''}
 
 Provide a comprehensive health check analysis.`;
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4-turbo-preview',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-    temperature: 0.5,
-    response_format: { type: 'json_object' },
-  });
-
-  return JSON.parse(completion.choices[0].message.content || '{}');
+  return generateAIResponse(systemPrompt, userPrompt, model, 3000);
 }
 
 // ============================================================================
@@ -223,7 +236,8 @@ export interface AutoTags {
 
 export async function generateAutoTags(
   content: string,
-  logline?: string
+  logline?: string,
+  model: AIModel = DEFAULT_AI_MODEL
 ): Promise<AutoTags> {
   const systemPrompt = `You are a Hollywood script analyst specializing in genre classification and market positioning.
 
@@ -259,17 +273,7 @@ ${content.substring(0, 6000)} ${content.length > 6000 ? '...(truncated)' : ''}
 
 Generate comprehensive auto-tags for this screenplay.`;
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4-turbo-preview',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-    temperature: 0.6,
-    response_format: { type: 'json_object' },
-  });
-
-  return JSON.parse(completion.choices[0].message.content || '{}');
+  return generateAIResponse(systemPrompt, userPrompt, model, 2500);
 }
 
 // ============================================================================
@@ -306,7 +310,8 @@ export async function getCollaborativeRecommendations(
   currentProject?: {
     logline?: string;
     genre?: string;
-  }
+  },
+  model: AIModel = 'deepseek-chat' // DeepSeek is faster and cheaper for recommendations
 ): Promise<CollaborativeRecommendation[]> {
   const systemPrompt = `You are a recommendation engine for screenwriters.
 
@@ -318,18 +323,20 @@ Consider:
 - Success patterns
 - Current project context
 
-Return JSON array:
-[
-  {
-    "template_type": "tv_drama",
-    "template_name": "TV Drama (1-Hour)",
-    "usageCount": 127,
-    "averageRating": 4.6,
-    "similarWriters": 89,
-    "reason": "Writers who completed Sci-Fi features often expand into TV drama format",
-    "examples": ["Used for Breaking Bad-style pilots", "Complex character-driven stories"]
-  }
-]`;
+Return JSON with a "recommendations" array:
+{
+  "recommendations": [
+    {
+      "template_type": "tv_drama",
+      "template_name": "TV Drama (1-Hour)",
+      "usageCount": 127,
+      "averageRating": 4.6,
+      "similarWriters": 89,
+      "reason": "Writers who completed Sci-Fi features often expand into TV drama format",
+      "examples": ["Used for Breaking Bad-style pilots", "Complex character-driven stories"]
+    }
+  ]
+}`;
 
   const userPrompt = `User Profile:
 - Preferred Genres: ${userProfile.preferredGenres.join(', ')}
@@ -342,17 +349,7 @@ ${currentProject ? `Current Project:
 
 Recommend templates based on collaborative filtering.`;
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4-turbo-preview',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-    temperature: 0.7,
-    response_format: { type: 'json_object' },
-  });
-
-  const result = JSON.parse(completion.choices[0].message.content || '{}');
+  const result = await generateAIResponse(systemPrompt, userPrompt, model, 1500);
   return result.recommendations || [];
 }
 
@@ -375,7 +372,8 @@ export async function generateContextAwarePlaceholder(
     previousContent?: string; // Last few lines/scenes
     characterName?: string; // For dialogue
     location?: string; // For scene headings
-  }
+  },
+  model: AIModel = 'gpt-5' // GPT-5 for creative suggestions
 ): Promise<ContextAwarePlaceholder> {
   const systemPrompt = `You are a creative writing assistant helping screenwriters with context-aware suggestions.
 
@@ -412,17 +410,7 @@ ${context.previousContent ? `Previous Content:\n${context.previousContent}` : ''
 
 Generate a context-aware ${elementType} placeholder.`;
 
-  const completion = await openai.chat.completions.create({
-    model: 'gpt-4-turbo-preview',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-    temperature: 0.8,
-    response_format: { type: 'json_object' },
-  });
-
-  return JSON.parse(completion.choices[0].message.content || '{}');
+  return generateAIResponse(systemPrompt, userPrompt, model, 1500);
 }
 
 // ============================================================================

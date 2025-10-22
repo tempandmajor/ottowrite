@@ -8,6 +8,49 @@
 
 ---
 
+## 🔧 Production Hotfixes
+
+### HOTFIX: user_profiles Missing Onboarding Columns
+**Status**: ✅ COMPLETE
+**Priority**: P0 - Critical (Production Blocker)
+**Completed**: January 21, 2025
+**Time Taken**: 15 minutes
+
+**Issue**: 400 Bad Request errors on login when trying to access `has_completed_onboarding` and `onboarding_checklist` columns in `user_profiles` table. Users unable to skip onboarding tour.
+
+**Root Cause**: Database migration for UX-001 onboarding columns was never applied to production database. Table existed but was missing the two required columns.
+
+**Error Messages**:
+```
+GET https://jtngociduoicfnieidxf.supabase.co/rest/v1/user_profiles?select=has_completed_onboarding%2Conboarding_checklist&id=eq.029e5c99-23fe-4013-9e0a-2fc614252307 400 (Bad Request)
+
+PATCH https://jtngociduoicfnieidxf.supabase.co/rest/v1/user_profiles?id=eq.029e5c99-23fe-4013-9e0a-2fc614252307 400 (Bad Request)
+```
+
+**Solution**:
+- Applied migration `add_onboarding_columns_to_user_profiles` to production database
+- Added `has_completed_onboarding` column (boolean, default false)
+- Added `onboarding_checklist` column (jsonb, default `{"created_project": false, "created_document": false, "used_ai": false}`)
+- Verified RLS policies allow users to SELECT and UPDATE their own profile
+- Confirmed columns are now queryable
+
+**Database Changes**:
+```sql
+ALTER TABLE public.user_profiles
+ADD COLUMN IF NOT EXISTS has_completed_onboarding boolean DEFAULT false,
+ADD COLUMN IF NOT EXISTS onboarding_checklist jsonb DEFAULT '{"created_project": false, "created_document": false, "used_ai": false}'::jsonb;
+```
+
+**Build Status**: ✅ Passing (12.3s, 0 TypeScript errors)
+
+**Impact**:
+- ✅ Login flow now works without errors
+- ✅ Users can skip onboarding tour
+- ✅ Onboarding checklist tracking functional
+- ✅ No breaking changes to existing user_profiles records
+
+---
+
 ## 🎯 Active Sprint Tickets
 
 ### UX-013: Skip Navigation Link

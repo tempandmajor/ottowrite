@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
 import { validateQuery, validationErrorResponse } from '@/lib/validation/middleware'
 import { projectQuerySchema } from '@/lib/validation/schemas/projects'
@@ -234,6 +234,6 @@ export async function GET(request: NextRequest) {
     logger.error('Project query failed', {
       operation: 'projects:query',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError('Failed to query projects', { details: error })
+    return errorResponse('Failed to query projects', { status: 500, details: error })
   }
 }

@@ -227,6 +227,13 @@ export function TemplateDialog({ open, onOpenChange, projectId }: TemplateDialog
                           setSelectedTemplate(template)
                           setDocumentTitle(templateTitle)
                         }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setSelectedTemplate(template)
+                            setDocumentTitle(templateTitle)
+                          }
+                        }}
                       >
                         <div className="flex items-start gap-3">
                           <Icon className="h-5 w-5 mt-1 text-primary" />

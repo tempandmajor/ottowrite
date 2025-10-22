@@ -68,7 +68,7 @@ export default function UpdatePasswordPage() {
   )
 
   return (
-    <div className="min-h-screen bg-background">
+    <div id="main-content" className="min-h-screen bg-background">
       <div className="mx-auto grid min-h-screen max-w-5xl gap-10 px-6 py-12 lg:grid-cols-[1.1fr_1fr] lg:items-center">
         <div className="space-y-6">
           <Badge variant="outline" className="rounded-full border-border bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">

@@ -13,7 +13,7 @@ import {
   type DialogueSample,
   type VoicePattern,
 } from '@/lib/ai/dialogue-analyzer'
-import { errorResponses } from '@/lib/api/error-response'
+import { errorResponses, errorResponse } from '@/lib/api/error-response'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
   if (error && error.code !== 'PGRST116') {
     // PGRST116 is "no rows returned", which is expected for first-time
     console.error('Error fetching voice analysis:', error)
-    return errorResponses.internalError('Failed to fetch voice analysis')
+    return errorResponse('Failed to fetch voice analysis', { status: 500 })
   }
 
   // Also get dialogue samples count
@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Dialogue analysis error:', error)
-    return errorResponses.internalError(error instanceof Error ? error.message : 'Failed to analyze dialogue')
+    return errorResponse(error instanceof Error ? error.message : 'Failed to analyze dialogue', { status: 500 })
   }
 }
 

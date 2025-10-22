@@ -6,7 +6,7 @@
 
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
 import { validateBody, validateQuery, validationErrorResponse } from '@/lib/validation/middleware'
 import { z } from 'zod'
 import { logger } from '@/lib/monitoring/structured-logger'
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
         documentId,
         operation: 'changes:list',
       }, error)
-      return errorResponses.internalError('Failed to fetch changes')
+      return errorResponse('Failed to fetch changes', { status: 500 })
     }
 
     return successResponse({
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
     logger.error('Unexpected error in GET /api/changes', {
       operation: 'changes:list',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError()
+    return errorResponse("Internal server error", { status: 500 })
   }
 }
 
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
         documentId,
         operation: 'changes:create',
       }, error)
-      return errorResponses.internalError('Failed to create change')
+      return errorResponse('Failed to create change', { status: 500 })
     }
 
     logger.info('Document change created', {
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
     logger.error('Unexpected error in POST /api/changes', {
       operation: 'changes:create',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError()
+    return errorResponse("Internal server error", { status: 500 })
   }
 }
 
@@ -296,7 +296,7 @@ export async function PATCH(request: NextRequest) {
         action,
         operation: 'changes:review',
       }, error)
-      return errorResponses.internalError('Failed to review change')
+      return errorResponse('Failed to review change', { status: 500 })
     }
 
     // Add comment to history if provided
@@ -324,7 +324,7 @@ export async function PATCH(request: NextRequest) {
     logger.error('Unexpected error in PATCH /api/changes', {
       operation: 'changes:review',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError()
+    return errorResponse("Internal server error", { status: 500 })
   }
 }
 
@@ -379,7 +379,7 @@ export async function DELETE(request: NextRequest) {
         changeId,
         operation: 'changes:delete',
       }, error)
-      return errorResponses.internalError('Failed to delete change')
+      return errorResponse('Failed to delete change', { status: 500 })
     }
 
     logger.info('Change deleted', {
@@ -393,6 +393,6 @@ export async function DELETE(request: NextRequest) {
     logger.error('Unexpected error in DELETE /api/changes', {
       operation: 'changes:delete',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError()
+    return errorResponse("Internal server error", { status: 500 })
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
@@ -71,7 +71,7 @@ export async function GET() {
     logger.error('Error in GET /api/projects/tags', {
       operation: 'project_tags:get',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError('Failed to load tags', { details: error })
+    return errorResponse('Failed to load tags', { details: error, status: 500 })
   }
 }
 
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
     logger.error('Error in POST /api/projects/tags', {
       operation: 'project_tags:post',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError('Failed to create tag', { details: error })
+    return errorResponse('Failed to create tag', { details: error, status: 500 })
   }
 }
 
@@ -196,7 +196,7 @@ export async function PATCH(request: NextRequest) {
     logger.error('Error in PATCH /api/projects/tags', {
       operation: 'project_tags:patch',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError('Failed to update tag', { details: error })
+    return errorResponse('Failed to update tag', { details: error, status: 500 })
   }
 }
 
@@ -241,6 +241,6 @@ export async function DELETE(request: NextRequest) {
     logger.error('Error in DELETE /api/projects/tags', {
       operation: 'project_tags:delete',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError('Failed to delete tag', { details: error })
+    return errorResponse('Failed to delete tag', { details: error, status: 500 })
   }
 }

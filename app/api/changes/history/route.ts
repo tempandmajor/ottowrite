@@ -5,7 +5,7 @@
 
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
 import { validateQuery, validationErrorResponse } from '@/lib/validation/middleware'
 import { z } from 'zod'
 import { logger } from '@/lib/monitoring/structured-logger'
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
         documentId,
         operation: 'change_history:list',
       }, error)
-      return errorResponses.internalError('Failed to fetch change history')
+      return errorResponse('Failed to fetch change history', { status: 500 })
     }
 
     return successResponse({
@@ -131,6 +131,6 @@ export async function GET(request: NextRequest) {
     logger.error('Unexpected error in GET /api/changes/history', {
       operation: 'change_history:list',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError()
+    return errorResponse("Internal server error", { status: 500 })
   }
 }

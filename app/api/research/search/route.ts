@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { searchWeb, extractCitations } from '@/lib/search/search-service'
 import { formatSearchResultsForAI } from '@/lib/search/brave-search'
 import { generateWithAI } from '@/lib/ai/service'
-import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
@@ -192,7 +192,7 @@ Based on the search results above, provide a comprehensive answer to the user's 
     logger.error('Error starting research', {
       operation: 'research:post',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError('Failed to start research', { details: error })
+    return errorResponse('Failed to start research', { details: error, status: 500 })
   }
 }
 
@@ -233,6 +233,6 @@ export async function GET(request: NextRequest) {
     logger.error('Error fetching research notes', {
       operation: 'research:get',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError('Failed to fetch research notes', { details: error })
+    return errorResponse('Failed to fetch research notes', { details: error, status: 500 })
   }
 }

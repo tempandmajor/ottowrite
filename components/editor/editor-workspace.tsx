@@ -81,6 +81,9 @@ import { InlineAnalyticsPanel } from '@/components/editor/inline-analytics-panel
 import type { ScreenplayAct } from '@/types/screenplay'
 import { ReadingTimeWidget } from '@/components/editor/reading-time-widget'
 import { CharacterSceneIndex } from '@/components/editor/character-scene-index'
+import { BreadcrumbNav } from '@/components/dashboard/breadcrumb-nav'
+import { DocumentTree } from '@/components/editor/document-tree'
+import { useDocumentTree } from '@/hooks/use-document-tree'
 
 type RecentDocument = {
   id: string
@@ -364,7 +367,15 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   } = useEditorStore()
   const isWorkspaceMode = workspaceMode
   const [showAI, setShowAI] = useState(() => !isWorkspaceMode)
+  const [binderSidebarOpen, setBinderSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined' && document?.project_id) {
+      const saved = localStorage.getItem(`binder-sidebar-open-${document.project_id}`)
+      return saved !== null ? saved === 'true' : !isWorkspaceMode
+    }
+    return !isWorkspaceMode
+  })
   const [structureSidebarOpen, setStructureSidebarOpen] = useState(() => !isWorkspaceMode)
+  // const [binderWidth, setBinderWidth] = useState(280) // Reserved for future resize functionality
   const [leftRailWidth, setLeftRailWidth] = useState(320)
   const [rightRailWidth, setRightRailWidth] = useState(360)
   const [focusMode, setFocusMode] = useState(false)
@@ -402,14 +413,36 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     persistInterval: 5000,
   })
 
+  // Initialize document tree for binder
+  const {
+    nodes: binderNodes,
+    isLoading: binderLoading,
+    createDocument: createBinderDocument,
+    createFolder: createBinderFolder,
+    deleteNode: deleteBinderNode,
+    renameNode: renameBinderNode,
+    moveNode: moveBinderNode,
+  } = useDocumentTree({
+    projectId: document?.project_id || '',
+    enabled: Boolean(document?.project_id && binderSidebarOpen),
+  })
+
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setShowAI(false)
     }
   }, [])
 
+  // Persist binder sidebar state to localStorage
+  useEffect(() => {
+    if (document?.project_id) {
+      localStorage.setItem(`binder-sidebar-open-${document.project_id}`, String(binderSidebarOpen))
+    }
+  }, [binderSidebarOpen, document?.project_id])
+
   useEffect(() => {
     if (isWorkspaceMode) {
+      setBinderSidebarOpen(false)
       setStructureSidebarOpen(false)
       setShowAI(false)
       setFocusMode(false)
@@ -2125,13 +2158,29 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     )
   }
 
+  const showBinderSidebar = binderSidebarOpen && Boolean(document?.project_id) && !focusMode
   const showStructureSidebar = structureSidebarOpen && Boolean(document) && !focusMode
   const showUtilitySidebar = !focusMode // Hide utility sidebar in focus mode
   
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center gap-4 px-4 py-4 sm:px-6 xl:px-8">
+        <div className="mx-auto w-full max-w-[1600px] space-y-3 px-4 py-4 sm:px-6 xl:px-8">
+          {/* Breadcrumbs */}
+          {document.project_id && projectTitle && (
+            <BreadcrumbNav
+              items={[
+                { label: 'Dashboard', href: '/dashboard' },
+                { label: 'Projects', href: '/dashboard/projects' },
+                { label: projectTitle, href: `/dashboard/projects/${document.project_id}` },
+                { label: 'Documents', href: '/dashboard/documents' },
+                { label: title || 'Untitled' },
+              ]}
+            />
+          )}
+
+          {/* Header controls */}
+          <div className="flex w-full flex-wrap items-center gap-4">
           <div className="flex flex-1 items-center gap-3">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/dashboard/documents">
@@ -2211,6 +2260,31 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Export document</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFocusMode(false)
+                        setBinderSidebarOpen((prev) => !prev)
+                      }}
+                    >
+                      {binderSidebarOpen ? (
+                        <>
+                          <PanelLeftClose className="mr-2 h-4 w-4" />
+                          Hide binder
+                        </>
+                      ) : (
+                        <>
+                          <PanelLeftOpen className="mr-2 h-4 w-4" />
+                          Show binder
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Toggle binder (Ctrl+Shift+B)</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -2402,28 +2476,59 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>
+          </div>
         </div>
       </header>
 
       <main
         className={cn(
-          'mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:gap-8 xl:px-8',
+          'mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:gap-8 xl:px-8',
           'flex flex-col gap-8 xl:gap-10',
           // Enable grid layout when sidebars are present
-          (showStructureSidebar || showUtilitySidebar) && 'lg:grid',
+          (showBinderSidebar || showStructureSidebar || showUtilitySidebar) && 'lg:grid',
           // Focus mode: single column only
           focusMode && 'lg:grid-cols-[minmax(0,1fr)]',
-          // Both sidebars visible
-          !focusMode && showStructureSidebar && showUtilitySidebar &&
+          // All three sidebars visible
+          !focusMode && showBinderSidebar && showStructureSidebar && showUtilitySidebar &&
+            'lg:grid-cols-[minmax(200px,280px)_minmax(220px,280px)_minmax(0,1fr)_minmax(280px,340px)]',
+          // Binder + Outline (no utility)
+          !focusMode && showBinderSidebar && showStructureSidebar && !showUtilitySidebar &&
+            'lg:grid-cols-[minmax(200px,280px)_minmax(220px,280px)_minmax(0,1fr)]',
+          // Binder + Utility (no outline)
+          !focusMode && showBinderSidebar && !showStructureSidebar && showUtilitySidebar &&
+            'lg:grid-cols-[minmax(200px,280px)_minmax(0,1fr)_minmax(280px,340px)]',
+          // Only binder
+          !focusMode && showBinderSidebar && !showStructureSidebar && !showUtilitySidebar &&
+            'lg:grid-cols-[minmax(200px,280px)_minmax(0,1fr)]',
+          // Outline + Utility (no binder) - original layout
+          !focusMode && !showBinderSidebar && showStructureSidebar && showUtilitySidebar &&
             'lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)_minmax(280px,340px)]',
-          // Only outline sidebar
-          !focusMode && showStructureSidebar && !showUtilitySidebar &&
+          // Only outline (no binder)
+          !focusMode && !showBinderSidebar && showStructureSidebar && !showUtilitySidebar &&
             'lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]',
           // Only utility sidebar (AI panel)
-          !focusMode && !showStructureSidebar && showUtilitySidebar &&
+          !focusMode && !showBinderSidebar && !showStructureSidebar && showUtilitySidebar &&
             'lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]'
         )}
       >
+        {showBinderSidebar && document?.project_id && (
+          <div className="space-y-4">
+            <DocumentTree
+              projectId={document.project_id}
+              nodes={binderNodes}
+              activeDocumentId={document.id}
+              onSelectDocument={(id) => {
+                router.push(`/dashboard/editor/${id}`)
+              }}
+              onCreateDocument={createBinderDocument}
+              onCreateFolder={createBinderFolder}
+              onDeleteNode={deleteBinderNode}
+              onRename={renameBinderNode}
+              onMove={moveBinderNode}
+              isLoading={binderLoading}
+            />
+          </div>
+        )}
         {showStructureSidebar && document && (
           <div className="space-y-4">
             {isScriptType(document.type) ? (

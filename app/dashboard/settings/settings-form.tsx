@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles, RotateCcw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { UsageMeter } from '@/components/account/usage-meter'
 import { formatNumber } from '@/lib/number-format'
@@ -79,6 +80,7 @@ const formatDate = (value: string) =>
 export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps) {
   const supabase = useMemo(() => createClient(), [])
   const { toast } = useToast()
+  const router = useRouter()
 
   const [fullName, setFullName] = useState(profile.fullName)
   const [writingFocus, setWritingFocus] = useState(profile.writingFocus || 'prose')
@@ -87,6 +89,7 @@ export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps
   const [voiceNotes, setVoiceNotes] = useState(profile.writingPreferences?.voice ?? '')
   const [timezone, setTimezone] = useState(profile.timezone ?? '')
   const [saving, setSaving] = useState(false)
+  const [restartingOnboarding, setRestartingOnboarding] = useState(false)
 
   const planName = usageSummary.plan.charAt(0).toUpperCase() + usageSummary.plan.slice(1)
   const projectsLimit = usageSummary.limits?.max_projects ?? null
@@ -162,6 +165,53 @@ export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps
       }
     } catch (error) {
       console.warn('Unable to detect timezone', error)
+    }
+  }
+
+  const handleRestartOnboarding = async () => {
+    if (!confirm('This will reset your onboarding progress and show you the welcome wizard again. Continue?')) {
+      return
+    }
+
+    setRestartingOnboarding(true)
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          has_completed_onboarding: false,
+          onboarding_step: 0,
+        })
+        .eq('id', profile.id)
+
+      if (error) {
+        console.error('Failed to restart onboarding:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to restart onboarding. Please try again.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      toast({
+        title: 'Onboarding restarted',
+        description: 'Redirecting to dashboard...',
+      })
+
+      // Redirect to dashboard to trigger onboarding wizard
+      setTimeout(() => {
+        router.push('/dashboard')
+        router.refresh()
+      }, 500)
+    } catch (error) {
+      console.error('Error restarting onboarding:', error)
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred.',
+        variant: 'destructive',
+      })
+    } finally {
+      setRestartingOnboarding(false)
     }
   }
 
@@ -393,6 +443,35 @@ export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps
             <p className="text-xs text-muted-foreground">
               We use your timezone to schedule AI-assisted writing sessions and align progress reports.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none bg-card/80 shadow-card">
+          <CardHeader>
+            <CardTitle>Onboarding</CardTitle>
+            <CardDescription>
+              Want to see the welcome tutorial again? Restart the onboarding wizard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleRestartOnboarding}
+              disabled={restartingOnboarding}
+            >
+              {restartingOnboarding ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Restarting...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Restart Onboarding
+                </>
+              )}
+            </Button>
           </CardContent>
         </Card>
 

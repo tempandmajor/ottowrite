@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
+import { OutlineCardSkeletonGrid } from '@/components/dashboard/outline-card-skeleton'
 
 type Project = {
   id: string
@@ -60,6 +60,7 @@ export default function OutlinesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [formatFilter, setFormatFilter] = useState<string>('all')
   const [sortOrder, setSortOrder] = useState<'recent' | 'az'>('recent')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadProject = useCallback(async () => {
     try {
@@ -123,6 +124,7 @@ export default function OutlinesPage() {
   const deleteOutline = async (id: string) => {
     if (!confirm('Are you sure you want to delete this outline?')) return
 
+    setDeletingId(id)
     try {
       const response = await fetch(`/api/outlines?id=${id}`, {
         method: 'DELETE',
@@ -143,6 +145,8 @@ export default function OutlinesPage() {
         description: 'Failed to delete outline',
         variant: 'destructive',
       })
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -346,23 +350,7 @@ export default function OutlinesPage() {
 
       {/* Outlines List */}
       {outlinesLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Card key={index}>
-              <CardHeader>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-full" />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Skeleton className="h-6 w-24" />
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-10 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <OutlineCardSkeletonGrid count={3} />
       ) : filteredOutlines.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
@@ -408,6 +396,7 @@ export default function OutlinesPage() {
               outline={outline}
               projectId={project.id}
               onDelete={() => deleteOutline(outline.id)}
+              isDeleting={deletingId === outline.id}
             />
           ))}
         </div>

@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -140,6 +141,7 @@ export default function ProjectsPage() {
     description: '',
     folderId: '',
   })
+  const [createDefaultFolders, setCreateDefaultFolders] = useState(true)
   const [selectedCreateTagIds, setSelectedCreateTagIds] = useState<string[]>([])
   const { toast } = useToast()
 
@@ -243,6 +245,66 @@ export default function ProjectsPage() {
 
   const isRefreshing = !initialLoad && loading
 
+  async function createDefaultProjectStructure(projectId: string, projectType: ProjectType, userId: string) {
+    const supabase = createClient()
+
+    // Define default structure based on project type
+    const isScreenplay = projectType === 'screenplay' || projectType === 'play'
+
+    const defaultFolders = isScreenplay
+      ? [
+          { title: 'Acts', type: 'manuscript', position: 0 },
+          { title: 'Scenes', type: 'manuscript', position: 1 },
+          { title: 'Characters', type: 'characters', position: 2 },
+          { title: 'Locations', type: 'notes', position: 3 },
+        ]
+      : [
+          { title: 'Manuscript', type: 'manuscript', position: 0 },
+          { title: 'Research', type: 'research', position: 1 },
+          { title: 'Characters', type: 'characters', position: 2 },
+          { title: 'Notes', type: 'notes', position: 3 },
+          { title: 'Deleted Scenes', type: 'deleted', position: 4 },
+        ]
+
+    // Create folders
+    const folderInserts = defaultFolders.map((folder) => ({
+      user_id: userId,
+      project_id: projectId,
+      title: folder.title,
+      type: projectType,
+      is_folder: true,
+      folder_type: folder.type,
+      position: folder.position,
+      word_count: 0,
+    }))
+
+    const { data: folders, error: foldersError } = await supabase
+      .from('documents')
+      .insert(folderInserts)
+      .select('id, folder_type')
+
+    if (foldersError) throw foldersError
+
+    // Create a starter document in the Manuscript/Acts folder
+    const manuscriptFolder = folders?.find((f) => f.folder_type === 'manuscript')
+    if (manuscriptFolder) {
+      const starterDoc = {
+        user_id: userId,
+        project_id: projectId,
+        parent_folder_id: manuscriptFolder.id,
+        title: isScreenplay ? 'Act I' : 'Chapter 1',
+        type: projectType,
+        is_folder: false,
+        position: 0,
+        content: { html: '', structure: [] },
+        word_count: 0,
+      }
+
+      const { error: docError } = await supabase.from('documents').insert(starterDoc)
+      if (docError) throw docError
+    }
+  }
+
   async function createProject() {
     try {
       setCreatingProject(true)
@@ -272,6 +334,16 @@ export default function ProjectsPage() {
         .single()
 
       if (error) throw error
+
+      // Create default folder structure if enabled
+      if (project?.id && createDefaultFolders) {
+        try {
+          await createDefaultProjectStructure(project.id, formData.type, user.id)
+        } catch (structureError) {
+          console.error('Error creating default structure:', structureError)
+          // Don't fail the project creation if structure creation fails
+        }
+      }
 
       if (project?.id && selectedCreateTagIds.length > 0) {
         const linkRows = selectedCreateTagIds.map((tagId) => ({
@@ -614,6 +686,19 @@ export default function ProjectsPage() {
                 value={formData.description}
                 onChange={(event) => setFormData((prev) => ({ ...prev, description: event.target.value }))}
               />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="create-default-folders"
+                checked={createDefaultFolders}
+                onCheckedChange={(checked) => setCreateDefaultFolders(checked as boolean)}
+              />
+              <Label
+                htmlFor="create-default-folders"
+                className="text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Create default folders (Manuscript, Research, Characters, Notes)
+              </Label>
             </div>
             <div className="grid gap-2">
               <Label>Select tags</Label>

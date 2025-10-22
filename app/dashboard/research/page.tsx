@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -23,8 +22,10 @@ import {
   Filter,
   BookOpen,
   ExternalLink,
+  Loader2,
 } from 'lucide-react'
 import { NoteEditor } from '@/components/research/note-editor'
+import { NoteCardSkeletonGrid } from '@/components/dashboard/note-card-skeleton'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
@@ -63,6 +64,8 @@ export default function ResearchNotesPage() {
   const [showPinnedOnly, setShowPinnedOnly] = useState(false)
   const [editingNote, setEditingNote] = useState<ResearchNote | null>(null)
   const [creatingNew, setCreatingNew] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [togglingPinId, setTogglingPinId] = useState<string | null>(null)
 
   const fetchNotes = useCallback(async () => {
     try {
@@ -126,6 +129,7 @@ export default function ResearchNotesPage() {
     if (!note.id) return
     if (!confirm('Are you sure you want to delete this note?')) return
 
+    setDeletingId(note.id)
     try {
       const response = await fetch(`/api/research/notes?id=${note.id}`, {
         method: 'DELETE',
@@ -146,10 +150,15 @@ export default function ResearchNotesPage() {
         description: 'Failed to delete note',
         variant: 'destructive',
       })
+    } finally {
+      setDeletingId(null)
     }
   }
 
   async function togglePin(note: ResearchNote) {
+    if (!note.id) return
+
+    setTogglingPinId(note.id)
     try {
       const response = await fetch('/api/research/notes', {
         method: 'PATCH',
@@ -170,6 +179,8 @@ export default function ResearchNotesPage() {
         description: 'Failed to update note',
         variant: 'destructive',
       })
+    } finally {
+      setTogglingPinId(null)
     }
   }
 
@@ -299,11 +310,7 @@ export default function ResearchNotesPage() {
 
       {/* Notes List */}
       {loading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-48" />
-          ))}
-        </div>
+        <NoteCardSkeletonGrid count={3} />
       ) : notes.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -347,9 +354,14 @@ export default function ResearchNotesPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => togglePin(note)}
+                      disabled={togglingPinId === note.id}
                       title={note.is_pinned ? 'Unpin' : 'Pin'}
                     >
-                      <Pin className={cn('h-4 w-4', note.is_pinned && 'fill-current')} />
+                      {togglingPinId === note.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Pin className={cn('h-4 w-4', note.is_pinned && 'fill-current')} />
+                      )}
                     </Button>
                     <Button
                       variant="ghost"
@@ -363,9 +375,14 @@ export default function ResearchNotesPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDeleteNote(note)}
+                      disabled={deletingId === note.id}
                       title="Delete"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {deletingId === note.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 </div>

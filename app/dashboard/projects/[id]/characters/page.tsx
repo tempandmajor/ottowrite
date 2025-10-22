@@ -17,8 +17,11 @@ import {
   Handshake,
   UserCircle2,
   Network,
+  Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
+import { CharacterCardSkeletonGrid } from '@/components/dashboard/character-card-skeleton'
+import { StatsCardRow } from '@/components/dashboard/stats-skeleton'
 
 type Character = {
   id: string
@@ -65,6 +68,7 @@ export default function CharactersPage() {
   const [characters, setCharacters] = useState<Character[]>([])
   const [loading, setLoading] = useState(true)
   const [filterRole, setFilterRole] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     const supabase = createClient()
@@ -110,13 +114,18 @@ export default function CharactersPage() {
       return
     }
 
-    const response = await fetch(`/api/characters?id=${id}`, {
-      method: 'DELETE',
-    })
+    setDeletingId(id)
+    try {
+      const response = await fetch(`/api/characters?id=${id}`, {
+        method: 'DELETE',
+      })
 
-    if (response.ok) {
-      setAllCharacters((prev) => prev.filter((c) => c.id !== id))
-      setCharacters((prev) => prev.filter((c) => c.id !== id))
+      if (response.ok) {
+        setAllCharacters((prev) => prev.filter((c) => c.id !== id))
+        setCharacters((prev) => prev.filter((c) => c.id !== id))
+      }
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -130,16 +139,23 @@ export default function CharactersPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-48 bg-gray-200 rounded"></div>
-            ))}
+      <div className="container mx-auto px-4 py-8 space-y-8">
+        {/* Header skeleton */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="h-9 w-9 bg-muted rounded-lg animate-pulse" />
+            <div className="flex-1 space-y-2">
+              <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+              <div className="h-4 w-64 bg-muted rounded animate-pulse" />
+            </div>
           </div>
         </div>
+
+        {/* Stats skeleton */}
+        <StatsCardRow count={5} />
+
+        {/* Characters grid skeleton */}
+        <CharacterCardSkeletonGrid count={6} />
       </div>
     )
   }
@@ -291,8 +307,13 @@ export default function CharactersPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => deleteCharacter(character.id)}
+                      disabled={deletingId === character.id}
                     >
-                      <Trash2 className="h-3 w-3" />
+                      {deletingId === character.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3 w-3" />
+                      )}
                     </Button>
                   </div>
                 </CardContent>

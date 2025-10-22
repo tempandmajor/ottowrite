@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { X, Plus, Save, Pin, PinOff } from 'lucide-react'
+import { X, Plus, Save, Pin, PinOff, Loader2 } from 'lucide-react'
 
 type NoteCategory = 'reference' | 'character' | 'worldbuilding' | 'plot' | 'setting' | 'research' | 'other'
 
@@ -230,7 +230,11 @@ export function NoteEditor({ note, onSave, onCancel }: NoteEditorProps) {
             </Button>
           )}
           <Button onClick={handleSave} disabled={!title.trim() || !content.trim() || saving}>
-            <Save className="h-4 w-4 mr-2" />
+            {saving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
             {saving ? 'Saving...' : 'Save Research Note'}
           </Button>
         </div>

@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { MoreVertical, Eye, FileText, Trash2, Calendar } from 'lucide-react'
+import { MoreVertical, Eye, FileText, Trash2, Calendar, Loader2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 
@@ -30,6 +30,7 @@ type OutlineCardProps = {
   projectId: string
   onDelete: () => void
   defaultExpanded?: boolean
+  isDeleting?: boolean
 }
 
 const formatLabels: Record<string, { label: string; color: string }> = {
@@ -45,6 +46,7 @@ export function OutlineCard({
   projectId,
   onDelete,
   defaultExpanded = false,
+  isDeleting = false,
 }: OutlineCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
 
@@ -80,9 +82,13 @@ export function OutlineCard({
                 {expanded ? 'Hide' : 'Preview'} Sections
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+              <DropdownMenuItem onClick={onDelete} disabled={isDeleting} className="text-destructive">
+                {isDeleting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                {isDeleting ? 'Deleting...' : 'Delete'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

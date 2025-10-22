@@ -72,11 +72,25 @@ export function GettingStartedChecklist({ initialProgress }: GettingStartedCheck
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from('user_profiles')
           .select('onboarding_checklist')
           .eq('id', user.id)
-          .single()
+          .maybeSingle()
+
+        if (error) {
+          const message = (error.message ?? '').toLowerCase()
+          if (
+            error.code === 'PGRST116' ||
+            message.includes('json object requested') ||
+            message.includes('has_completed_onboarding') ||
+            message.includes('onboarding_checklist')
+          ) {
+            console.warn('Checklist progress unavailable; using local defaults.')
+            return
+          }
+          throw error
+        }
 
         if (profile?.onboarding_checklist) {
           setProgress(profile.onboarding_checklist as ChecklistProgress)

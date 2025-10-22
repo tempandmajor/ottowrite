@@ -18,6 +18,7 @@ import { TemplateStep } from './template-step'
 import { TourStep } from './tour-step'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 
 interface OnboardingWizardProps {
   open: boolean
@@ -28,6 +29,104 @@ type ProjectType = 'novel' | 'series' | 'screenplay' | 'play' | 'short_story'
 
 const STEPS = ['welcome', 'project-type', 'template', 'tour'] as const
 type Step = typeof STEPS[number]
+
+const isMissingProfileRow = (error: PostgrestError | null | undefined) => {
+  if (!error) return false
+  const message = (error.message ?? '').toLowerCase()
+  const details = (error.details ?? '').toLowerCase()
+  return (
+    error.code === 'PGRST116' ||
+    message.includes('json object requested') ||
+    message.includes('results contain 0 rows') ||
+    details.includes('0 rows')
+  )
+}
+
+const isOnboardingColumnMissing = (error: PostgrestError | null | undefined) => {
+  if (!error) return false
+  const message = (error.message ?? '').toLowerCase()
+  return (
+    message.includes('has_completed_onboarding') ||
+    message.includes('onboarding_completed_at') ||
+    message.includes('onboarding_step')
+  )
+}
+
+const ensureProfileRow = async (
+  supabase: SupabaseClient,
+  userId: string,
+  email: string | null | undefined
+) => {
+  const safeEmail = (email && email.trim().length > 0) ? email : `${userId}@profile.local`
+  const { error } = await supabase
+    .from('user_profiles')
+    .upsert(
+      {
+        id: userId,
+        email: safeEmail,
+      },
+      {
+        onConflict: 'id',
+      }
+    )
+
+  if (error) {
+    console.warn('Failed to create user profile scaffold', error)
+    return false
+  }
+  return true
+}
+
+type AuthenticatedUser = {
+  id: string
+  email?: string | null
+}
+
+const persistOnboardingUpdate = async (
+  supabase: SupabaseClient,
+  user: AuthenticatedUser,
+  payload: Record<string, any>
+) => {
+  const response = await supabase
+    .from('user_profiles')
+    .update(payload)
+    .eq('id', user.id)
+
+  if (!response.error) {
+    return true
+  }
+
+  const missingProfile = isMissingProfileRow(response.error)
+  const missingColumns = isOnboardingColumnMissing(response.error)
+
+  if (missingProfile) {
+    const ensured = await ensureProfileRow(supabase, user.id, user.email)
+    if (ensured) {
+      const retry = await supabase
+        .from('user_profiles')
+        .update(payload)
+        .eq('id', user.id)
+
+      if (!retry.error) {
+        return true
+      }
+
+      if (!isOnboardingColumnMissing(retry.error)) {
+        throw retry.error
+      }
+
+      console.warn('Onboarding update retry skipped due to missing columns.', retry.error)
+      return false
+    }
+  }
+
+  if (!missingProfile && !missingColumns) {
+    throw response.error
+  }
+
+  console.warn('Onboarding metadata unavailable; proceeding without persistence.', response.error)
+  return false
+}
 
 export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState<Step>('welcome')
@@ -60,13 +159,20 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
-        await supabase
-          .from('user_profiles')
-          .update({
+        const persisted = await persistOnboardingUpdate(
+          supabase,
+          user,
+          {
             has_completed_onboarding: true,
             onboarding_completed_at: new Date().toISOString(),
-          })
-          .eq('id', user.id)
+          }
+        )
+
+        if (!persisted) {
+          console.warn(
+            'Onboarding skip acknowledged locally; remote flag will be set once profile schema is available.'
+          )
+        }
       }
 
       onComplete()
@@ -85,14 +191,21 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (user) {
-        await supabase
-          .from('user_profiles')
-          .update({
+        const persisted = await persistOnboardingUpdate(
+          supabase,
+          user,
+          {
             has_completed_onboarding: true,
             onboarding_completed_at: new Date().toISOString(),
             onboarding_step: totalSteps,
-          })
-          .eq('id', user.id)
+          }
+        )
+
+        if (!persisted) {
+          console.warn(
+            'Onboarding completion not persisted due to missing profile metadata; continuing without blocking user.'
+          )
+        }
 
         toast({
           title: 'Welcome to Ottowrite! 🎉',

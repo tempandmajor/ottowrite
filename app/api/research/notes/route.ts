@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
         userId: user.id,
         operation: 'research:fetch_notes',
       }, error)
-      return errorResponses.internalError('Failed to fetch notes', { details: error })
+      return errorResponse('Failed to fetch notes', { status: 500, details: error })
     }
 
     return successResponse({ notes: data || [] })
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     logger.error('Error fetching research notes', {
       operation: 'research:get_notes',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError('Failed to fetch notes', { details: error })
+    return errorResponse('Failed to fetch notes', { status: 500, details: error })
   }
 }
 
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         operation: 'research:create_note',
       }, error)
-      return errorResponses.internalError('Failed to create note', { details: error })
+      return errorResponse('Failed to create note', { status: 500, details: error })
     }
 
     return successResponse({ note }, 201)
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
     logger.error('Error creating research note', {
       operation: 'research:post_note',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError('Failed to create note', { details: error })
+    return errorResponse('Failed to create note', { status: 500, details: error })
   }
 }
 
@@ -203,7 +203,7 @@ export async function PATCH(request: NextRequest) {
         noteId: id,
         operation: 'research:update_note',
       }, error)
-      return errorResponses.internalError('Failed to update note', { details: error })
+      return errorResponse('Failed to update note', { status: 500, details: error })
     }
 
     if (!note) {
@@ -215,7 +215,7 @@ export async function PATCH(request: NextRequest) {
     logger.error('Error updating research note', {
       operation: 'research:patch_note',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError('Failed to update note', { details: error })
+    return errorResponse('Failed to update note', { status: 500, details: error })
   }
 }
 
@@ -253,7 +253,7 @@ export async function DELETE(request: NextRequest) {
         noteId: id,
         operation: 'research:delete_note',
       }, error)
-      return errorResponses.internalError('Failed to delete note', { details: error })
+      return errorResponse('Failed to delete note', { status: 500, details: error })
     }
 
     return successResponse({ success: true })
@@ -261,6 +261,6 @@ export async function DELETE(request: NextRequest) {
     logger.error('Error deleting research note', {
       operation: 'research:delete_note',
     }, error instanceof Error ? error : undefined)
-    return errorResponses.internalError('Failed to delete note', { details: error })
+    return errorResponse('Failed to delete note', { status: 500, details: error })
   }
 }

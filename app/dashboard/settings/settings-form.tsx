@@ -12,10 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Sparkles, RotateCcw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { UsageMeter } from '@/components/account/usage-meter'
-import { formatNumber } from '@/lib/number-format'
-import { ManageSubscriptionButton } from '@/components/account/manage-subscription-button'
+import { UsageSummaryCard } from '@/components/account/usage-summary-card'
+import type { UsageSummary } from '@/lib/account/usage'
 
 type ProfileSettings = {
   id: string
@@ -35,47 +33,8 @@ const WRITING_FOCUS_OPTIONS = [
 type SettingsFormProps = {
   profile: ProfileSettings
   email: string
-  usageSummary: {
-    plan: string
-    limits: {
-      max_projects: number | null
-      max_documents: number | null
-      max_document_snapshots: number | null
-      max_templates: number | null
-      ai_words_per_month: number | null
-      ai_requests_per_month: number | null
-      collaborator_slots: number | null
-    } | null
-    usage: {
-      projects: number
-      documents: number
-      document_snapshots: number
-      templates_created: number
-      ai_words_used_month: number
-      ai_requests_month: number
-      ai_prompt_tokens: number
-      ai_completion_tokens: number
-      ai_cost_month: number
-      collaborators: number
-    }
-    currentPeriod: { start: string; end: string }
-    latestSnapshot: {
-      projects_count: number
-      documents_count: number
-      document_snapshots_count: number
-      templates_created: number
-      ai_words_used: number
-      ai_requests_count: number
-      collaborators_count: number
-      period_start: string
-      period_end: string
-      created_at: string
-    } | null
-  }
+  usageSummary: UsageSummary
 }
-
-const formatDate = (value: string) =>
-  new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
 export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps) {
   const supabase = useMemo(() => createClient(), [])
@@ -90,29 +49,6 @@ export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps
   const [timezone, setTimezone] = useState(profile.timezone ?? '')
   const [saving, setSaving] = useState(false)
   const [restartingOnboarding, setRestartingOnboarding] = useState(false)
-
-  const planName = usageSummary.plan.charAt(0).toUpperCase() + usageSummary.plan.slice(1)
-  const projectsLimit = usageSummary.limits?.max_projects ?? null
-  const documentsLimit = usageSummary.limits?.max_documents ?? null
-  const aiWordsLimit = usageSummary.limits?.ai_words_per_month ?? null
-  const aiRequestsLimit = usageSummary.limits?.ai_requests_per_month ?? null
-  const collaboratorLimit = usageSummary.limits?.collaborator_slots ?? null
-
-  const projectUsagePercent = projectsLimit
-    ? Math.min(100, Math.round((usageSummary.usage.projects / projectsLimit) * 100))
-    : 0
-  const documentUsagePercent = documentsLimit
-    ? Math.min(100, Math.round((usageSummary.usage.documents / documentsLimit) * 100))
-    : 0
-  const aiWordsPercent = aiWordsLimit
-    ? Math.min(100, Math.round((usageSummary.usage.ai_words_used_month / aiWordsLimit) * 100))
-    : 0
-  const aiRequestPercent = aiRequestsLimit
-    ? Math.min(100, Math.round((usageSummary.usage.ai_requests_month / aiRequestsLimit) * 100))
-    : 0
-  const collaboratorPercent = collaboratorLimit
-    ? Math.min(100, Math.round((usageSummary.usage.collaborators / collaboratorLimit) * 100))
-    : 0
 
   const preferredGenres = genresInput
     .split(',')
@@ -240,97 +176,7 @@ export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps
         </div>
       </section>
 
-      <Card className="border-none bg-card/80 shadow-card">
-        <CardHeader>
-          <CardTitle>Plan usage</CardTitle>
-          <CardDescription>
-            Current period {formatDate(usageSummary.currentPeriod.start)} – {formatDate(usageSummary.currentPeriod.end)} (resets monthly).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-2">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active plan</p>
-                <p className="text-lg font-semibold text-foreground">{planName}</p>
-              </div>
-              <div className="flex gap-2">
-                <ManageSubscriptionButton />
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/pricing">View plans</Link>
-                </Button>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Need more detail?{' '}
-                <Link href="/dashboard/account/usage" className="text-primary underline-offset-2 hover:underline">
-                  Open the usage dashboard
-                </Link>
-                .
-              </p>
-            </div>
-            <UsageMeter
-              label="Projects"
-              value={usageSummary.usage.projects}
-              limit={projectsLimit}
-              percent={projectUsagePercent}
-              warningThreshold={0.8}
-              warningMessage="You’re nearing the project limit for your current plan."
-            />
-            <UsageMeter
-              label="Documents"
-              value={usageSummary.usage.documents}
-              limit={documentsLimit}
-              percent={documentUsagePercent}
-              warningThreshold={0.8}
-              warningMessage="Document quota is nearly full. Upgrade to keep adding drafts."
-            />
-            <UsageMeter
-              label="Collaborator seats"
-              value={usageSummary.usage.collaborators}
-              limit={collaboratorLimit}
-              percent={collaboratorPercent}
-              warningThreshold={0.8}
-              warningMessage="Your team seats are almost full. Upgrade to add more collaborators."
-            />
-          </div>
-
-          <div className="space-y-4">
-            <UsageMeter
-              label="AI words this month"
-              value={usageSummary.usage.ai_words_used_month}
-              limit={aiWordsLimit}
-              percent={aiWordsPercent}
-              warningThreshold={0.8}
-              warningMessage="AI word allowance is almost used for this billing period."
-              unit="words"
-            />
-            <UsageMeter
-              label="AI requests this month"
-              value={usageSummary.usage.ai_requests_month}
-              limit={aiRequestsLimit}
-              percent={aiRequestPercent}
-              warningThreshold={0.8}
-              warningMessage="Most of your AI requests have been consumed this month."
-              unit="requests"
-            />
-            <div className="rounded-xl border border-border/60 bg-background/60 p-4 text-sm text-muted-foreground">
-              <p>
-                <span className="font-semibold text-foreground">${usageSummary.usage.ai_cost_month.toFixed(2)}</span> estimated AI spend this
-                period
-              </p>
-              <p className="mt-1 text-xs">
-                Prompt tokens: {formatNumber(usageSummary.usage.ai_prompt_tokens)} · Completion tokens:{' '}
-                {formatNumber(usageSummary.usage.ai_completion_tokens)}
-              </p>
-              {usageSummary.latestSnapshot && (
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Snapshot saved {formatDate(usageSummary.latestSnapshot.created_at)}
-                </p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <UsageSummaryCard usageSummary={usageSummary} />
 
       <form className="space-y-8" onSubmit={handleSave}>
         <Card className="border-none bg-card/80 shadow-card">

@@ -7,7 +7,8 @@ import Link from 'next/link'
 import { formatNumber } from '@/lib/number-format'
 import type { UsageSummary } from '@/lib/account/usage'
 import { Badge } from '@/components/ui/badge'
-import { CalendarIcon, TrendingUp, Activity } from 'lucide-react'
+import { CalendarIcon, TrendingUp, Activity, Download } from 'lucide-react'
+import { useState } from 'react'
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
@@ -23,7 +24,55 @@ type UsageDashboardProps = {
 }
 
 export function UsageDashboard({ userEmail, fullName, usageSummary }: UsageDashboardProps) {
+  const [isExporting, setIsExporting] = useState(false)
   const planName = PLAN_LABELS[usageSummary.plan] ?? usageSummary.plan
+
+  const handleExport = () => {
+    setIsExporting(true)
+    try {
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        user: {
+          email: userEmail,
+          fullName: fullName || 'N/A',
+        },
+        plan: {
+          name: planName,
+          tier: usageSummary.plan,
+        },
+        currentPeriod: {
+          start: usageSummary.currentPeriod.start,
+          end: usageSummary.currentPeriod.end,
+        },
+        usage: {
+          projects: usageSummary.usage.projects,
+          documents: usageSummary.usage.documents,
+          documentSnapshots: usageSummary.usage.document_snapshots,
+          templatesCreated: usageSummary.usage.templates_created,
+          aiWordsUsedMonth: usageSummary.usage.ai_words_used_month,
+          aiRequestsMonth: usageSummary.usage.ai_requests_month,
+          aiPromptTokens: usageSummary.usage.ai_prompt_tokens,
+          aiCompletionTokens: usageSummary.usage.ai_completion_tokens,
+          aiCostMonth: usageSummary.usage.ai_cost_month,
+          collaborators: usageSummary.usage.collaborators,
+        },
+        limits: usageSummary.limits,
+        history: usageSummary.history,
+      }
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `ottowrite-usage-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   const planLimits = usageSummary.limits ?? {
     max_projects: null,
@@ -83,6 +132,10 @@ export function UsageDashboard({ userEmail, fullName, usageSummary }: UsageDashb
       </header>
 
       <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting}>
+          <Download className="mr-2 h-4 w-4" />
+          {isExporting ? 'Exporting...' : 'Export usage data'}
+        </Button>
         <Button variant="outline" size="sm" asChild>
           <Link href="/dashboard/account/ai-telemetry">
             <Activity className="mr-2 h-4 w-4" />
@@ -166,6 +219,89 @@ export function UsageDashboard({ userEmail, fullName, usageSummary }: UsageDashb
                 Prompt tokens: {formatNumber(usageSummary.usage.ai_prompt_tokens)} · Completion tokens:{' '}
                 {formatNumber(usageSummary.usage.ai_completion_tokens)}
               </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-none bg-card/80 shadow-card">
+        <CardHeader>
+          <CardTitle>AI usage breakdown</CardTitle>
+          <CardDescription>
+            Detailed token consumption and cost analysis for this billing period.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+              <p className="text-sm text-muted-foreground">Total tokens</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">
+                {formatNumber(usageSummary.usage.ai_prompt_tokens + usageSummary.usage.ai_completion_tokens)}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatNumber(usageSummary.usage.ai_prompt_tokens)} prompt + {formatNumber(usageSummary.usage.ai_completion_tokens)} completion
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+              <p className="text-sm text-muted-foreground">Total cost</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">
+                ${usageSummary.usage.ai_cost_month.toFixed(2)}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Estimated for current period
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+              <p className="text-sm text-muted-foreground">Average per request</p>
+              <p className="mt-2 text-2xl font-semibold text-foreground">
+                {usageSummary.usage.ai_requests_month > 0
+                  ? formatNumber(
+                      Math.round(
+                        (usageSummary.usage.ai_prompt_tokens + usageSummary.usage.ai_completion_tokens) /
+                          usageSummary.usage.ai_requests_month
+                      )
+                    )
+                  : '0'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Tokens per AI request
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-xl border border-border/60 bg-muted/40 p-4">
+            <p className="text-sm font-medium text-foreground">Token breakdown</p>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Prompt tokens (input)</span>
+                <span className="font-medium">
+                  {formatNumber(usageSummary.usage.ai_prompt_tokens)} ({' '}
+                  {usageSummary.usage.ai_prompt_tokens + usageSummary.usage.ai_completion_tokens > 0
+                    ? Math.round(
+                        (usageSummary.usage.ai_prompt_tokens /
+                          (usageSummary.usage.ai_prompt_tokens + usageSummary.usage.ai_completion_tokens)) *
+                          100
+                      )
+                    : 0}
+                  %)
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Completion tokens (output)</span>
+                <span className="font-medium">
+                  {formatNumber(usageSummary.usage.ai_completion_tokens)} ({' '}
+                  {usageSummary.usage.ai_prompt_tokens + usageSummary.usage.ai_completion_tokens > 0
+                    ? Math.round(
+                        (usageSummary.usage.ai_completion_tokens /
+                          (usageSummary.usage.ai_prompt_tokens + usageSummary.usage.ai_completion_tokens)) *
+                          100
+                      )
+                    : 0}
+                  %)
+                </span>
+              </div>
             </div>
           </div>
         </CardContent>

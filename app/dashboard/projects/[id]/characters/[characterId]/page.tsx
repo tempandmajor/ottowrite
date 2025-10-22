@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SectionNav } from '@/components/dashboard/section-nav'
 import { useToast } from '@/hooks/use-toast'
 import type { CharacterArcStage } from '@/components/characters/arc-timeline'
+import { BreadcrumbNav } from '@/components/dashboard/breadcrumb-nav'
 
 // Lazy load heavy character analysis components
 const DialogueAnalyzer = lazy(() =>
@@ -101,6 +102,7 @@ export default function CharacterEditorPage() {
   const isNew = characterId === 'new'
 
   const [character, setCharacter] = useState<Character>(() => createInitialCharacter(projectId))
+  const [projectName, setProjectName] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!isNew)
   const [arcStages, setArcStages] = useState<CharacterArcStage[]>([])
@@ -170,6 +172,23 @@ export default function CharacterEditorPage() {
     resetListInputs()
     loadCharacter()
   }, [isNew, projectId, loadCharacter])
+
+  useEffect(() => {
+    async function loadProject() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('projects')
+        .select('name')
+        .eq('id', projectId)
+        .single()
+
+      if (data) {
+        setProjectName(data.name)
+      }
+    }
+    loadProject()
+  }, [projectId])
+
   const loadArcStages = useCallback(async () => {
     setArcLoading(true)
     try {
@@ -330,14 +349,24 @@ export default function CharacterEditorPage() {
   }
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:grid-cols-[260px_1fr]">
-      <div className="space-y-6 lg:sticky lg:top-28 lg:h-fit">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/dashboard/projects/${projectId}/characters`}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to characters
-          </Link>
-        </Button>
+    <div className="space-y-4">
+      <BreadcrumbNav
+        items={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Projects', href: '/dashboard/projects' },
+          { label: projectName || 'Project', href: `/dashboard/projects/${projectId}` },
+          { label: 'Characters', href: `/dashboard/projects/${projectId}/characters` },
+          { label: isNew ? 'New Character' : character.name },
+        ]}
+      />
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 lg:px-8 lg:grid-cols-[260px_1fr]">
+        <div className="space-y-6 lg:sticky lg:top-28 lg:h-fit">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/dashboard/projects/${projectId}/characters`}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to characters
+            </Link>
+          </Button>
         <section className="rounded-3xl border bg-card/80 p-6 shadow-card">
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-wide text-secondary-foreground">
@@ -874,6 +903,7 @@ export default function CharacterEditorPage() {
             )}
           </Button>
         </div>
+      </div>
       </div>
     </div>
   )

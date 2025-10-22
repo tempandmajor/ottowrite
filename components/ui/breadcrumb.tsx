@@ -48,14 +48,11 @@ const BreadcrumbLink = React.forwardRef<
     asChild?: boolean
   }
 >(({ asChild, className, children, ...props }, ref) => {
-  const Comp = asChild ? React.Fragment : 'a'
-
   if (asChild) {
     return <>{children}</>
   }
 
   return (
-    // eslint-disable-next-line jsx-a11y/anchor-has-content
     <a
       ref={ref}
       className={cn(

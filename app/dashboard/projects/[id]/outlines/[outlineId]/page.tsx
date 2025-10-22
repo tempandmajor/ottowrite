@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
+import { BreadcrumbNav } from '@/components/dashboard/breadcrumb-nav'
 
 type Outline = {
   id: string
@@ -55,6 +56,7 @@ export default function OutlineDetailPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [outline, setOutline] = useState<Outline | null>(null)
+  const [projectName, setProjectName] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editingNotes, setEditingNotes] = useState<Record<number, string>>({})
@@ -96,6 +98,22 @@ export default function OutlineDetailPage() {
   useEffect(() => {
     loadOutline()
   }, [loadOutline])
+
+  useEffect(() => {
+    async function loadProject() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('projects')
+        .select('name')
+        .eq('id', params.id)
+        .single()
+
+      if (data) {
+        setProjectName(data.name)
+      }
+    }
+    loadProject()
+  }, [params.id])
 
   const updateSectionNotes = async (index: number, notes: string) => {
     if (!outline) return
@@ -195,23 +213,33 @@ export default function OutlineDetailPage() {
       : null
 
   return (
-    <div className="space-y-6 lg:space-y-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-4">
-          <Link href={`/dashboard/projects/${projectId}/outlines`}>
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Outlines
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold">{outline.title}</h1>
-            <p className="text-muted-foreground mt-1">
-              {formatLabel} • {sectionCount} sections • Created {createdAgo}
-            </p>
+    <div className="space-y-4">
+      <BreadcrumbNav
+        items={[
+          { label: 'Dashboard', href: '/dashboard' },
+          { label: 'Projects', href: '/dashboard/projects' },
+          { label: projectName || 'Project', href: `/dashboard/projects/${projectId}` },
+          { label: 'Outlines', href: `/dashboard/projects/${projectId}/outlines` },
+          { label: outline.title },
+        ]}
+      />
+      <div className="space-y-6 lg:space-y-8">
+        {/* Header */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <Link href={`/dashboard/projects/${projectId}/outlines`}>
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Outlines
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold">{outline.title}</h1>
+              <p className="text-muted-foreground mt-1">
+                {formatLabel} • {sectionCount} sections • Created {createdAgo}
+              </p>
+            </div>
           </div>
-        </div>
         <div className="flex items-center gap-2">
           {hasUnsavedChanges && (
             <Badge variant="destructive" className="flex items-center gap-1">
@@ -505,6 +533,7 @@ export default function OutlineDetailPage() {
             </CardContent>
           </Card>
         </aside>
+      </div>
       </div>
     </div>
   )

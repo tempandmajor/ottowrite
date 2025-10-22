@@ -148,26 +148,26 @@ export default function DashboardPage() {
         <GettingStartedChecklist initialProgress={checklistProgress} />
       )}
 
-      <section className="flex flex-col gap-6 rounded-3xl bg-gradient-to-r from-muted via-background to-muted p-8 shadow-card md:flex-row md:items-center md:justify-between">
-        <div className="space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-wide text-secondary-foreground">
-            <Sparkles className="h-3.5 w-3.5" />
+      <section className="flex flex-col gap-6 rounded-3xl bg-gradient-to-br from-primary/10 via-background to-accent/5 p-10 shadow-lg md:flex-row md:items-center md:justify-between">
+        <div className="space-y-5">
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+            <Sparkles className="h-4 w-4" />
             Workspace Overview
           </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          <div className="space-y-3">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
               Welcome back, storyteller.
             </h1>
-            <p className="max-w-xl text-sm text-muted-foreground sm:text-base">
-              Keep your narratives, characters, and outlines aligned. Here’s what’s happening across your workspace today.
+            <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
+              Keep your narratives, characters, and outlines aligned. Here&apos;s what&apos;s happening across your workspace today.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button size="lg" onClick={() => setShowTemplateDialog(true)}>
-              <PenSquare className="h-4 w-4 mr-2" />
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <Button size="lg" className="h-12 px-6 text-base font-semibold shadow-md" onClick={() => setShowTemplateDialog(true)}>
+              <PenSquare className="h-5 w-5 mr-2" />
               New from Template
             </Button>
-            <Button variant="outline" size="lg" asChild>
+            <Button variant="outline" size="lg" className="h-12 px-6" asChild>
               <Link href="/dashboard/projects">
                 View Projects
                 <ArrowUpRight className="h-4 w-4 ml-2" />
@@ -175,22 +175,22 @@ export default function DashboardPage() {
             </Button>
           </div>
         </div>
-        <div className="flex flex-col gap-3 rounded-2xl border bg-card/70 p-6 shadow-card">
-          <p className="text-sm font-medium text-muted-foreground">Recent milestones</p>
-          <ul className="space-y-3 text-sm text-muted-foreground">
+        <div className="flex flex-col gap-3 rounded-2xl border border-border/50 bg-card/50 p-5 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground/80">Recent milestones</p>
+          <ul className="space-y-2.5 text-sm text-muted-foreground">
             <li className="flex items-center justify-between">
               <span>Projects created</span>
-              <Badge variant="outline" className="text-primary">
+              <Badge variant="outline" className="text-xs text-primary">
                 {stats.projectCount}
               </Badge>
             </li>
             <li className="flex items-center justify-between">
               <span>Active documents</span>
-              <Badge variant="outline">{stats.documentCount}</Badge>
+              <Badge variant="outline" className="text-xs">{stats.documentCount}</Badge>
             </li>
             <li className="flex items-center justify-between">
               <span>AI words generated</span>
-              <Badge variant="outline">{stats.totalWordsGenerated.toLocaleString()}</Badge>
+              <Badge variant="outline" className="text-xs">{stats.totalWordsGenerated.toLocaleString()}</Badge>
             </li>
           </ul>
         </div>
@@ -201,8 +201,10 @@ export default function DashboardPage() {
           label="Projects"
           value={stats.projectCount}
           helper="Across all genres"
-          icon={<PenSquare className="h-5 w-5" />}
+          icon={<PenSquare className="h-6 w-6" />}
           delta={{ value: '+2 this month', positive: true }}
+          tone="primary"
+          priority="high"
           tooltip="Total number of writing projects you've created across all genres (novels, screenplays, series, plays, and short stories)"
         />
         <StatCard
@@ -210,6 +212,7 @@ export default function DashboardPage() {
           value={stats.documentCount}
           helper="Works in progress"
           icon={<FileText className="h-5 w-5" />}
+          tone="secondary"
           tooltip="Active documents across all your projects, including chapters, scenes, outlines, and character profiles"
         />
         <StatCard

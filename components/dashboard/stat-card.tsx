@@ -17,26 +17,34 @@ export function StatCard({
   delta,
   tone = 'default',
   tooltip,
+  priority = 'normal',
 }: {
   label: string
   value: string | number
   helper?: string
   icon?: ReactNode
   delta?: { value: string; positive?: boolean }
-  tone?: 'default' | 'accent'
+  tone?: 'default' | 'accent' | 'primary' | 'secondary'
   tooltip?: string
+  priority?: 'high' | 'normal'
 }) {
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border bg-card/80 p-6 shadow-card transition hover:shadow-lg',
-        tone === 'accent' && 'bg-gradient-to-br from-muted via-card to-card'
+        'relative overflow-hidden rounded-2xl border bg-card/80 shadow-card transition hover:shadow-lg',
+        tone === 'accent' && 'bg-gradient-to-br from-accent/10 via-card to-card border-accent/20',
+        tone === 'primary' && 'bg-gradient-to-br from-primary/10 via-card to-card border-primary/20',
+        tone === 'secondary' && 'bg-gradient-to-br from-secondary via-card to-card',
+        priority === 'high' ? 'p-7 md:p-8' : 'p-6'
       )}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground/90">
+            <p className={cn(
+              'font-medium uppercase tracking-wide text-muted-foreground/90',
+              priority === 'high' ? 'text-sm' : 'text-xs'
+            )}>
               {label}
             </p>
             {tooltip && (
@@ -58,10 +66,19 @@ export function StatCard({
               </TooltipProvider>
             )}
           </div>
-          <p className="text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-          {helper && <p className="text-sm text-muted-foreground/80">{helper}</p>}
+          <p className={cn(
+            'font-bold tracking-tight text-foreground',
+            priority === 'high' ? 'text-4xl md:text-5xl' : 'text-3xl'
+          )}>{value}</p>
+          {helper && <p className={cn(
+            'text-muted-foreground/80',
+            priority === 'high' ? 'text-base' : 'text-sm'
+          )}>{helper}</p>}
         </div>
-        {icon && <div className="rounded-full bg-secondary p-3 text-secondary-foreground">{icon}</div>}
+        {icon && <div className={cn(
+          'rounded-full bg-secondary text-secondary-foreground',
+          priority === 'high' ? 'p-4' : 'p-3'
+        )}>{icon}</div>}
       </div>
       {delta && (
         <Badge

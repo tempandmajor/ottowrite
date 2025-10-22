@@ -2,9 +2,9 @@
 
 **Last Updated**: January 21, 2025
 **Total Tickets**: 89 tickets
-**Completed**: 63 tickets (71%)
+**Completed**: 64 tickets (72%)
 **In Progress**: 0 tickets (0%)
-**Not Started**: 26 tickets (29%)
+**Not Started**: 25 tickets (28%)
 
 ---
 
@@ -435,6 +435,99 @@ Due to time constraints and token limits, implemented core breadcrumb infrastruc
 4. Verify text truncation with long project/document names
 
 **Related**: Part of UX Audit 2025 (Navigation track), Sprint 2 Ticket 1 of 4
+
+---
+
+### UX-012: Improve Visual Hierarchy on Dashboard
+**Status**: ✅ COMPLETE
+**Priority**: P1 - High (Visual Design)
+**Track**: User Experience Enhancement - Sprint 2
+**Completed**: January 21, 2025
+**Time Taken**: 1.5 hours (3 story points)
+
+**Description**: Strengthen visual hierarchy on dashboard to guide user attention to most important actions and data.
+
+**Acceptance Criteria**:
+- [x] Increase welcome banner prominence (larger heading, stronger gradient, bigger CTA)
+- [x] Add visual hierarchy to stat cards (size differences, color coding)
+- [x] Reduce visual weight of secondary elements (quick actions, milestones)
+- [x] Build passes with no errors
+
+**Implementation Summary**:
+
+**1. Welcome Banner Enhancement** (`app/dashboard/page.tsx`):
+- **Heading**: Increased from `text-3xl sm:text-4xl` → `text-4xl sm:text-5xl` with bold weight
+- **Gradient**: Enhanced from `from-muted via-background to-muted` → `from-primary/10 via-background to-accent/5`
+- **Badge**: Changed from secondary → primary color with larger icon (`h-4 w-4`)
+- **Description**: Increased from `text-sm sm:text-base` → `text-base sm:text-lg`
+- **Primary CTA**: Added larger size (`h-12 px-6`), increased font weight, added shadow
+- **Padding**: Increased from `p-8` → `p-10` for more breathing room
+
+**2. Stat Card Visual Hierarchy** (`components/dashboard/stat-card.tsx`):
+
+Added new `priority` and enhanced `tone` props:
+- **Priority prop**: `'high' | 'normal'` (default: `'normal'`)
+- **Tone prop**: Extended to include `'primary' | 'secondary'` color schemes
+
+**Priority 'high' styling**:
+- Padding: `p-7 md:p-8` (vs `p-6` for normal)
+- Label: `text-sm` (vs `text-xs`)
+- Value: `text-4xl md:text-5xl` with `font-bold` (vs `text-3xl`)
+- Helper: `text-base` (vs `text-sm`)
+- Icon container: `p-4` (vs `p-3`)
+
+**Tone color schemes**:
+- `'primary'`: `bg-gradient-to-br from-primary/10 via-card to-card border-primary/20`
+- `'secondary'`: `bg-gradient-to-br from-secondary via-card to-card`
+- `'accent'`: `bg-gradient-to-br from-accent/10 via-card to-card border-accent/20`
+
+**Dashboard stat card assignments**:
+1. **Projects**: `tone="primary"` + `priority="high"` (most important)
+2. **Documents**: `tone="secondary"` (secondary importance)
+3. **AI words**: `tone="accent"` (supporting metric)
+
+**3. Secondary Elements Reduced Weight**:
+
+**Recent Milestones Sidebar**:
+- Border: Added opacity `border-border/50` (was solid)
+- Background: Reduced opacity `bg-card/50` (was `bg-card/70`)
+- Shadow: Reduced to `shadow-sm` (was `shadow-card`)
+- Padding: Reduced to `p-5` (was `p-6`)
+- Title: Made smaller `text-xs uppercase` with reduced opacity `text-muted-foreground/80`
+- Spacing: Tightened to `space-y-2.5` (was `space-y-3`)
+- Badges: Reduced to `text-xs` size
+
+**Files Modified**:
+- `app/dashboard/page.tsx` (welcome banner, stat card props, milestones sidebar)
+- `components/dashboard/stat-card.tsx` (added priority/tone visual hierarchy)
+
+**Build Status**: ✅ Passing (11.8s, 0 TypeScript errors, 0 ESLint errors)
+
+**UX Improvements Delivered**:
+- ✅ **Clear Focus**: Primary CTA (New from Template) now stands out prominently
+- ✅ **Information Hierarchy**: Projects stat card clearly most important (larger, primary color)
+- ✅ **Visual Balance**: Secondary elements (milestones) reduced in weight to avoid competition
+- ✅ **Guided Attention**: Stronger gradient and larger heading draw eye to welcome banner
+- ✅ **Color Psychology**: Primary (blue) for projects, accent (purple) for AI features
+- ✅ **Breathing Room**: Increased spacing creates more comfortable visual hierarchy
+
+**Visual Hierarchy Pattern**:
+```
+PRIORITY LEVELS:
+1. Welcome Banner (text-5xl, strong gradient, large CTA) ← Highest
+2. Projects Stat Card (text-5xl, primary color, high priority)
+3. Other Stat Cards (text-3xl, secondary/accent colors)
+4. Recent Milestones (reduced opacity, smaller text) ← Lowest
+```
+
+**Design Principles Applied**:
+- **Size**: Larger elements = more important
+- **Color**: Primary color for most important actions/data
+- **Weight**: Bold fonts for key information
+- **Contrast**: Stronger gradients for focal points
+- **Proximity**: More spacing around important elements
+
+**Related**: Part of UX Audit 2025 (Visual Design track), Sprint 2 Ticket 2 of 4
 
 ---
 

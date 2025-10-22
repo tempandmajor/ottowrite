@@ -1,0 +1,315 @@
+/**
+ * Template Health Check API
+ * POST /api/ai/health-check
+ *
+ * Feature 2: Story structure and pacing analysis
+ * "Your Act II feels rushed (only 40 pages)"
+ * "Missing 'All Is Lost' moment at page 75"
+ */
+
+import { NextRequest } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { errorResponses, successResponse } from '@/lib/api/error-response';
+import { logger } from '@/lib/monitoring/structured-logger';
+import { analyzeTemplateHealth } from '@/lib/ai/recommendations-engine';
+import crypto from 'crypto';
+
+export const dynamic = 'force-dynamic';
+
+interface RequestBody {
+  projectId: string;
+  documentId?: string;
+  content: string;
+  templateType: string;
+  metadata?: {
+    totalPages?: number;
+    actBreaks?: Array<{ act: string; startPage: number; endPage: number }>;
+    genre?: string;
+  };
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    // Check authentication
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      logger.warn('Unauthorized health check request', {
+        operation: 'ai:health-check',
+      });
+      return errorResponses.unauthorized();
+    }
+
+    // Parse request body
+    const body: RequestBody = await request.json();
+    const { projectId, documentId, content, templateType, metadata } = body;
+
+    // Validate input
+    if (!projectId) {
+      return errorResponses.badRequest('Project ID is required');
+    }
+
+    if (!content || content.trim().length === 0) {
+      return errorResponses.badRequest('Content is required');
+    }
+
+    if (!templateType) {
+      return errorResponses.badRequest('Template type is required');
+    }
+
+    // Verify project ownership
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id, title')
+      .eq('id', projectId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (projectError || !project) {
+      return errorResponses.notFound('Project not found');
+    }
+
+    // Generate content hash to avoid re-analyzing same content
+    const contentHash = crypto
+      .createHash('sha256')
+      .update(content)
+      .digest('hex')
+      .substring(0, 32);
+
+    // Check if we already have a recent analysis for this content
+    const { data: existingCheck } = await supabase
+      .from('template_health_checks')
+      .select('*')
+      .eq('project_id', projectId)
+      .eq('content_hash', contentHash)
+      .gte('analyzed_at', new Date(Date.now() - 1000 * 60 * 60).toISOString()) // Within last hour
+      .single();
+
+    if (existingCheck) {
+      logger.info('Returning cached health check', {
+        user_id: user.id,
+        project_id: projectId,
+        operation: 'ai:health-check',
+      });
+
+      return successResponse({
+        healthCheck: existingCheck,
+        cached: true,
+      });
+    }
+
+    logger.info('Analyzing template health', {
+      user_id: user.id,
+      project_id: projectId,
+      template_type: templateType,
+      content_length: content.length,
+      operation: 'ai:health-check',
+    });
+
+    // Call AI health check engine
+    const healthCheck = await analyzeTemplateHealth(content, templateType, metadata);
+
+    // Save health check to database
+    const { data: savedCheck, error: insertError } = await supabase
+      .from('template_health_checks')
+      .insert({
+        user_id: user.id,
+        project_id: projectId,
+        document_id: documentId || null,
+        template_type: templateType,
+        total_pages: metadata?.totalPages || null,
+        genre: metadata?.genre || null,
+        overall_score: healthCheck.overallScore,
+        issues: healthCheck.issues,
+        strengths: healthCheck.strengths,
+        act_breakdown: healthCheck.actBreakdown || [],
+        beat_presence: healthCheck.beatPresence || [],
+        content_hash: contentHash,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      logger.error(
+        'Failed to save health check',
+        {
+          user_id: user.id,
+          project_id: projectId,
+          operation: 'ai:health-check',
+        },
+        insertError ?? undefined
+      );
+      // Don't fail - return the analysis anyway
+    }
+
+    logger.info('Health check completed', {
+      user_id: user.id,
+      project_id: projectId,
+      overall_score: healthCheck.overallScore,
+      issues_count: healthCheck.issues.length,
+      operation: 'ai:health-check',
+    });
+
+    return successResponse({
+      healthCheck: savedCheck || healthCheck,
+      cached: false,
+    });
+  } catch (error) {
+    logger.error(
+      'Error generating health check',
+      {
+        operation: 'ai:health-check',
+      },
+      error instanceof Error ? error : undefined
+    );
+
+    return errorResponses.internalError('Failed to generate health check');
+  }
+}
+
+// GET endpoint to retrieve health checks for a project
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    // Check authentication
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return errorResponses.unauthorized();
+    }
+
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId');
+    const documentId = searchParams.get('documentId');
+    const limit = parseInt(searchParams.get('limit') || '10');
+
+    if (!projectId) {
+      return errorResponses.badRequest('Project ID is required');
+    }
+
+    // Verify project ownership
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', projectId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (projectError || !project) {
+      return errorResponses.notFound('Project not found');
+    }
+
+    // Build query
+    let query = supabase
+      .from('template_health_checks')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('analyzed_at', { ascending: false })
+      .limit(limit);
+
+    if (documentId) {
+      query = query.eq('document_id', documentId);
+    }
+
+    const { data: healthChecks, error: queryError } = await query;
+
+    if (queryError) {
+      logger.error(
+        'Failed to fetch health checks',
+        {
+          user_id: user.id,
+          project_id: projectId,
+          operation: 'ai:health-check:get',
+        },
+        queryError ?? undefined
+      );
+      return errorResponses.internalError('Failed to fetch health checks');
+    }
+
+    return successResponse({
+      healthChecks: healthChecks || [],
+    });
+  } catch (error) {
+    logger.error(
+      'Error fetching health checks',
+      {
+        operation: 'ai:health-check:get',
+      },
+      error instanceof Error ? error : undefined
+    );
+
+    return errorResponses.internalError('Failed to fetch health checks');
+  }
+}
+
+// PATCH endpoint to mark health check as viewed/dismissed
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    // Check authentication
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return errorResponses.unauthorized();
+    }
+
+    const body = await request.json();
+    const { healthCheckId, viewed, dismissed } = body;
+
+    if (!healthCheckId) {
+      return errorResponses.badRequest('Health check ID is required');
+    }
+
+    // Update health check
+    const updateData: any = {};
+    if (viewed !== undefined) updateData.user_viewed = viewed;
+    if (dismissed !== undefined) updateData.user_dismissed = dismissed;
+
+    const { error: updateError } = await supabase
+      .from('template_health_checks')
+      .update(updateData)
+      .eq('id', healthCheckId)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      logger.error(
+        'Failed to update health check status',
+        {
+          user_id: user.id,
+          health_check_id: healthCheckId,
+          operation: 'ai:health-check:patch',
+        },
+        updateError ?? undefined
+      );
+      return errorResponses.internalError('Failed to update health check');
+    }
+
+    return successResponse({
+      message: 'Health check updated successfully',
+    });
+  } catch (error) {
+    logger.error(
+      'Error updating health check',
+      {
+        operation: 'ai:health-check:patch',
+      },
+      error instanceof Error ? error : undefined
+    );
+
+    return errorResponses.internalError('Failed to update health check');
+  }
+}

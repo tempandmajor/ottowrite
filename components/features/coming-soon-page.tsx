@@ -205,18 +205,9 @@ export function ComingSoonPage({
 
       {/* Development Progress (Optional) */}
       <div className="mt-8 text-center">
-        <p className="text-sm text-muted-foreground mb-4">
-          We&apos;re working hard to bring you this feature. Follow our progress:
+        <p className="text-sm text-muted-foreground">
+          We&apos;re working hard to bring you this feature. Stay tuned for updates!
         </p>
-        <div className="flex items-center justify-center gap-4">
-          <Link href="/changelog" className="text-sm text-primary hover:underline">
-            View Changelog
-          </Link>
-          <span className="text-muted-foreground">•</span>
-          <Link href="/roadmap" className="text-sm text-primary hover:underline">
-            Product Roadmap
-          </Link>
-        </div>
       </div>
     </div>
   )

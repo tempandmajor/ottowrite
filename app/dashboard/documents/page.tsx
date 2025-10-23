@@ -36,6 +36,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { Filter, FileText, Plus, Search, Trash2 } from 'lucide-react'
+import { UpgradePrompt } from '@/components/upgrade/upgrade-prompt'
+import { UpgradeModal } from '@/components/upgrade/upgrade-modal'
+import { checkDocumentQuota } from '@/lib/account/quota'
 
 interface Document {
   id: string
@@ -78,6 +81,10 @@ export default function DocumentsPage() {
     type: 'novel' as Document['type'],
     project_id: '',
   })
+  const [userPlan, setUserPlan] = useState<string>('free')
+  const [documentQuota, setDocumentQuota] = useState<{ used: number; limit: number } | null>(null)
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [showBanner, setShowBanner] = useState(false)
   const { toast } = useToast()
 
   const loadInitialData = useCallback(async () => {
@@ -89,7 +96,7 @@ export default function DocumentsPage() {
 
       if (!user) return
 
-      const [documentsResponse, projectsResponse] = await Promise.all([
+      const [documentsResponse, projectsResponse, profileResponse] = await Promise.all([
         supabase
           .from('documents')
           .select(
@@ -103,11 +110,19 @@ export default function DocumentsPage() {
           .select('id, name, type')
           .eq('user_id', user.id)
           .order('name', { ascending: true }),
+        supabase
+          .from('user_profiles')
+          .select('subscription_tier, subscription_status')
+          .eq('id', user.id)
+          .maybeSingle(),
       ])
 
       if (documentsResponse.error) throw documentsResponse.error
       if (projectsResponse.error) throw projectsResponse.error
+      if (profileResponse.error) throw profileResponse.error
 
+      const plan = profileResponse.data?.subscription_tier ?? 'free'
+      setUserPlan(plan)
       setDocuments(documentsResponse.data || [])
       setProjects(projectsResponse.data || [])
       const firstProjectId = projectsResponse.data?.[0]?.id ?? ''
@@ -116,6 +131,15 @@ export default function DocumentsPage() {
         setFormData((prev) =>
           prev.project_id ? prev : { ...prev, project_id: firstProjectId }
         )
+      }
+
+      // Check document quota
+      const quotaCheck = await checkDocumentQuota(supabase, user.id, plan)
+      setDocumentQuota({ used: quotaCheck.used, limit: quotaCheck.limit })
+
+      // Show banner if at 80% or more of limit (and not unlimited)
+      if (quotaCheck.limit > 0 && quotaCheck.used >= quotaCheck.limit * 0.8) {
+        setShowBanner(true)
       }
     } catch (error) {
       console.error('Error loading documents:', error)
@@ -137,6 +161,15 @@ export default function DocumentsPage() {
       } = await supabase.auth.getUser()
 
       if (!user) return
+
+      // Check quota before creating
+      const quotaCheck = await checkDocumentQuota(supabase, user.id, userPlan)
+      if (!quotaCheck.allowed) {
+        // Show upgrade modal instead of error
+        setDialogOpen(false)
+        setUpgradeModalOpen(true)
+        return
+      }
 
       const { error } = await supabase
         .from('documents')
@@ -221,12 +254,26 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-8">
+      {/* Upgrade Banner */}
+      {showBanner && documentQuota && documentQuota.limit > 0 && (
+        <UpgradePrompt
+          reason="document_limit"
+          currentPlan={userPlan}
+          recommendedPlan={userPlan === 'free' ? 'hobbyist' : 'professional'}
+          variant="banner"
+          onDismiss={() => setShowBanner(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
             {documents.length} {documents.length === 1 ? 'document' : 'documents'} · {totalWords.toLocaleString()} words
+            {documentQuota && documentQuota.limit > 0 && (
+              <> · {documentQuota.used}/{documentQuota.limit} used</>
+            )}
           </p>
         </div>
         <Button onClick={() => setDialogOpen(true)} size="default" className="shrink-0">
@@ -427,6 +474,16 @@ export default function DocumentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onOpenChange={setUpgradeModalOpen}
+        reason="document_limit"
+        currentPlan={userPlan}
+        recommendedPlan={userPlan === 'free' ? 'hobbyist' : 'professional'}
+        limitInfo={documentQuota ? { current: documentQuota.used, limit: documentQuota.limit } : undefined}
+      />
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { ArrowRight, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { formatNumber } from '@/lib/number-format'
 import type { UsageSummary } from '@/lib/account/usage'
+import { UpgradePrompt } from '@/components/upgrade/upgrade-prompt'
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
@@ -166,6 +167,17 @@ export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
             </span>
           </div>
         </div>
+
+        {/* AI Words Upgrade Prompt */}
+        {aiWordsPercent >= 80 && limits.ai_words_per_month && limits.ai_words_per_month > 0 && (
+          <UpgradePrompt
+            reason="ai_words_limit"
+            currentPlan={usageSummary.plan}
+            recommendedPlan={usageSummary.plan === 'free' ? 'hobbyist' : usageSummary.plan === 'hobbyist' ? 'professional' : 'studio'}
+            variant="inline"
+            compact
+          />
+        )}
       </CardContent>
     </Card>
   )

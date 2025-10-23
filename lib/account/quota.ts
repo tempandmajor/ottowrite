@@ -12,19 +12,22 @@ export function getCurrentBillingWindow() {
   }
 }
 
-export async function getPlanLimits(
+export async function getTierLimits(
   supabase: SupabaseClient,
-  plan: string
+  tier: string
 ) {
   const { data, error } = await supabase
-    .from('subscription_plan_limits')
+    .from('subscription_tier_limits')
     .select('*')
-    .eq('plan', plan)
+    .eq('tier', tier)
     .maybeSingle()
 
   if (error) throw error
   return data ?? null
 }
+
+// Legacy alias for backward compatibility
+export const getPlanLimits = getTierLimits
 
 export async function checkAIRequestQuota(
   supabase: SupabaseClient,

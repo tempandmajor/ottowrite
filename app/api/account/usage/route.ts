@@ -25,12 +25,12 @@ export async function GET() {
       .eq('id', user.id)
       .single()
 
-    const plan = profile?.subscription_tier ?? 'free'
+    const tier = profile?.subscription_tier ?? 'free'
 
-    const { data: planLimits } = await supabase
-      .from('subscription_plan_limits')
+    const { data: tierLimits } = await supabase
+      .from('subscription_tier_limits')
       .select('*')
-      .eq('plan', plan)
+      .eq('tier', tier)
       .single()
 
     const [
@@ -88,8 +88,8 @@ export async function GET() {
     const latestSnapshot = usageSnapshotResult.data?.[0] ?? null
 
     return NextResponse.json({
-      plan,
-      limits: planLimits ?? null,
+      plan: tier, // Keep 'plan' in response for backward compatibility
+      limits: tierLimits ?? null,
       usage: {
         projects: projectsResult.count ?? 0,
         documents: documentsResult.count ?? 0,

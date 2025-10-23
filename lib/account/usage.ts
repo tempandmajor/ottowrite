@@ -70,7 +70,7 @@ export async function getUsageSummary(
   const periodEndISO = periodEnd.toISOString()
 
   const [
-    planLimitsResult,
+    tierLimitsResult,
     projectsResult,
     documentsResult,
     snapshotsResult,
@@ -82,9 +82,9 @@ export async function getUsageSummary(
     apiRequestsTodayResult,
   ] = await Promise.all([
     supabase
-      .from('subscription_plan_limits')
+      .from('subscription_tier_limits')
       .select('*')
-      .eq('plan', plan)
+      .eq('tier', plan)
       .maybeSingle(),
     supabase.from('projects').select('id', { count: 'exact', head: true }).eq('user_id', userId),
     supabase.from('documents').select('id', { count: 'exact', head: true }).eq('user_id', userId),
@@ -124,7 +124,7 @@ export async function getUsageSummary(
     supabase.rpc('get_api_request_count_today', { p_user_id: userId }),
   ])
 
-  if (planLimitsResult.error) throw planLimitsResult.error
+  if (tierLimitsResult.error) throw tierLimitsResult.error
   if (projectsResult.error) throw projectsResult.error
   if (documentsResult.error) throw documentsResult.error
   if (snapshotsResult.error) throw snapshotsResult.error
@@ -169,7 +169,7 @@ export async function getUsageSummary(
   return {
     plan,
     limits: {
-      ...(planLimitsResult.data ?? {}),
+      ...(tierLimitsResult.data ?? {}),
       api_requests_per_day: apiRequestsPerDay,
     } as UsageSummary['limits'],
     usage: {

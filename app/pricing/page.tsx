@@ -72,10 +72,12 @@ const plans = [
     features: [
       '2,000,000 AI words/month',
       'Everything in Professional',
+      'Unlimited manuscript submissions',
+      'Verified agent & publisher network',
+      'Watermarking & IP protection',
       '5 team seats included',
       'Real-time collaboration',
       'Team workspace',
-      'Publishing integrations',
       'Dedicated support',
     ],
     cta: 'Start Free Trial',
@@ -279,6 +281,26 @@ export default function PricingPage() {
             </h3>
             <p className="text-muted-foreground">
               Yes, we offer a 7-day money-back guarantee on all paid plans. No questions asked.
+            </p>
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold mb-2">
+              What are manuscript submissions?
+            </h3>
+            <p className="text-muted-foreground">
+              Studio plan includes unlimited submissions to our network of verified literary agents
+              and publishers. Each submission is watermarked for IP protection, and you can track
+              responses directly in your dashboard. This feature is exclusive to Studio subscribers.
+            </p>
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold mb-2">
+              How does the watermarking work?
+            </h3>
+            <p className="text-muted-foreground">
+              Every manuscript sent to agents and publishers receives a unique, invisible watermark.
+              This protects your intellectual property and allows you to track the source if your
+              work is leaked or distributed without authorization.
             </p>
           </div>
         </div>

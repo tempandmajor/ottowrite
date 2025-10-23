@@ -30,7 +30,7 @@ export default async function DashboardLayout({
 
     return (
       <div className="min-h-screen bg-background font-sans text-foreground">
-        <DashboardHeader email={user.email ?? ''} />
+        <DashboardHeader email={user.email ?? ''} userId={user.id} />
         <DashboardShell>{children}</DashboardShell>
       </div>
     )

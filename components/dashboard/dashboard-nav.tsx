@@ -14,15 +14,20 @@ import {
   BookOpen,
   TrendingUp,
   PieChart,
-  ChevronRight
+  ChevronRight,
+  Send,
+  Shield,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 
 type NavItem = {
   label: string
   href: string
   icon: React.ElementType
+  badge?: string
+  premium?: boolean
 }
 
 type NavGroup = {
@@ -57,6 +62,20 @@ const routes: Route[] = [
     label: 'Research',
     href: '/dashboard/research',
     icon: BookOpen,
+  },
+  {
+    label: 'Submissions',
+    href: '/dashboard/submissions',
+    icon: Send,
+    badge: 'Studio',
+    premium: true,
+  },
+  {
+    label: 'IP Protection',
+    href: '/dashboard/ip-protection',
+    icon: Shield,
+    badge: 'Studio',
+    premium: true,
   },
   {
     label: 'Analytics',
@@ -196,6 +215,14 @@ export function DashboardNav() {
                     >
                       <route.icon className="h-4 w-4" />
                       {route.label}
+                      {route.badge && (
+                        <Badge
+                          variant="outline"
+                          className="ml-auto text-xs font-normal"
+                        >
+                          {route.badge}
+                        </Badge>
+                      )}
                     </Link>
                   </li>
                 )

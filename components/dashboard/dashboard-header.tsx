@@ -2,10 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowUpRight, Bell } from 'lucide-react'
+import { ArrowUpRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { SignOutButton } from '@/components/auth/sign-out-button'
+import { NotificationsPanel } from '@/components/submissions/notifications-panel'
 
 const quickLinks = [
   { label: 'Create Project', href: '/dashboard/projects?new=true' },
@@ -13,7 +13,7 @@ const quickLinks = [
   { label: 'Manage plan', href: '/dashboard/account/usage' },
 ]
 
-export function DashboardHeader({ email }: { email: string }) {
+export function DashboardHeader({ email, userId }: { email: string; userId: string }) {
   const pathname = usePathname()
 
   return (
@@ -28,23 +28,7 @@ export function DashboardHeader({ email }: { email: string }) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Notifications">
-                <Bell className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-full max-w-sm p-6">
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-lg font-semibold">Notifications</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Stay tuned! Notifications will appear here soon.
-                  </p>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+          <NotificationsPanel userId={userId} />
           <div className="hidden items-center gap-2 md:flex">
             {quickLinks.map((link) => (
               <Button key={link.href} variant="ghost" size="sm" asChild>

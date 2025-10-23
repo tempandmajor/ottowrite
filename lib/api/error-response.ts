@@ -178,6 +178,19 @@ export const errorResponses = {
     errorResponse(message, { ...options, status: 404, code: options?.code || 'NOT_FOUND' }),
 
   /**
+   * 402 Payment Required (for subscription-gated features)
+   */
+  paymentRequired: async (
+    message = 'Payment required',
+    options?: Omit<ErrorResponseOptions, 'status'>
+  ) =>
+    errorResponse(message, {
+      ...options,
+      status: 402,
+      code: options?.code || 'PAYMENT_REQUIRED',
+    }),
+
+  /**
    * 409 Conflict
    */
   conflict: async (message = 'Conflict', options?: Omit<ErrorResponseOptions, 'status'>) =>

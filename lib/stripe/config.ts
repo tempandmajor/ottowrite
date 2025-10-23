@@ -83,6 +83,10 @@ export const SUBSCRIPTION_TIERS = {
       screenplayTools: true,
       apiAccess: true,
       apiRequestsPerDay: 1000,
+      // Manuscript Submissions (Studio-exclusive)
+      submissions: true,
+      submissionsPriority: true,
+      submissionsUnlimited: true,
     },
   },
 } as const

@@ -36,7 +36,7 @@ export const SUBSCRIPTION_TIERS = {
   },
   hobbyist: {
     name: 'Hobbyist',
-    price: 12,
+    price: 20,
     priceId: process.env.STRIPE_PRICE_HOBBYIST,
     features: {
       aiWordsPerMonth: 100000,
@@ -52,7 +52,7 @@ export const SUBSCRIPTION_TIERS = {
   },
   professional: {
     name: 'Professional',
-    price: 24,
+    price: 60,
     priceId: process.env.STRIPE_PRICE_PROFESSIONAL,
     features: {
       aiWordsPerMonth: 500000,
@@ -69,7 +69,7 @@ export const SUBSCRIPTION_TIERS = {
   },
   studio: {
     name: 'Studio',
-    price: 49,
+    price: 100,
     priceId: process.env.STRIPE_PRICE_STUDIO,
     features: {
       aiWordsPerMonth: 2000000,

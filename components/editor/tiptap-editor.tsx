@@ -64,6 +64,7 @@ interface TiptapEditorProps {
   theme?: 'serif' | 'sans'
   fontScale?: 'sm' | 'md' | 'lg'
   showRuler?: boolean
+  documentType?: string
   focusScene?: {
     id: string
     title: string
@@ -89,6 +90,7 @@ export function TiptapEditor({
   theme = 'sans',
   fontScale = 'md',
   showRuler = false,
+  documentType,
   focusScene = null,
   onSceneFocusResult,
   onAnchorsChange,
@@ -106,15 +108,27 @@ export function TiptapEditor({
           ? 'prose-xl sm:prose-2xl'
           : 'prose-lg sm:prose-xl'
 
+    // Detect screenplay/script types that need monospace font
+    const isScreenplayType = documentType === 'screenplay' ||
+                             documentType === 'stage_play' ||
+                             documentType === 'one_act_play' ||
+                             documentType === 'musical' ||
+                             documentType === 'radio_play'
+
+    // Use monospace for screenplay types, serif/sans for others
+    const fontClass = isScreenplayType
+      ? 'font-mono prose-headings:font-mono prose-blockquote:font-mono'
+      : theme === 'serif'
+        ? 'font-serif prose-headings:font-serif prose-blockquote:font-serif'
+        : 'font-sans'
+
     return cn(
       'editor-body prose max-w-none focus:outline-none leading-relaxed selection:bg-primary/20 selection:text-primary-foreground',
       scaleClass,
-      theme === 'serif'
-        ? 'font-serif prose-headings:font-serif prose-blockquote:font-serif'
-        : 'font-sans',
+      fontClass,
       'prose-headings:font-semibold prose-headings:tracking-tight prose-p:leading-relaxed prose-li:leading-relaxed prose-blockquote:border-l-4 prose-blockquote:border-primary/40 prose-blockquote:bg-muted/40 prose-blockquote:pl-6 prose-strong:font-semibold'
     )
-  }, [fontScale, theme])
+  }, [fontScale, theme, documentType])
 
   const editor = useEditor({
     extensions: [
@@ -360,18 +374,18 @@ export function TiptapEditor({
   const pageFrameClass = useMemo(() => {
     switch (layoutMode) {
       case 'wide':
-        return 'rounded-[28px] border border-border bg-card px-10 py-12 shadow-lg'
+        return 'rounded-lg border border-border bg-white px-10 py-12 shadow-lg'
       case 'typewriter':
-        return 'rounded-[28px] border border-primary/20 bg-background/98 px-8 py-12 shadow-[0_0_0_1px_rgba(59,130,246,0.12)] backdrop-blur-sm'
+        return 'rounded-lg border border-primary/20 bg-white px-8 py-12 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]'
       default:
-        return 'rounded-[36px] border border-border/60 bg-white px-12 py-14 shadow-[0_40px_120px_-60px_rgba(15,23,42,0.3)] sm:px-14 sm:py-16'
+        return 'rounded-lg border border-border/60 bg-white px-12 py-14 shadow-[0_40px_120px_-60px_rgba(15,23,42,0.3)] sm:px-14 sm:py-16'
     }
   }, [layoutMode])
 
   const toolbarWrapperClass = useMemo(
     () =>
       cn(
-        'mx-auto flex w-full flex-wrap items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-3 py-2 shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur-sm sm:gap-1.5 sm:px-4',
+        'sticky top-0 z-10 mx-auto flex w-full flex-wrap items-center gap-2 rounded-md border border-border bg-background/95 px-4 py-2.5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/90',
         maxWidthClass
       ),
     [maxWidthClass]
@@ -384,7 +398,7 @@ export function TiptapEditor({
         maxWidthClass,
         outerPaddingClass,
         layoutMode === 'typewriter'
-          ? "before:absolute before:inset-y-6 before:left-1/2 before:w-[min(680px,calc(100%-2rem))] before:-translate-x-1/2 before:rounded-[30px] before:border before:border-primary/10 before:bg-primary/5 before:opacity-40 before:blur-sm before:content-['']"
+          ? "before:absolute before:inset-y-6 before:left-1/2 before:w-[min(680px,calc(100%-2rem))] before:-translate-x-1/2 before:rounded-lg before:border before:border-primary/10 before:bg-primary/5 before:opacity-40 before:blur-sm before:content-['']"
           : '',
         layoutMode === 'page' ? 'px-2 sm:px-4' : 'px-2'
       ),

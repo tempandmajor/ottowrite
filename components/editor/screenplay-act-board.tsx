@@ -256,7 +256,7 @@ export function ScreenplayActBoard({ acts, onChange, sceneMeta }: ScreenplayActB
               <div
                 key={act.id}
                 className={cn(
-                  'flex flex-col gap-3 rounded-2xl border bg-background/60 p-4 transition-shadow',
+                  'flex flex-col gap-3 rounded-lg border bg-background/60 p-4 transition-shadow',
                   dragging && dragging.sourceActId !== act.id && 'ring-1 ring-dashed ring-border/70'
                 )}
                 onDragOver={(event) => event.preventDefault()}

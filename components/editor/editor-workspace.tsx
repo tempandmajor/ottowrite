@@ -1561,6 +1561,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
           theme={editorTheme}
           fontScale={fontScale}
           showRuler={showRuler && !focusMode}
+          documentType={document.type}
           focusScene={activeSceneInfo}
           onAnchorsChange={handleAnchorsChange}
           onSceneFocusResult={handleSceneFocusResult}
@@ -1962,7 +1963,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             </div>
           </header>
 
-          <main className="flex flex-1 overflow-hidden bg-muted/20">
+          <main className="flex flex-1 overflow-hidden bg-muted/30">
             <div className="flex h-full w-full overflow-hidden">
               {structureSidebarOpen && (
                 <>
@@ -2015,7 +2016,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                 <div className="h-full overflow-auto">
                   <div className="mx-auto flex max-w-[1300px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
                     {!focusMode && (
-                      <div className="rounded-3xl border border-border/60 bg-background/80 px-5 py-5 shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur-sm">
+                      <div className="rounded-lg border border-border/60 bg-background/80 px-5 py-5 shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur-sm">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                             <Badge variant="muted" className="capitalize">
@@ -2394,7 +2395,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const showUtilitySidebar = !focusMode // Hide utility sidebar in focus mode
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-muted/30">
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="mx-auto w-full max-w-[1600px] space-y-3 px-4 py-4 sm:px-6 xl:px-8">
           {/* Breadcrumbs */}
@@ -2714,7 +2715,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
       <main
         className={cn(
           'mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:gap-8 xl:px-8',
-          'flex flex-col gap-8 xl:gap-10',
+          'flex flex-col gap-8 xl:gap-10 bg-muted/30',
           // Enable grid layout when sidebars are present
           (showBinderSidebar || showStructureSidebar || showUtilitySidebar) && 'lg:grid',
           // Focus mode: single column only
@@ -2819,7 +2820,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             </CardContent>
           </Card>
 
-          <div className="overflow-hidden rounded-2xl border bg-card shadow-card">
+          <div className="overflow-hidden rounded-lg border bg-card shadow-card">
             <div className="p-4 sm:p-6 lg:p-8">
               {editorElement}
             </div>
@@ -2855,7 +2856,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     </Suspense>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
+                  <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
                     <p>AI panel hidden. Reopen it to access brainstorming and rewriting tools.</p>
                     <Button variant="outline" size="sm" onClick={() => setShowAI(true)}>
                       <PanelRightOpen className="mr-2 h-4 w-4" />

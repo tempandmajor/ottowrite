@@ -29,6 +29,7 @@ type NavItem = {
   icon: React.ElementType
   badge?: string
   premium?: boolean
+  comingSoon?: boolean // Feature is visible but not yet available
 }
 
 type NavGroup = {
@@ -68,6 +69,7 @@ const routes: Route[] = [
     label: 'Ghostwriter',
     href: '/dashboard/ghostwriter',
     icon: Sparkles,
+    comingSoon: true, // TODO: Set to false when feature is ready
   },
   {
     label: 'Submissions',
@@ -75,6 +77,7 @@ const routes: Route[] = [
     icon: Send,
     badge: 'Studio',
     premium: true,
+    comingSoon: true, // TODO: Set to false when feature is ready
   },
   {
     label: 'IP Protection',
@@ -221,7 +224,15 @@ export function DashboardNav() {
                     >
                       <route.icon className="h-4 w-4" />
                       {route.label}
-                      {route.badge && (
+                      {route.comingSoon && (
+                        <Badge
+                          variant="secondary"
+                          className="ml-auto text-xs font-normal bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400"
+                        >
+                          Coming Soon
+                        </Badge>
+                      )}
+                      {route.badge && !route.comingSoon && (
                         <Badge
                           variant="outline"
                           className="ml-auto text-xs font-normal"

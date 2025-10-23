@@ -151,3 +151,58 @@ export async function checkProjectQuota(
     limit,
   }
 }
+
+export async function checkTeamSeatQuota(
+  supabase: SupabaseClient,
+  projectOwnerId: string,
+  plan: string
+) {
+  const limits = await getPlanLimits(supabase, plan)
+  const limit = limits?.collaborator_slots ?? null
+
+  // null or 0 means no collaboration allowed
+  if (limit === null || limit === 0) {
+    return {
+      allowed: false,
+      used: 0,
+      limit: limit ?? 0,
+    }
+  }
+
+  // -1 means unlimited (though we don't currently use this for team seats)
+  if (limit === -1) {
+    return {
+      allowed: true,
+      used: 0,
+      limit,
+    }
+  }
+
+  // Count existing team members across all projects owned by this user
+  // Only count invited and accepted members (not declined)
+  // Exclude owners (they don't count as team members)
+  // We need to join with projects to filter by owner
+  const { count, error } = await supabase
+    .from('project_members')
+    .select('*, projects!inner(user_id)', { count: 'exact', head: true })
+    .eq('projects.user_id', projectOwnerId)
+    .in('status', ['invited', 'accepted'])
+    .neq('role', 'owner')
+
+  if (error) throw error
+  const used = count ?? 0
+
+  if (used >= limit) {
+    return {
+      allowed: false,
+      used,
+      limit,
+    }
+  }
+
+  return {
+    allowed: true,
+    used,
+    limit,
+  }
+}

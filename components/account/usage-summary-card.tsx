@@ -27,6 +27,7 @@ export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
     max_documents: null,
     ai_words_per_month: null,
     ai_requests_per_month: null,
+    collaborator_slots: null,
   }
 
   const projectsPercent = limits.max_projects
@@ -38,8 +39,12 @@ export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
   const aiWordsPercent = limits.ai_words_per_month
     ? Math.min(100, Math.round((usageSummary.usage.ai_words_used_month / limits.ai_words_per_month) * 100))
     : 0
+  const teamSeatsPercent = limits.collaborator_slots && limits.collaborator_slots > 0
+    ? Math.min(100, Math.round((usageSummary.usage.collaborators / limits.collaborator_slots) * 100))
+    : 0
 
-  const hasWarning = projectsPercent >= 80 || documentsPercent >= 80 || aiWordsPercent >= 80
+  const hasTeamSeats = limits.collaborator_slots && limits.collaborator_slots > 0
+  const hasWarning = projectsPercent >= 80 || documentsPercent >= 80 || aiWordsPercent >= 80 || teamSeatsPercent >= 80
 
   const formatDate = (value: string) =>
     new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -89,7 +94,7 @@ export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
           </div>
         )}
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className={`grid gap-4 ${hasTeamSeats ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Projects</span>
@@ -122,6 +127,18 @@ export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
             </div>
             <Progress value={aiWordsPercent} className="h-2" />
           </div>
+
+          {hasTeamSeats && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Team seats</span>
+                <span className="font-medium">
+                  {usageSummary.usage.collaborators} / {limits.collaborator_slots}
+                </span>
+              </div>
+              <Progress value={teamSeatsPercent} className="h-2" />
+            </div>
+          )}
         </div>
 
         <div className="rounded-lg border border-border/60 bg-background/60 p-3 text-sm">

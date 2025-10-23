@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { generateWithAI, type AIModel } from '@/lib/ai/service'
-import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
+import { getMonthlyAIWordLimit, isSubscriptionActive, getInactiveSubscriptionError } from '@/lib/stripe/config'
 import { checkAIRequestQuota } from '@/lib/account/quota'
 import { classifyIntent, type AICommand } from '@/lib/ai/intent'
 import { logger } from '@/lib/monitoring/structured-logger'
@@ -94,6 +94,12 @@ export async function POST(request: NextRequest) {
 
     if (!profile) {
       return errorResponses.notFound('User profile not found')
+    }
+
+    // Check if subscription is active (includes trialing and expiration check)
+    if (!isSubscriptionActive(profile)) {
+      const errorDetails = getInactiveSubscriptionError(profile)
+      return errorResponses.paymentRequired(errorDetails.error, errorDetails)
     }
 
     const plan = profile.subscription_tier || 'free'

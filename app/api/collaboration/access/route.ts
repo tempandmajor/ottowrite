@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { canAccessFeature, type SubscriptionTier } from '@/lib/stripe/config'
+import { canAccessFeature, type SubscriptionTier, isSubscriptionActive } from '@/lib/stripe/config'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +29,7 @@ export async function GET() {
     // Get user's subscription tier
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
-      .select('subscription_tier, subscription_status')
+      .select('subscription_tier, subscription_status, subscription_current_period_end')
       .eq('id', user.id)
       .single()
 
@@ -41,15 +41,15 @@ export async function GET() {
       )
     }
 
-    // Check if subscription is active
-    const isActive = profile.subscription_status === 'active'
+    // Check if subscription is active (includes trialing and expiration check)
+    const hasActiveSubscription = isSubscriptionActive(profile)
     const tier = (profile.subscription_tier || 'free') as SubscriptionTier
 
     // Check if tier has collaboration feature
     const hasCollaboration = canAccessFeature(tier, 'collaboration')
 
     return NextResponse.json({
-      hasAccess: isActive && hasCollaboration,
+      hasAccess: hasActiveSubscription && hasCollaboration,
       tier,
       subscriptionStatus: profile.subscription_status,
       requiresUpgrade: !hasCollaboration,

@@ -33,7 +33,7 @@ export default async function DMCARequestsPage() {
   // Get user profile with subscription info
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('subscription_tier, subscription_status')
+    .select('subscription_tier, subscription_status, subscription_current_period_end')
     .eq('id', user.id)
     .single()
 

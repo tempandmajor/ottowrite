@@ -5,11 +5,12 @@
  * Only users with an active Studio subscription can access submission functionality.
  */
 
-import { SUBSCRIPTION_TIERS, type SubscriptionTier } from '@/lib/stripe/config'
+import { SUBSCRIPTION_TIERS, type SubscriptionTier, isSubscriptionActive } from '@/lib/stripe/config'
 
 export interface UserProfile {
   subscription_tier: string | null
   subscription_status: string | null
+  subscription_current_period_end: string | null
 }
 
 export interface SubmissionAccessResult {
@@ -52,7 +53,7 @@ export function canAccessSubmissions(
     }
   }
 
-  const { subscription_tier, subscription_status } = profile
+  const { subscription_tier } = profile
 
   // Check if user has Studio tier
   const isStudioTier = subscription_tier === 'studio'
@@ -65,9 +66,9 @@ export function canAccessSubmissions(
     }
   }
 
-  // Check if subscription is active
-  const isActive = subscription_status === 'active'
-  if (!isActive) {
+  // Check if subscription is active (includes trialing and expiration check)
+  const hasActiveSubscription = isSubscriptionActive(profile)
+  if (!hasActiveSubscription) {
     return {
       hasAccess: false,
       reason: 'inactive_subscription',

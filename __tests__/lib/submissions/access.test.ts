@@ -16,6 +16,7 @@ describe('canAccessSubmissions', () => {
     const profile: UserProfile = {
       subscription_tier: 'studio',
       subscription_status: 'active',
+      subscription_current_period_end: new Date(Date.now() + 86400000 * 30).toISOString(), // 30 days from now
     }
 
     const result = canAccessSubmissions(profile)
@@ -29,6 +30,7 @@ describe('canAccessSubmissions', () => {
     const profile: UserProfile = {
       subscription_tier: 'professional',
       subscription_status: 'active',
+      subscription_current_period_end: new Date(Date.now() + 86400000 * 30).toISOString(),
     }
 
     const result = canAccessSubmissions(profile)
@@ -43,6 +45,7 @@ describe('canAccessSubmissions', () => {
     const profile: UserProfile = {
       subscription_tier: 'studio',
       subscription_status: 'canceled',
+      subscription_current_period_end: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
     }
 
     const result = canAccessSubmissions(profile)
@@ -66,6 +69,7 @@ describe('canAccessSubmissions', () => {
     const profile: UserProfile = {
       subscription_tier: 'free',
       subscription_status: 'active',
+      subscription_current_period_end: null,
     }
 
     const result = canAccessSubmissions(profile)
@@ -79,6 +83,7 @@ describe('canAccessSubmissions', () => {
     const profile: UserProfile = {
       subscription_tier: 'hobbyist',
       subscription_status: 'active',
+      subscription_current_period_end: new Date(Date.now() + 86400000 * 30).toISOString(),
     }
 
     const result = canAccessSubmissions(profile)
@@ -88,22 +93,24 @@ describe('canAccessSubmissions', () => {
     expect(result.currentTier).toBe('hobbyist')
   })
 
-  it('should deny access for trial subscription status', () => {
+  it('should allow access for trialing Studio subscription', () => {
     const profile: UserProfile = {
       subscription_tier: 'studio',
       subscription_status: 'trialing',
+      subscription_current_period_end: new Date(Date.now() + 86400000 * 14).toISOString(), // 14 days trial
     }
 
     const result = canAccessSubmissions(profile)
 
-    expect(result.hasAccess).toBe(false)
-    expect(result.reason).toBe('inactive_subscription')
+    expect(result.hasAccess).toBe(true)
+    expect(result.reason).toBeUndefined()
   })
 
   it('should deny access for past_due subscription status', () => {
     const profile: UserProfile = {
       subscription_tier: 'studio',
       subscription_status: 'past_due',
+      subscription_current_period_end: new Date(Date.now() + 86400000 * 5).toISOString(),
     }
 
     const result = canAccessSubmissions(profile)

@@ -130,3 +130,77 @@ export function getAllowedPriceIds(): string[] {
     .map(({ priceId }) => priceId)
     .filter((id): id is string => typeof id === 'string' && id.length > 0)
 }
+
+/**
+ * Check if a user's subscription is active and valid.
+ *
+ * Returns true only if:
+ * 1. Subscription status is 'active' or 'trialing'
+ * 2. Subscription has not expired (current_period_end is in the future)
+ *
+ * This prevents users with past_due, canceled, or expired subscriptions
+ * from accessing paid features.
+ *
+ * @param profile - User profile with subscription fields
+ * @returns boolean - true if subscription is active and valid
+ */
+export function isSubscriptionActive(profile: {
+  subscription_status: string | null
+  subscription_tier: string | null
+  subscription_current_period_end: string | null
+}): boolean {
+  // Free tier is always "active" (no subscription required)
+  if (!profile.subscription_tier || profile.subscription_tier === 'free') {
+    return true
+  }
+
+  // Valid subscription statuses that allow feature access
+  const validStatuses = ['active', 'trialing']
+  const hasValidStatus = profile.subscription_status &&
+    validStatuses.includes(profile.subscription_status)
+
+  // Check if subscription hasn't expired
+  const periodEnd = profile.subscription_current_period_end
+    ? new Date(profile.subscription_current_period_end)
+    : null
+  const isExpired = periodEnd && periodEnd < new Date()
+
+  return !!(hasValidStatus && !isExpired)
+}
+
+/**
+ * Get the appropriate error response for an inactive subscription.
+ * Returns a 402 Payment Required error with upgrade/reactivate information.
+ */
+export function getInactiveSubscriptionError(profile: {
+  subscription_status: string | null
+  subscription_tier: string | null
+}) {
+  const status = profile.subscription_status
+
+  let message = 'Your subscription is not active.'
+  let action = 'upgrade'
+
+  if (status === 'past_due') {
+    message = 'Your subscription payment is past due. Please update your payment method to continue using paid features.'
+    action = 'update-payment'
+  } else if (status === 'canceled') {
+    message = 'Your subscription has been canceled. Please reactivate your subscription to continue using paid features.'
+    action = 'reactivate'
+  } else if (status === 'incomplete' || status === 'incomplete_expired') {
+    message = 'Your subscription setup is incomplete. Please complete your subscription to access paid features.'
+    action = 'complete-setup'
+  } else if (status === 'unpaid') {
+    message = 'Your subscription is unpaid. Please update your payment method to continue.'
+    action = 'update-payment'
+  }
+
+  return {
+    error: message,
+    code: 'SUBSCRIPTION_INACTIVE',
+    status: profile.subscription_status,
+    tier: profile.subscription_tier,
+    action,
+    upgradeUrl: '/dashboard/settings/billing',
+  }
+}

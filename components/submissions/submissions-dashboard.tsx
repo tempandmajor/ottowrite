@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { Send, Users, TrendingUp, Search, Filter } from 'lucide-react'
+import { Send, Users, TrendingUp, Search, Filter, BarChart3 } from 'lucide-react'
 import Link from 'next/link'
 import { SubmissionCard } from './submission-card'
 
@@ -205,12 +205,20 @@ export function SubmissionsDashboard({ userId }: { userId: string }) {
               <CardTitle>Your Submissions</CardTitle>
               <CardDescription>Manage and track your manuscript submissions</CardDescription>
             </div>
-            <Link href="/dashboard/submissions/new">
-              <Button>
-                <Send className="h-4 w-4 mr-2" />
-                New Submission
-              </Button>
-            </Link>
+            <div className="flex gap-2">
+              <Link href="/dashboard/submissions/analytics">
+                <Button variant="outline">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Analytics
+                </Button>
+              </Link>
+              <Link href="/dashboard/submissions/new">
+                <Button>
+                  <Send className="h-4 w-4 mr-2" />
+                  New Submission
+                </Button>
+              </Link>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

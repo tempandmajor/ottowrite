@@ -34,9 +34,11 @@ type SettingsFormProps = {
   profile: ProfileSettings
   email: string
   usageSummary: UsageSummary
+  subscriptionStatus?: string | null
+  trialEndsAt?: string | null
 }
 
-export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps) {
+export function SettingsForm({ profile, email, usageSummary, subscriptionStatus, trialEndsAt }: SettingsFormProps) {
   const supabase = useMemo(() => createClient(), [])
   const { toast } = useToast()
   const router = useRouter()
@@ -176,7 +178,7 @@ export function SettingsForm({ profile, email, usageSummary }: SettingsFormProps
         </div>
       </section>
 
-      <UsageSummaryCard usageSummary={usageSummary} />
+      <UsageSummaryCard usageSummary={usageSummary} subscriptionStatus={subscriptionStatus} trialEndsAt={trialEndsAt} />
 
       <form className="space-y-8" onSubmit={handleSave}>
         <Card className="border-none bg-card/80 shadow-card">

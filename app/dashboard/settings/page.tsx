@@ -16,7 +16,7 @@ export default async function SettingsPage() {
   const { data: profile, error } = await supabase
     .from('user_profiles')
     .select(
-      'id, full_name, preferred_genres, writing_focus, writing_preferences, timezone, subscription_tier'
+      'id, full_name, preferred_genres, writing_focus, writing_preferences, timezone, subscription_tier, subscription_status, subscription_current_period_end'
     )
     .eq('id', user.id)
     .single()
@@ -34,6 +34,8 @@ export default async function SettingsPage() {
       writing_preferences: null,
       timezone: null,
       subscription_tier: null,
+      subscription_status: null,
+      subscription_current_period_end: null,
     }
 
   const usageSummary = await getUsageSummary(supabase, user.id)
@@ -53,6 +55,8 @@ export default async function SettingsPage() {
       }}
       email={user.email ?? ''}
       usageSummary={usageSummary}
+      subscriptionStatus={safeProfile.subscription_status}
+      trialEndsAt={safeProfile.subscription_current_period_end}
     />
   )
 }

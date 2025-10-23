@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Check } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Check, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
@@ -26,6 +27,7 @@ const plans = [
     cta: 'Get Started',
     href: '/auth/signup',
     popular: false,
+    hasTrial: false,
   },
   {
     name: 'Hobbyist',
@@ -42,8 +44,9 @@ const plans = [
       'Screenplay formatting',
       'Advanced features',
     ],
-    cta: 'Start Free Trial',
+    cta: 'Start 7-Day Free Trial',
     popular: true,
+    hasTrial: true,
   },
   {
     name: 'Professional',
@@ -60,8 +63,9 @@ const plans = [
       'Advanced analytics',
       'Publishing tools',
     ],
-    cta: 'Start Free Trial',
+    cta: 'Start 7-Day Free Trial',
     popular: false,
+    hasTrial: true,
   },
   {
     name: 'Studio',
@@ -80,8 +84,9 @@ const plans = [
       'Team workspace',
       'Dedicated support',
     ],
-    cta: 'Start Free Trial',
+    cta: 'Start 7-Day Free Trial',
     popular: false,
+    hasTrial: true,
   },
 ]
 
@@ -210,11 +215,24 @@ export default function PricingPage() {
                 </div>
               )}
               <CardHeader>
-                <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                <div className="flex items-start justify-between mb-2">
+                  <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                  {plan.hasTrial && (
+                    <Badge variant="secondary" className="ml-2 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      7-day trial
+                    </Badge>
+                  )}
+                </div>
                 <CardDescription>{plan.description}</CardDescription>
                 <div className="mt-4">
                   <span className="text-4xl font-bold">{plan.price}</span>
                   <span className="text-muted-foreground">{plan.period}</span>
+                  {plan.hasTrial && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Try free for 7 days, then {plan.price}/month
+                    </p>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="flex-1">

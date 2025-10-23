@@ -19,9 +19,11 @@ const PLAN_LABELS: Record<string, string> = {
 
 type UsageSummaryCardProps = {
   usageSummary: UsageSummary
+  subscriptionStatus?: string | null
+  trialEndsAt?: string | null
 }
 
-export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
+export function UsageSummaryCard({ usageSummary, subscriptionStatus, trialEndsAt }: UsageSummaryCardProps) {
   const planName = PLAN_LABELS[usageSummary.plan] ?? usageSummary.plan
   const limits = usageSummary.limits ?? {
     max_projects: null,
@@ -55,6 +57,8 @@ export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
   const formatDate = (value: string) =>
     new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
+  const isTrialing = subscriptionStatus === 'trialing'
+
   return (
     <Card className="border-none bg-card/80 shadow-card">
       <CardHeader>
@@ -77,7 +81,19 @@ export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">Active plan</p>
-            <p className="text-lg font-semibold text-foreground">{planName}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-lg font-semibold text-foreground">{planName}</p>
+              {isTrialing && trialEndsAt && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                  Trial
+                </span>
+              )}
+            </div>
+            {isTrialing && trialEndsAt && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Trial ends {formatDate(trialEndsAt)}
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             <ManageSubscriptionButton />

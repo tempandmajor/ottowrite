@@ -2,7 +2,7 @@
 
 /* eslint-disable import/no-named-as-default */
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -10,6 +10,7 @@ import CharacterCount from '@tiptap/extension-character-count'
 import Color from '@tiptap/extension-color'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
+import TextAlign from '@tiptap/extension-text-align'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import {
@@ -24,8 +25,13 @@ import {
   Quote,
   Undo,
   Redo,
-  Highlighter
+  Highlighter,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 import { SceneAnchor } from '@/components/editor/extensions/scene-anchor'
 
@@ -54,6 +60,10 @@ interface TiptapEditorProps {
   onUpdate: (content: string) => void
   editable?: boolean
   placeholder?: string
+  layoutMode?: 'page' | 'wide' | 'typewriter'
+  theme?: 'serif' | 'sans'
+  fontScale?: 'sm' | 'md' | 'lg'
+  showRuler?: boolean
   focusScene?: {
     id: string
     title: string
@@ -75,6 +85,10 @@ export function TiptapEditor({
   onUpdate,
   editable = true,
   placeholder = 'Start writing...',
+  layoutMode = 'page',
+  theme = 'sans',
+  fontScale = 'md',
+  showRuler = false,
   focusScene = null,
   onSceneFocusResult,
   onAnchorsChange,
@@ -84,6 +98,24 @@ export function TiptapEditor({
   onCloseConflict,
   onReady,
 }: TiptapEditorProps) {
+  const computedEditorClass = useMemo(() => {
+    const scaleClass =
+      fontScale === 'sm'
+        ? 'prose-base sm:prose-lg'
+        : fontScale === 'lg'
+          ? 'prose-xl sm:prose-2xl'
+          : 'prose-lg sm:prose-xl'
+
+    return cn(
+      'editor-body prose max-w-none focus:outline-none leading-relaxed selection:bg-primary/20 selection:text-primary-foreground',
+      scaleClass,
+      theme === 'serif'
+        ? 'font-serif prose-headings:font-serif prose-blockquote:font-serif'
+        : 'font-sans',
+      'prose-headings:font-semibold prose-headings:tracking-tight prose-p:leading-relaxed prose-li:leading-relaxed prose-blockquote:border-l-4 prose-blockquote:border-primary/40 prose-blockquote:bg-muted/40 prose-blockquote:pl-6 prose-strong:font-semibold'
+    )
+  }, [fontScale, theme])
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -100,6 +132,9 @@ export function TiptapEditor({
       Highlight.configure({
         multicolor: true,
       }),
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+      }),
       SceneAnchor,
     ],
     content,
@@ -112,8 +147,7 @@ export function TiptapEditor({
     },
     editorProps: {
       attributes: {
-        class:
-          'prose prose-base sm:prose-lg xl:prose-xl focus:outline-none min-h-[500px] max-w-none px-4 sm:px-6 lg:px-8 py-6',
+        class: computedEditorClass,
       },
     },
   })
@@ -122,6 +156,19 @@ export function TiptapEditor({
     if (!editor || !onAnchorsChange) return
     onAnchorsChange(collectAnchorsFromEditor(editor))
   }, [editor, onAnchorsChange])
+
+  useEffect(() => {
+    if (!editor) return
+    editor.setOptions({
+      editorProps: {
+        ...editor.options.editorProps,
+        attributes: {
+          ...(editor.options.editorProps?.attributes ?? {}),
+          class: computedEditorClass,
+        },
+      },
+    })
+  }, [editor, computedEditorClass])
 
   useEffect(() => {
     if (!editor) return
@@ -294,144 +341,296 @@ export function TiptapEditor({
     }
   }, [editor, onReady])
 
+  const characterCount = editor?.storage.characterCount?.characters?.() ?? 0
+  const wordCount = editor?.storage.characterCount?.words?.() ?? 0
+
+  const maxWidthClass = useMemo(() => {
+    switch (layoutMode) {
+      case 'wide':
+        return 'max-w-[1200px]'
+      case 'typewriter':
+        return 'max-w-[760px]'
+      default:
+        return 'max-w-[960px]'
+    }
+  }, [layoutMode])
+
+  const outerPaddingClass = useMemo(() => (layoutMode === 'page' ? 'py-8 sm:py-10' : 'py-6'), [layoutMode])
+
+  const pageFrameClass = useMemo(() => {
+    switch (layoutMode) {
+      case 'wide':
+        return 'rounded-[28px] border border-border bg-card px-10 py-12 shadow-lg'
+      case 'typewriter':
+        return 'rounded-[28px] border border-primary/20 bg-background/98 px-8 py-12 shadow-[0_0_0_1px_rgba(59,130,246,0.12)] backdrop-blur-sm'
+      default:
+        return 'rounded-[36px] border border-border/60 bg-white px-12 py-14 shadow-[0_40px_120px_-60px_rgba(15,23,42,0.3)] sm:px-14 sm:py-16'
+    }
+  }, [layoutMode])
+
+  const toolbarWrapperClass = useMemo(
+    () =>
+      cn(
+        'mx-auto flex w-full flex-wrap items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-3 py-2 shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur-sm sm:gap-1.5 sm:px-4',
+        maxWidthClass
+      ),
+    [maxWidthClass]
+  )
+
+  const pageOuterClass = useMemo(
+    () =>
+      cn(
+        'relative mx-auto w-full',
+        maxWidthClass,
+        outerPaddingClass,
+        layoutMode === 'typewriter'
+          ? "before:absolute before:inset-y-6 before:left-1/2 before:w-[min(680px,calc(100%-2rem))] before:-translate-x-1/2 before:rounded-[30px] before:border before:border-primary/10 before:bg-primary/5 before:opacity-40 before:blur-sm before:content-['']"
+          : '',
+        layoutMode === 'page' ? 'px-2 sm:px-4' : 'px-2'
+      ),
+    [layoutMode, maxWidthClass, outerPaddingClass]
+  )
+
+  const countersClass = useMemo(
+    () =>
+      cn(
+        'mx-auto flex w-full items-center justify-between gap-4 text-xs text-muted-foreground',
+        maxWidthClass,
+        layoutMode === 'page' ? 'pb-8 px-2 sm:px-4' : 'pb-4 px-2'
+      ),
+    [layoutMode, maxWidthClass]
+  )
+
+  const rulerMarks = useMemo(() => Array.from({ length: 12 }, (_, index) => index + 1), [])
+
   if (!editor) {
     return null
   }
 
+  const currentAlignment = editor.isActive({ textAlign: 'right' })
+    ? 'right'
+    : editor.isActive({ textAlign: 'center' })
+      ? 'center'
+      : editor.isActive({ textAlign: 'justify' })
+        ? 'justify'
+        : 'left'
+
   return (
-    <div className="border rounded-lg bg-background">
+    <div className="flex flex-col gap-4">
       {editable && (
-        <div className="border-b bg-muted/30 p-2 flex flex-wrap gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={editor.isActive('bold') ? 'bg-muted' : ''}
-          >
-            <Bold className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={editor.isActive('italic') ? 'bg-muted' : ''}
-          >
-            <Italic className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            className={editor.isActive('strike') ? 'bg-muted' : ''}
-          >
-            <Strikethrough className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().toggleCode().run()}
-            className={editor.isActive('code') ? 'bg-muted' : ''}
-          >
-            <Code className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().toggleHighlight().run()}
-            className={editor.isActive('highlight') ? 'bg-muted' : ''}
-          >
-            <Highlighter className="h-4 w-4" />
-          </Button>
+        <div className={toolbarWrapperClass}>
+          <div className="flex flex-wrap items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Bold"
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              className={cn('rounded-full', editor.isActive('bold') && 'bg-muted')}
+            >
+              <Bold className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Italic"
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              className={cn('rounded-full', editor.isActive('italic') && 'bg-muted')}
+            >
+              <Italic className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Strikethrough"
+              onClick={() => editor.chain().focus().toggleStrike().run()}
+              className={cn('rounded-full', editor.isActive('strike') && 'bg-muted')}
+            >
+              <Strikethrough className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Code"
+              onClick={() => editor.chain().focus().toggleCode().run()}
+              className={cn('rounded-full', editor.isActive('code') && 'bg-muted')}
+            >
+              <Code className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Highlight"
+              onClick={() => editor.chain().focus().toggleHighlight().run()}
+              className={cn('rounded-full', editor.isActive('highlight') && 'bg-muted')}
+            >
+              <Highlighter className="h-4 w-4" />
+            </Button>
+          </div>
 
-          <div className="w-px h-6 bg-border my-auto mx-1" />
+          <div className="hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
 
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={editor.isActive('heading', { level: 1 }) ? 'bg-muted' : ''}
-          >
-            <Heading1 className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={editor.isActive('heading', { level: 2 }) ? 'bg-muted' : ''}
-          >
-            <Heading2 className="h-4 w-4" />
-          </Button>
+          <div className="flex flex-wrap items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Heading 1"
+              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+              className={cn('rounded-full', editor.isActive('heading', { level: 1 }) && 'bg-muted')}
+            >
+              <Heading1 className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Heading 2"
+              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+              className={cn('rounded-full', editor.isActive('heading', { level: 2 }) && 'bg-muted')}
+            >
+              <Heading2 className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Bullet list"
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+              className={cn('rounded-full', editor.isActive('bulletList') && 'bg-muted')}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Numbered list"
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+              className={cn('rounded-full', editor.isActive('orderedList') && 'bg-muted')}
+            >
+              <ListOrdered className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Quote"
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+              className={cn('rounded-full', editor.isActive('blockquote') && 'bg-muted')}
+            >
+              <Quote className="h-4 w-4" />
+            </Button>
+          </div>
 
-          <div className="w-px h-6 bg-border my-auto mx-1" />
+          <div className="hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
 
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={editor.isActive('bulletList') ? 'bg-muted' : ''}
-          >
-            <List className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={editor.isActive('orderedList') ? 'bg-muted' : ''}
-          >
-            <ListOrdered className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            className={editor.isActive('blockquote') ? 'bg-muted' : ''}
-          >
-            <Quote className="h-4 w-4" />
-          </Button>
+          <div className="flex flex-wrap items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Align left"
+              onClick={() => editor.chain().focus().setTextAlign('left').run()}
+              className={cn('rounded-full', currentAlignment === 'left' && 'bg-muted')}
+            >
+              <AlignLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Align center"
+              onClick={() => editor.chain().focus().setTextAlign('center').run()}
+              className={cn('rounded-full', currentAlignment === 'center' && 'bg-muted')}
+            >
+              <AlignCenter className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Align right"
+              onClick={() => editor.chain().focus().setTextAlign('right').run()}
+              className={cn('rounded-full', currentAlignment === 'right' && 'bg-muted')}
+            >
+              <AlignRight className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Justify"
+              onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+              className={cn('rounded-full', currentAlignment === 'justify' && 'bg-muted')}
+            >
+              <AlignJustify className="h-4 w-4" />
+            </Button>
+          </div>
 
-          <div className="w-px h-6 bg-border my-auto mx-1" />
+          <div className="hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
 
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().undo().run()}
-            disabled={!editor.can().undo()}
-          >
-            <Undo className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => editor.chain().focus().redo().run()}
-            disabled={!editor.can().redo()}
-          >
-            <Redo className="h-4 w-4" />
-          </Button>
+          <div className="flex flex-wrap items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Undo"
+              onClick={() => editor.chain().focus().undo().run()}
+              disabled={!editor.can().undo()}
+              className="rounded-full"
+            >
+              <Undo className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Redo"
+              onClick={() => editor.chain().focus().redo().run()}
+              disabled={!editor.can().redo()}
+              className="rounded-full"
+            >
+              <Redo className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 
-      <EditorContent editor={editor} />
+      {showRuler && (
+        <div
+          className={cn(
+            'mx-auto hidden w-full items-center text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground sm:flex',
+            maxWidthClass
+          )}
+        >
+          <div className="flex w-full overflow-hidden rounded-full border border-dashed border-border/60 bg-muted/40 px-4 py-1">
+            {rulerMarks.map((mark) => (
+              <div
+                key={mark}
+                className="flex-1 border-l border-border/40 text-center first:border-0"
+              >
+                {mark}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className={pageOuterClass}>
+        <div className={cn('relative z-[1]', pageFrameClass)}>
+          <EditorContent editor={editor} />
+        </div>
+      </div>
 
       {editable && (
-        <div className="border-t bg-muted/30 p-2 flex justify-between text-sm text-muted-foreground">
-          <div>
-            {editor.storage.characterCount.characters()} characters
-          </div>
-          <div>
-            {editor.storage.characterCount.words()} words
-          </div>
+        <div className={countersClass}>
+          <div>{characterCount.toLocaleString()} characters</div>
+          <div>{wordCount.toLocaleString()} words</div>
         </div>
       )}
 

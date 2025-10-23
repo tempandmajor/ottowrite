@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Send,
   Shield,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -62,6 +63,11 @@ const routes: Route[] = [
     label: 'Research',
     href: '/dashboard/research',
     icon: BookOpen,
+  },
+  {
+    label: 'Ghostwriter',
+    href: '/dashboard/ghostwriter',
+    icon: Sparkles,
   },
   {
     label: 'Submissions',

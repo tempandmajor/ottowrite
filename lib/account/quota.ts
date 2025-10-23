@@ -69,3 +69,85 @@ export async function checkAIRequestQuota(
     limit,
   }
 }
+
+export async function checkDocumentQuota(
+  supabase: SupabaseClient,
+  userId: string,
+  plan: string
+) {
+  const limits = await getPlanLimits(supabase, plan)
+  const limit = limits?.max_documents ?? null
+
+  // -1 means unlimited
+  if (limit === null || limit === -1) {
+    return {
+      allowed: true,
+      used: 0,
+      limit,
+    }
+  }
+
+  // Count existing documents for this user
+  const { count, error } = await supabase
+    .from('documents')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+
+  if (error) throw error
+  const used = count ?? 0
+
+  if (used >= limit) {
+    return {
+      allowed: false,
+      used,
+      limit,
+    }
+  }
+
+  return {
+    allowed: true,
+    used,
+    limit,
+  }
+}
+
+export async function checkProjectQuota(
+  supabase: SupabaseClient,
+  userId: string,
+  plan: string
+) {
+  const limits = await getPlanLimits(supabase, plan)
+  const limit = limits?.max_projects ?? null
+
+  // -1 means unlimited
+  if (limit === null || limit === -1) {
+    return {
+      allowed: true,
+      used: 0,
+      limit,
+    }
+  }
+
+  // Count existing projects for this user
+  const { count, error } = await supabase
+    .from('projects')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+
+  if (error) throw error
+  const used = count ?? 0
+
+  if (used >= limit) {
+    return {
+      allowed: false,
+      used,
+      limit,
+    }
+  }
+
+  return {
+    allowed: true,
+    used,
+    limit,
+  }
+}

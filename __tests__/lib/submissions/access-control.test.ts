@@ -4,7 +4,7 @@
  * @vitest-environment node
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   generateAccessToken,
   verifyAccessToken,
@@ -20,7 +20,6 @@ import {
   getDRMSecurityHeaders,
   generateSecureLink,
   isTokenRevoked,
-  type AccessTokenPayload,
   type AccessPermission,
   type AccessControlRules,
   type AccessSession,
@@ -594,7 +593,7 @@ describe('Access Control & DRM System', () => {
   describe('Integration Tests', () => {
     it('should complete full token lifecycle', async () => {
       // Generate token
-      const { token, expiresAt } = await generateAccessToken(mockPayload, 30)
+      const { token } = await generateAccessToken(mockPayload, 30)
 
       expect(token).toBeDefined()
 

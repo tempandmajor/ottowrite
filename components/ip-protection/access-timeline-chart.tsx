@@ -13,9 +13,8 @@
 
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Calendar, TrendingUp, Eye } from 'lucide-react'
+import { Calendar, Eye } from 'lucide-react'
 
 interface AccessDataPoint {
   date: string

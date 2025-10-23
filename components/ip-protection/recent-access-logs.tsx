@@ -12,7 +12,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -72,11 +72,14 @@ export function RecentAccessLogs({ userId }: { userId: string }) {
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
 
-  useEffect(() => {
-    fetchLogs()
-  }, [userId, filterAction, page])
+  const fetchLogs = useCallback(async () => {
+    if (!userId) {
+      setLogs([])
+      setHasMore(false)
+      setLoading(false)
+      return
+    }
 
-  async function fetchLogs() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -95,7 +98,11 @@ export function RecentAccessLogs({ userId }: { userId: string }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterAction, page, userId])
+
+  useEffect(() => {
+    fetchLogs()
+  }, [fetchLogs])
 
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return '-'
@@ -233,7 +240,8 @@ export function RecentAccessLogs({ userId }: { userId: string }) {
             {hasMore && (
               <div className="flex justify-center pt-4">
                 <button
-                  onClick={() => setPage(page + 1)}
+                  type="button"
+                  onClick={() => setPage((prev) => prev + 1)}
                   className="text-sm text-primary hover:underline"
                 >
                   Load More

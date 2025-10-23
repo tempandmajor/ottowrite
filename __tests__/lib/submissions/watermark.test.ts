@@ -114,7 +114,7 @@ The clock struck midnight as thunder rumbled in the distance.
       expect(watermarkedContent).toMatch(/Sarah|Chen/i)
 
       // Remove zero-width characters for comparison
-      const cleaned = watermarkedContent.replace(/[\u200B\u200C\u200D\uFEFF]/g, '')
+      const cleaned = watermarkedContent.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '')
 
       // After removing invisible chars, should be similar to original length
       // (homoglyph substitution doesn't change length significantly)

@@ -12,7 +12,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -77,11 +77,7 @@ export function PartnerResponsesList({ submissionId }: { submissionId: string })
   const [responses, setResponses] = useState<PartnerResponse[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchResponses()
-  }, [submissionId])
-
-  async function fetchResponses() {
+  const fetchResponses = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/submissions/${submissionId}/partners`)
@@ -97,23 +93,17 @@ export function PartnerResponsesList({ submissionId }: { submissionId: string })
     } finally {
       setLoading(false)
     }
-  }
+  }, [submissionId])
+
+  useEffect(() => {
+    fetchResponses()
+  }, [fetchResponses])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
-    })
-  }
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
     })
   }
 

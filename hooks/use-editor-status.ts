@@ -26,7 +26,6 @@ interface EditorStatus {
 function calculateCursorPosition(editor: Editor): CursorPosition | undefined {
   try {
     const { from } = editor.state.selection
-    const resolvedPos = editor.state.doc.resolve(from)
 
     // Calculate paragraph number (block-level nodes)
     let paragraph = 0

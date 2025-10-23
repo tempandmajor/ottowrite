@@ -12,7 +12,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -92,11 +92,13 @@ export function SecurityAlertsPanel({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
 
-  useEffect(() => {
-    fetchAlerts()
-  }, [userId, filterStatus, filterSeverity])
+  const fetchAlerts = useCallback(async () => {
+    if (!userId) {
+      setAlerts([])
+      setLoading(false)
+      return
+    }
 
-  async function fetchAlerts() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -113,7 +115,11 @@ export function SecurityAlertsPanel({ userId }: { userId: string }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterSeverity, filterStatus, userId])
+
+  useEffect(() => {
+    fetchAlerts()
+  }, [fetchAlerts])
 
   async function updateAlertStatus(alertId: string, status: string, notes: string) {
     try {
@@ -230,9 +236,10 @@ export function SecurityAlertsPanel({ userId }: { userId: string }) {
                 const IconComponent = alertTypeIcons[alert.alertType] || AlertTriangle
 
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={alert.id}
-                    className="p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                    className="w-full text-left p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                     onClick={() => setSelectedAlert(alert)}
                   >
                     <div className="flex items-start justify-between mb-2">
@@ -266,11 +273,11 @@ export function SecurityAlertsPanel({ userId }: { userId: string }) {
                           </div>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm">
+                      <div className="rounded-full bg-muted p-2 text-muted-foreground">
                         <Eye className="h-4 w-4" />
-                      </Button>
+                      </div>
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>

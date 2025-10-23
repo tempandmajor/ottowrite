@@ -17,8 +17,6 @@ import {
   Send,
   Building2,
   FileText,
-  BookOpen,
-  User,
   Shield,
   Info,
   X,

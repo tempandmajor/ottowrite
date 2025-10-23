@@ -4,11 +4,10 @@
  * View full manuscript submission and respond
  */
 
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PartnerManuscriptViewer } from '@/components/partners/manuscript-viewer'
 import { PartnerResponseForm } from '@/components/partners/response-form'
-import { notFound } from 'next/navigation'
 
 interface PageProps {
   params: Promise<{

@@ -8,7 +8,7 @@
  * Ticket: MS-4.2
  */
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -18,7 +18,7 @@ import { Separator } from '@/components/ui/separator'
 import { Bell, Mail, Loader2, Check } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
-interface NotificationPreferences {
+interface NotificationPreferencesData {
   emailEnabled: boolean
   inAppEnabled: boolean
   notifyPartnerViewed: boolean
@@ -36,16 +36,18 @@ interface NotificationPreferencesProps {
 
 export function NotificationPreferences({ userId }: NotificationPreferencesProps) {
   const { toast } = useToast()
-  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null)
+  const [preferences, setPreferences] = useState<NotificationPreferencesData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => {
-    fetchPreferences()
-  }, [userId])
+  const fetchPreferences = useCallback(async () => {
+    if (!userId) {
+      setPreferences(null)
+      setLoading(false)
+      return
+    }
 
-  const fetchPreferences = async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/notifications/preferences')
@@ -66,7 +68,11 @@ export function NotificationPreferences({ userId }: NotificationPreferencesProps
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast, userId])
+
+  useEffect(() => {
+    fetchPreferences()
+  }, [fetchPreferences])
 
   const savePreferences = async () => {
     if (!preferences) return
@@ -105,9 +111,9 @@ export function NotificationPreferences({ userId }: NotificationPreferencesProps
     }
   }
 
-  const updatePreference = <K extends keyof NotificationPreferences>(
+  const updatePreference = <K extends keyof NotificationPreferencesData>(
     key: K,
-    value: NotificationPreferences[K]
+    value: NotificationPreferencesData[K]
   ) => {
     if (!preferences) return
     setPreferences({ ...preferences, [key]: value })
@@ -196,7 +202,7 @@ export function NotificationPreferences({ userId }: NotificationPreferencesProps
                     onValueChange={(value) =>
                       updatePreference(
                         'emailDigestFrequency',
-                        value as NotificationPreferences['emailDigestFrequency']
+                        value as NotificationPreferencesData['emailDigestFrequency']
                       )
                     }
                   >

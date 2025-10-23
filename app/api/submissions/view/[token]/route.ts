@@ -8,12 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses } from '@/lib/api/error-response'
-import {
-  verifyAccessToken,
-  hasPermission,
-  getDRMSecurityHeaders,
-  createDeviceFingerprint as createDeviceFP,
-} from '@/lib/submissions/access-control'
+import { verifyAccessToken, hasPermission, getDRMSecurityHeaders } from '@/lib/submissions/access-control'
 import {
   logManuscriptAccess,
   getClientIp,

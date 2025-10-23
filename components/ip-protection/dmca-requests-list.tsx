@@ -11,7 +11,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,15 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Shield,
-  FileText,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  ExternalLink,
-} from 'lucide-react'
+import { Shield, FileText, Clock, CheckCircle2, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 
 interface DMCARequest {
@@ -82,11 +74,14 @@ export function DMCARequestsList({ userId }: { userId: string }) {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchData()
-  }, [userId, filterStatus])
+  const fetchData = useCallback(async () => {
+    if (!userId) {
+      setRequests([])
+      setStats(null)
+      setLoading(false)
+      return
+    }
 
-  async function fetchData() {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -113,7 +108,11 @@ export function DMCARequestsList({ userId }: { userId: string }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterStatus, userId])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const handleWithdraw = async (requestId: string) => {
     if (!confirm('Are you sure you want to withdraw this DMCA request?')) return
@@ -227,7 +226,7 @@ export function DMCARequestsList({ userId }: { userId: string }) {
               <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
               <p className="text-lg font-medium mb-2">No DMCA Requests</p>
               <p className="text-sm text-muted-foreground mb-4">
-                You haven't submitted any DMCA takedown requests yet
+                You haven&apos;t submitted any DMCA takedown requests yet
               </p>
               <Link href="/dashboard/ip-protection/dmca/new">
                 <Button>Create Your First Request</Button>

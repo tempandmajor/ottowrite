@@ -8,9 +8,8 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import {
   Send,
   Eye,
@@ -57,11 +56,7 @@ export function SubmissionActivityTimeline({ submissionId }: { submissionId: str
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchActivities()
-  }, [submissionId])
-
-  async function fetchActivities() {
+  const fetchActivities = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/submissions/${submissionId}/activity`)
@@ -77,7 +72,11 @@ export function SubmissionActivityTimeline({ submissionId }: { submissionId: str
     } finally {
       setLoading(false)
     }
-  }
+  }, [submissionId])
+
+  useEffect(() => {
+    fetchActivities()
+  }, [fetchActivities])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
@@ -118,7 +117,7 @@ export function SubmissionActivityTimeline({ submissionId }: { submissionId: str
 
             {/* Activities */}
             <div className="space-y-6">
-              {activities.map((activity, index) => {
+              {activities.map((activity) => {
                 const Icon = activityIcons[activity.type] || FileText
                 const color = activityColors[activity.type] || 'bg-gray-500'
 

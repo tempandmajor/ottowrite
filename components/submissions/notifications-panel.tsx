@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Bell, Check, CheckCheck, Loader2, Eye, FileText, Mail, PartyPopper, X } from 'lucide-react'
+import { Bell, CheckCheck, Loader2, Eye, FileText, Mail, PartyPopper, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -194,7 +194,7 @@ export function NotificationsPanel({ userId }: NotificationsPanelProps) {
             <Bell className="h-12 w-12 mx-auto text-muted-foreground mb-3 opacity-50" />
             <p className="text-sm text-muted-foreground">No notifications yet</p>
             <p className="text-xs text-muted-foreground mt-1">
-              You'll be notified about submission activity here
+              You&apos;ll be notified about submission activity here
             </p>
           </div>
         ) : (
@@ -234,13 +234,12 @@ function NotificationItem({
   const icon = notificationIcons[notification.type] || <Bell className="h-4 w-4" />
   const iconColor = notificationColors[notification.type] || 'text-muted-foreground'
 
-  const content = (
-    <div
-      className={`flex gap-3 p-4 hover:bg-muted/50 transition-colors cursor-pointer ${
-        !notification.read ? 'bg-muted/30' : ''
-      }`}
-      onClick={onClick}
-    >
+  const containerClasses = `flex gap-3 p-4 hover:bg-muted/50 transition-colors ${
+    !notification.read ? 'bg-muted/30' : ''
+  }`
+
+  const inner = (
+    <>
       <div className={`mt-0.5 ${iconColor}`}>{icon}</div>
       <div className="flex-1 space-y-1">
         <div className="flex items-start justify-between gap-2">
@@ -254,16 +253,28 @@ function NotificationItem({
           {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
         </p>
       </div>
-    </div>
+    </>
   )
 
   if (notification.actionUrl) {
     return (
-      <Link href={notification.actionUrl} onClick={onClick}>
-        {content}
+      <Link
+        href={notification.actionUrl}
+        onClick={onClick}
+        className={`block text-left ${containerClasses}`}
+      >
+        {inner}
       </Link>
     )
   }
 
-  return content
+  return (
+    <button
+      type="button"
+      className={`w-full text-left ${containerClasses}`}
+      onClick={onClick}
+    >
+      {inner}
+    </button>
+  )
 }

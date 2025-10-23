@@ -12,9 +12,8 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -24,17 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import {
-  Send,
-  Eye,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Users,
-  TrendingUp,
-  Search,
-  Filter,
-} from 'lucide-react'
+import { Send, Users, TrendingUp, Search, Filter } from 'lucide-react'
 import Link from 'next/link'
 import { SubmissionCard } from './submission-card'
 
@@ -78,11 +67,14 @@ export function SubmissionsDashboard({ userId }: { userId: string }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'recent' | 'activity' | 'title'>('recent')
 
-  useEffect(() => {
-    fetchData()
-  }, [userId])
+  const fetchData = useCallback(async () => {
+    if (!userId) {
+      setSubmissions([])
+      setStats(null)
+      setLoading(false)
+      return
+    }
 
-  async function fetchData() {
     try {
       setLoading(true)
       const [submissionsRes, statsRes] = await Promise.all([
@@ -106,7 +98,11 @@ export function SubmissionsDashboard({ userId }: { userId: string }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userId])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   // Filter and sort submissions
   const filteredSubmissions = submissions

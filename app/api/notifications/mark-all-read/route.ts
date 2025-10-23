@@ -6,11 +6,11 @@
  * Ticket: MS-4.2
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses } from '@/lib/api/error-response'
 
-export async function PATCH(request: NextRequest) {
+export async function PATCH() {
   try {
     const supabase = await createClient()
 

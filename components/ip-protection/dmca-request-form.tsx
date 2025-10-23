@@ -188,8 +188,6 @@ export function DMCARequestForm({ submissionId }: { submissionId?: string }) {
         throw new Error(error.error?.message || 'Failed to submit request')
       }
 
-      const result = await response.json()
-
       // Redirect to the DMCA requests list
       router.push(`/dashboard/ip-protection/dmca${isDraft ? '?saved=true' : '?submitted=true'}`)
     } catch (error) {

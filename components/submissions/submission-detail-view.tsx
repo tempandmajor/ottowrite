@@ -12,11 +12,10 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   BookOpen,
@@ -54,11 +53,7 @@ export function SubmissionDetailView({ submissionId }: { submissionId: string })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchSubmission()
-  }, [submissionId])
-
-  async function fetchSubmission() {
+  const fetchSubmission = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/submissions/${submissionId}`)
@@ -75,7 +70,11 @@ export function SubmissionDetailView({ submissionId }: { submissionId: string })
     } finally {
       setLoading(false)
     }
-  }
+  }, [submissionId])
+
+  useEffect(() => {
+    fetchSubmission()
+  }, [fetchSubmission])
 
   if (loading) {
     return (

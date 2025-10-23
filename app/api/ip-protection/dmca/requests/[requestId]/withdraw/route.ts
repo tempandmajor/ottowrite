@@ -32,7 +32,7 @@ export async function POST(
     const reason = body.reason || null
 
     // Call database function to withdraw request
-    const { data, error: withdrawError } = await supabase.rpc('withdraw_dmca_request', {
+    const { error: withdrawError } = await supabase.rpc('withdraw_dmca_request', {
       p_request_id: requestId,
       p_user_id: user.id,
       p_reason: reason,

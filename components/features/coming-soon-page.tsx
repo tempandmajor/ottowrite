@@ -31,7 +31,7 @@ import {
   FileText,
 } from 'lucide-react'
 import Link from 'next/link'
-import { getFeatureConfig, type FeatureConfig } from '@/lib/features/feature-flags'
+import { getFeatureConfig } from '@/lib/features/feature-flags'
 
 interface ComingSoonPageProps {
   featureId: string
@@ -146,7 +146,7 @@ export function ComingSoonPage({
         <CardHeader>
           <CardTitle>What to Expect</CardTitle>
           <CardDescription>
-            Here's what you'll be able to do with {config.name}
+            Here&apos;s what you&apos;ll be able to do with {config.name}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -169,8 +169,8 @@ export function ComingSoonPage({
             Get Early Access
           </CardTitle>
           <CardDescription>
-            Be the first to know when {config.name} launches. We'll send you an email as soon as
-            it's ready.
+            Be the first to know when {config.name} launches. We&apos;ll send you an email as soon as
+            it&apos;s ready.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -178,7 +178,7 @@ export function ComingSoonPage({
             <Alert className="border-primary/20 bg-primary/10">
               <CheckCircle2 className="h-4 w-4 text-primary" />
               <AlertDescription>
-                <strong className="text-primary">You're on the list!</strong> We'll notify you when{' '}
+                <strong className="text-primary">You&apos;re on the list!</strong> We&apos;ll notify you when{' '}
                 {config.name} launches.
               </AlertDescription>
             </Alert>
@@ -206,7 +206,7 @@ export function ComingSoonPage({
       {/* Development Progress (Optional) */}
       <div className="mt-8 text-center">
         <p className="text-sm text-muted-foreground mb-4">
-          We're working hard to bring you this feature. Follow our progress:
+          We&apos;re working hard to bring you this feature. Follow our progress:
         </p>
         <div className="flex items-center justify-center gap-4">
           <Link href="/changelog" className="text-sm text-primary hover:underline">

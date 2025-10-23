@@ -28,6 +28,7 @@ export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
     ai_words_per_month: null,
     ai_requests_per_month: null,
     collaborator_slots: null,
+    api_requests_per_day: null,
   }
 
   const projectsPercent = limits.max_projects
@@ -42,9 +43,13 @@ export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
   const teamSeatsPercent = limits.collaborator_slots && limits.collaborator_slots > 0
     ? Math.min(100, Math.round((usageSummary.usage.collaborators / limits.collaborator_slots) * 100))
     : 0
+  const apiRequestsPercent = limits.api_requests_per_day && limits.api_requests_per_day > 0
+    ? Math.min(100, Math.round((usageSummary.usage.api_requests_today / limits.api_requests_per_day) * 100))
+    : 0
 
   const hasTeamSeats = limits.collaborator_slots && limits.collaborator_slots > 0
-  const hasWarning = projectsPercent >= 80 || documentsPercent >= 80 || aiWordsPercent >= 80 || teamSeatsPercent >= 80
+  const hasAPIAccess = limits.api_requests_per_day && limits.api_requests_per_day > 0
+  const hasWarning = projectsPercent >= 80 || documentsPercent >= 80 || aiWordsPercent >= 80 || teamSeatsPercent >= 80 || apiRequestsPercent >= 80
 
   const formatDate = (value: string) =>
     new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -94,7 +99,7 @@ export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
           </div>
         )}
 
-        <div className={`grid gap-4 ${hasTeamSeats ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+        <div className={`grid gap-4 ${hasTeamSeats || hasAPIAccess ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Projects</span>
@@ -137,6 +142,18 @@ export function UsageSummaryCard({ usageSummary }: UsageSummaryCardProps) {
                 </span>
               </div>
               <Progress value={teamSeatsPercent} className="h-2" />
+            </div>
+          )}
+
+          {hasAPIAccess && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">API requests (today)</span>
+                <span className="font-medium">
+                  {usageSummary.usage.api_requests_today} / {limits.api_requests_per_day}
+                </span>
+              </div>
+              <Progress value={apiRequestsPercent} className="h-2" />
             </div>
           )}
         </div>

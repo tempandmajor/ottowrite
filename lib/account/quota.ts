@@ -206,3 +206,64 @@ export async function checkTeamSeatQuota(
     limit,
   }
 }
+
+export async function checkAPIRateLimit(
+  supabase: SupabaseClient,
+  userId: string,
+  plan: string
+) {
+  // Get API requests per day limit from config
+  // Professional: 50, Studio: 1000, others: 0 (no API access)
+  const apiLimits: Record<string, number> = {
+    free: 0,
+    hobbyist: 0,
+    professional: 50,
+    studio: 1000,
+  }
+
+  const limit = apiLimits[plan] ?? 0
+
+  // No API access for this plan
+  if (limit === 0) {
+    return {
+      allowed: false,
+      used: 0,
+      limit: 0,
+      resetAt: null,
+    }
+  }
+
+  // Get today's API request count
+  const { data, error } = await supabase.rpc('get_api_request_count_today', {
+    p_user_id: userId,
+  })
+
+  if (error) throw error
+  const used = data ?? 0
+
+  // Calculate reset time (next day at 00:00 UTC)
+  const now = new Date()
+  const resetAt = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1,
+    0, 0, 0, 0
+  ))
+
+  if (used >= limit) {
+    return {
+      allowed: false,
+      used,
+      limit,
+      resetAt: resetAt.toISOString(),
+    }
+  }
+
+  return {
+    allowed: true,
+    used,
+    limit,
+    remaining: limit - used,
+    resetAt: resetAt.toISOString(),
+  }
+}

@@ -10,6 +10,7 @@ export type UsageSummary = {
     ai_words_per_month: number | null
     ai_requests_per_month: number | null
     collaborator_slots: number | null
+    api_requests_per_day: number | null
   } | null
   usage: {
     projects: number
@@ -22,6 +23,7 @@ export type UsageSummary = {
     ai_completion_tokens: number
     ai_cost_month: number
     collaborators: number
+    api_requests_today: number
   }
   currentPeriod: { start: string; end: string }
   latestSnapshot: {
@@ -32,6 +34,7 @@ export type UsageSummary = {
     ai_words_used: number
     ai_requests_count: number
     collaborators_count: number
+    api_requests_count_day: number
     period_start: string
     period_end: string
     created_at: string
@@ -44,6 +47,7 @@ export type UsageSummary = {
     projectsCount: number
     documentsCount: number
     collaboratorsCount: number
+    apiRequestsDay: number
     createdAt: string
   }>
 }
@@ -75,6 +79,7 @@ export async function getUsageSummary(
     aiRequestsResult,
     usageHistoryResult,
     collaboratorsResult,
+    apiRequestsTodayResult,
   ] = await Promise.all([
     supabase
       .from('subscription_plan_limits')
@@ -105,7 +110,7 @@ export async function getUsageSummary(
     supabase
       .from('user_plan_usage')
       .select(
-        'projects_count, documents_count, document_snapshots_count, templates_created, ai_words_used, ai_requests_count, collaborators_count, period_start, period_end, created_at'
+        'projects_count, documents_count, document_snapshots_count, templates_created, ai_words_used, ai_requests_count, collaborators_count, api_requests_count_day, period_start, period_end, created_at'
       )
       .eq('user_id', userId)
       .order('period_start', { ascending: false })
@@ -116,6 +121,7 @@ export async function getUsageSummary(
       .eq('projects.user_id', userId)
       .in('status', ['invited', 'accepted'])
       .neq('role', 'owner'),
+    supabase.rpc('get_api_request_count_today', { p_user_id: userId }),
   ])
 
   if (planLimitsResult.error) throw planLimitsResult.error
@@ -127,6 +133,7 @@ export async function getUsageSummary(
   if (aiRequestsResult.error) throw aiRequestsResult.error
   if (usageHistoryResult.error) throw usageHistoryResult.error
   if (collaboratorsResult.error) throw collaboratorsResult.error
+  if (apiRequestsTodayResult.error) throw apiRequestsTodayResult.error
 
   const aiUsage = aiUsageResult.data?.[0] ?? {
     words_generated: 0,
@@ -143,14 +150,28 @@ export async function getUsageSummary(
     projectsCount: row.projects_count ?? 0,
     documentsCount: row.documents_count ?? 0,
     collaboratorsCount: row.collaborators_count ?? 0,
+    apiRequestsDay: row.api_requests_count_day ?? 0,
     createdAt: row.created_at,
   }))
 
   const collaboratorsActive = collaboratorsResult.count ?? 0
+  const apiRequestsToday = apiRequestsTodayResult.data ?? 0
+
+  // Calculate API requests per day limit based on plan
+  const apiLimits: Record<string, number> = {
+    free: 0,
+    hobbyist: 0,
+    professional: 50,
+    studio: 1000,
+  }
+  const apiRequestsPerDay = apiLimits[plan] ?? 0
 
   return {
     plan,
-    limits: planLimitsResult.data ?? null,
+    limits: {
+      ...(planLimitsResult.data ?? {}),
+      api_requests_per_day: apiRequestsPerDay,
+    } as UsageSummary['limits'],
     usage: {
       projects: projectsResult.count ?? 0,
       documents: documentsResult.count ?? 0,
@@ -162,6 +183,7 @@ export async function getUsageSummary(
       ai_completion_tokens: aiUsage.completion_tokens ?? 0,
       ai_cost_month: aiUsage.total_cost ?? 0,
       collaborators: collaboratorsActive,
+      api_requests_today: apiRequestsToday,
     },
     currentPeriod: {
       start: periodStartISO,
@@ -176,6 +198,7 @@ export async function getUsageSummary(
           ai_words_used: usageHistoryResult.data[0].ai_words_used ?? 0,
           ai_requests_count: usageHistoryResult.data[0].ai_requests_count ?? 0,
           collaborators_count: usageHistoryResult.data[0].collaborators_count ?? 0,
+          api_requests_count_day: usageHistoryResult.data[0].api_requests_count_day ?? 0,
           period_start: usageHistoryResult.data[0].period_start,
           period_end: usageHistoryResult.data[0].period_end,
           created_at: usageHistoryResult.data[0].created_at,

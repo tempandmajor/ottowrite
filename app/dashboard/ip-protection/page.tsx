@@ -9,15 +9,17 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { canAccessSubmissions } from '@/lib/submissions/access'
-import { SubmissionsUpgradeRequired } from '@/components/submissions/upgrade-required'
+import { canAccessStudioFeatures } from '@/lib/studio/access'
+import { StudioUpgradeRequired } from '@/components/studio/studio-upgrade-required'
 import { SubmissionSecurityOverview } from '@/components/ip-protection/submission-security-overview'
 import { AccessTimelineChart } from '@/components/ip-protection/access-timeline-chart'
 import { SecurityAlertsPanel } from '@/components/ip-protection/security-alerts-panel'
 import { RecentAccessLogs } from '@/components/ip-protection/recent-access-logs'
 import { DMCARequestsList } from '@/components/ip-protection/dmca-requests-list'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Shield } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Shield, Send } from 'lucide-react'
+import Link from 'next/link'
 
 export default async function IPProtectionPage() {
   const supabase = await createClient()
@@ -39,11 +41,11 @@ export default async function IPProtectionPage() {
     .single()
 
   // Check Studio access
-  const accessResult = canAccessSubmissions(profile)
+  const accessResult = canAccessStudioFeatures(profile)
 
   // Show upgrade page if no access
   if (!accessResult.hasAccess) {
-    return <SubmissionsUpgradeRequired currentPlan={accessResult.currentTier} />
+    return <StudioUpgradeRequired currentPlan={accessResult.currentTier} feature="ipProtection" />
   }
 
   // User has access - show IP protection dashboard
@@ -59,6 +61,12 @@ export default async function IPProtectionPage() {
             Monitor manuscript security, access patterns, and suspicious activity
           </p>
         </div>
+        <Button variant="outline" asChild>
+          <Link href="/dashboard/submissions">
+            <Send className="h-4 w-4 mr-2" />
+            View Submissions
+          </Link>
+        </Button>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">

@@ -2,12 +2,14 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
-import { validateQuery, validationErrorResponse } from '@/lib/validation/middleware'
 import { projectQuerySchema } from '@/lib/validation/schemas/projects'
 import { detectSQLInjection } from '@/lib/security/sanitize'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
+
+const escapeForILike = (value: string) =>
+  value.replace(/[\\%_]/g, (match) => `\\${match}`)
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,21 +22,63 @@ export async function GET(request: NextRequest) {
       return errorResponses.unauthorized()
     }
 
-    // Validate query parameters
-    const validation = validateQuery(request, projectQuerySchema)
-    if (!validation.success) {
-      return validationErrorResponse(validation, user.id)
+    const { searchParams } = new URL(request.url)
+    const rawSearch = searchParams.get('search') ?? searchParams.get('q') ?? ''
+    const rawFolder = searchParams.get('folderId') ?? searchParams.get('folder') ?? undefined
+    const rawTagsEntries = searchParams.getAll('tags')
+    const tagList = rawTagsEntries
+      .flatMap((entry) => entry.split(','))
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0)
+    const rawType = searchParams.get('type') ?? undefined
+    const rawGenre = searchParams.get('genre') ?? undefined
+    const rawStatus = searchParams.get('status') ?? undefined
+    const rawSortBy = searchParams.get('sortBy') ?? searchParams.get('sort') ?? undefined
+    const rawSortOrder = searchParams.get('sortOrder') ?? searchParams.get('order') ?? undefined
+    const rawLimit = searchParams.get('limit') ?? undefined
+    const rawOffset = searchParams.get('offset') ?? undefined
+
+    const validationResult = projectQuerySchema.safeParse({
+      search: rawSearch || undefined,
+      folderId: rawFolder && rawFolder !== '__none' ? rawFolder : undefined,
+      tags: tagList.length > 0 ? tagList : undefined,
+      type: rawType || undefined,
+      genre: rawGenre || undefined,
+      status: rawStatus || undefined,
+      sortBy: rawSortBy || undefined,
+      sortOrder: rawSortOrder || undefined,
+      limit: rawLimit,
+      offset: rawOffset,
+    })
+
+    if (!validationResult.success) {
+      const issues = validationResult.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      }))
+
+      logger.warn('Query validation failed', {
+        operation: 'projects:query:validation',
+        userId: user.id,
+        issues,
+      })
+
+      return errorResponses.validationError('Invalid project query parameters', {
+        userId: user.id,
+        details: { issues },
+      })
     }
 
-    const validated = validation.data!
+    const validated = validationResult.data
     const {
-      search: searchTerm = '',
+      search: rawValidatedSearch,
       folderId,
       tags,
       type,
       limit,
       offset,
     } = validated
+    const searchTerm = (rawValidatedSearch ?? '').trim()
 
     // Security: Detect SQL injection attempts in search term
     if (searchTerm && detectSQLInjection(searchTerm)) {
@@ -46,8 +90,8 @@ export async function GET(request: NextRequest) {
       // Still allow the request but use parameterized query (Supabase handles this safely)
     }
 
-    const folderFilter = folderId === 'none' ? '__none' : folderId
-    const tagIds = tags || []
+    const folderFilter = rawFolder === '__none' ? '__none' : folderId
+    const tagIds = tags ? Array.from(new Set(tags)) : []
     const page = Math.floor(offset / limit) + 1
 
     let filteredProjectIds: string[] | null = null
@@ -129,13 +173,9 @@ export async function GET(request: NextRequest) {
       query = query.eq('folder_id', folderFilter)
     }
 
-    if (searchTerm.length > 2) {
-      query = query.textSearch('search_vector', searchTerm, {
-        type: 'websearch',
-        config: 'english',
-      })
-    } else if (searchTerm.length > 0) {
-      query = query.ilike('name', `%${searchTerm}%`)
+    if (searchTerm.length > 0) {
+      const pattern = `%${escapeForILike(searchTerm)}%`
+      query = query.ilike('name', pattern)
     }
 
     const { data: projectRows, error: projectError, count } = await query.range(offset, offset + limit - 1)

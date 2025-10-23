@@ -67,18 +67,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return errorResponses.forbidden('Access denied')
     }
 
-    // Update the partner submission
+    // Update the partner submission with proper column names
     const updateData: any = {
       status: body.status,
-      response_message: body.response_message,
-      responded_at: new Date().toISOString(),
+      partner_response: body.response_message,
+      partner_response_date: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
 
-    const { error: updateError } = await supabase
+    const { data: updatedSubmission, error: updateError } = await supabase
       .from('partner_submissions')
       .update(updateData)
       .eq('id', submissionId)
+      .select(`
+        id,
+        submission_id,
+        user_id,
+        manuscript_submissions (
+          id,
+          title
+        ),
+        submission_partners (
+          name
+        )
+      `)
+      .single()
 
     if (updateError) {
       return errorResponses.internalError('Failed to update submission', {
@@ -86,8 +99,41 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       })
     }
 
-    // TODO: Send email notification to author
-    // This would be implemented in a future iteration
+    // Send notification to author
+    if (updatedSubmission) {
+      const submission = updatedSubmission.manuscript_submissions as any
+      const partner = updatedSubmission.submission_partners as any
+
+      try {
+        const { notifyResponseReceived, notifySubmissionAccepted, notifySubmissionRejected } = await import('@/lib/notifications/create-notification')
+
+        if (body.status === 'accepted') {
+          await notifySubmissionAccepted(
+            updatedSubmission.user_id,
+            submission.id,
+            submission.title,
+            partner.name
+          )
+        } else if (body.status === 'rejected') {
+          await notifySubmissionRejected(
+            updatedSubmission.user_id,
+            submission.id,
+            submission.title,
+            partner.name
+          )
+        } else {
+          await notifyResponseReceived(
+            updatedSubmission.user_id,
+            submission.id,
+            submission.title,
+            partner.name
+          )
+        }
+      } catch (notificationError) {
+        console.error('Failed to send notification:', notificationError)
+        // Don't fail the request if notification fails
+      }
+    }
 
     return successResponse({
       message: 'Response submitted successfully',

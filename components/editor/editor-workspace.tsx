@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
+import { Switch } from '@/components/ui/switch'
 import {
   ArrowLeft,
   Save,
@@ -38,6 +39,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   FileDown,
+  FileText,
   History,
   Search,
   Sparkles,
@@ -47,6 +49,7 @@ import {
   Keyboard,
   Maximize2,
   Command,
+  Type,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
@@ -387,6 +390,26 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const [leftRailWidth, setLeftRailWidth] = useState(320)
   const [rightRailWidth, setRightRailWidth] = useState(360)
   const [focusMode, setFocusMode] = useState(false)
+  const [layoutMode, setLayoutMode] = useState<'page' | 'wide' | 'typewriter'>(() => {
+    if (typeof window === 'undefined') return 'page'
+    const stored = window.localStorage.getItem('editor:layout-mode')
+    return stored === 'wide' || stored === 'typewriter' || stored === 'page' ? (stored as 'page' | 'wide' | 'typewriter') : 'page'
+  })
+  const [editorTheme, setEditorTheme] = useState<'serif' | 'sans'>(() => {
+    if (typeof window === 'undefined') return 'sans'
+    const stored = window.localStorage.getItem('editor:theme')
+    return stored === 'serif' || stored === 'sans' ? (stored as 'serif' | 'sans') : 'sans'
+  })
+  const [fontScale, setFontScale] = useState<'sm' | 'md' | 'lg'>(() => {
+    if (typeof window === 'undefined') return 'md'
+    const stored = window.localStorage.getItem('editor:font-scale')
+    return stored === 'sm' || stored === 'lg' ? (stored as 'sm' | 'lg') : 'md'
+  })
+  const [showRuler, setShowRuler] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const stored = window.localStorage.getItem('editor:show-ruler')
+    return stored === null ? true : stored === 'true'
+  })
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>([])
   const [recentsLoading, setRecentsLoading] = useState(false)
@@ -399,6 +422,26 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [screenplayStructure, setScreenplayStructure] = useState<ScreenplayAct[]>([])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('editor:layout-mode', layoutMode)
+  }, [layoutMode])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('editor:theme', editorTheme)
+  }, [editorTheme])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('editor:font-scale', fontScale)
+  }, [fontScale])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('editor:show-ruler', showRuler ? 'true' : 'false')
+  }, [showRuler])
   const lastSceneFocusMissRef = useRef<string | null>(null)
   const tiptapApiRef = useRef<TiptapEditorApi | null>(null)
   const screenplayApiRef = useRef<ScreenplayEditorApi | null>(null)
@@ -1476,6 +1519,17 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
       ? Math.min(100, Math.round((wordCount / targetWordCount) * 100))
       : null
 
+  const editorMaxWidthClass = useMemo(() => {
+    switch (layoutMode) {
+      case 'wide':
+        return 'max-w-[1200px]'
+      case 'typewriter':
+        return 'max-w-[760px]'
+      default:
+        return 'max-w-[960px]'
+    }
+  }, [layoutMode])
+
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -1503,6 +1557,10 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
           content={content}
           onUpdate={setContent}
           placeholder="Start writing your story..."
+          layoutMode={layoutMode}
+          theme={editorTheme}
+          fontScale={fontScale}
+          showRuler={showRuler && !focusMode}
           focusScene={activeSceneInfo}
           onAnchorsChange={handleAnchorsChange}
           onSceneFocusResult={handleSceneFocusResult}
@@ -1955,38 +2013,127 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
 
               <div className="flex-1 min-w-0 overflow-hidden">
                 <div className="h-full overflow-auto">
-                  <div className="mx-auto flex max-w-[1100px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
+                  <div className="mx-auto flex max-w-[1300px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
                     {!focusMode && (
-                      <Card className="border-none bg-card/80 shadow-card">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <Sparkles className="h-5 w-5 text-primary" />
-                            Writing cockpit
-                          </CardTitle>
-                          <CardDescription>
-                            Stay aligned with your outline, track word count, and jump to plot analysis.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                          <Badge variant="muted" className="capitalize">
-                            {document.type}
-                          </Badge>
-                          <span className="h-4 w-px bg-border" aria-hidden />
-                          <span>{wordCount.toLocaleString()} words</span>
-                          <span className="h-4 w-px bg-border" aria-hidden />
-                          <Button variant="link" className="p-0" asChild>
+                      <div className="rounded-3xl border border-border/60 bg-background/80 px-5 py-5 shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                            <Badge variant="muted" className="capitalize">
+                              {document.type}
+                            </Badge>
+                            <span className="hidden h-4 w-px bg-border sm:inline-flex" aria-hidden />
+                            <span>{wordCount.toLocaleString()} words</span>
+                            {wordProgress !== null && (
+                              <>
+                                <span className="hidden h-4 w-px bg-border sm:inline-flex" aria-hidden />
+                                <span>{wordProgress}% of target</span>
+                              </>
+                            )}
+                          </div>
+                          <Button variant="ghost" size="sm" className="gap-2" asChild>
                             <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
-                              Open plot analysis
+                              <Sparkles className="h-4 w-4" />
+                              Plot analysis
                             </Link>
                           </Button>
-                        </CardContent>
-                      </Card>
-                    )}
-                    <div className="overflow-hidden rounded-2xl border bg-card shadow-card">
-                      <div className="p-6 sm:p-8 lg:p-10">
-                        {editorElement}
+                        </div>
+                        <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Layout</p>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={layoutMode === 'page' ? 'default' : 'outline'}
+                                className="gap-2 rounded-full"
+                                onClick={() => setLayoutMode('page')}
+                              >
+                                <FileText className="h-4 w-4" />
+                                Page
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={layoutMode === 'wide' ? 'default' : 'outline'}
+                                className="gap-2 rounded-full"
+                                onClick={() => setLayoutMode('wide')}
+                              >
+                                <Maximize2 className="h-4 w-4" />
+                                Wide
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={layoutMode === 'typewriter' ? 'default' : 'outline'}
+                                className="gap-2 rounded-full"
+                                onClick={() => setLayoutMode('typewriter')}
+                              >
+                                <Type className="h-4 w-4" />
+                                Typewriter
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Typography</p>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={editorTheme === 'serif' ? 'default' : 'outline'}
+                                  className="rounded-full"
+                                  onClick={() => setEditorTheme('serif')}
+                                >
+                                  Serif
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={editorTheme === 'sans' ? 'default' : 'outline'}
+                                  className="rounded-full"
+                                  onClick={() => setEditorTheme('sans')}
+                                >
+                                  Sans
+                                </Button>
+                              </div>
+                              <div className="flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2 py-1">
+                                {(['sm', 'md', 'lg'] as const).map((scale) => (
+                                  <Button
+                                    key={scale}
+                                    type="button"
+                                    size="sm"
+                                    variant={fontScale === scale ? 'default' : 'ghost'}
+                                    className={cn(
+                                      'h-8 w-8 rounded-full p-0 transition-all',
+                                      scale === 'sm' && 'text-xs',
+                                      scale === 'md' && 'text-sm',
+                                      scale === 'lg' && 'text-base'
+                                    )}
+                                    onClick={() => setFontScale(scale)}
+                                  >
+                                    Aa
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Guides</p>
+                            <div className="flex items-center gap-3 rounded-full border border-border/60 bg-muted/30 px-3 py-2">
+                              <Switch id="editor-ruler" checked={showRuler} onCheckedChange={(checked) => setShowRuler(checked === true)} />
+                              <label htmlFor="editor-ruler" className="text-sm text-muted-foreground">
+                                Page ruler
+                              </label>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      {!focusMode && (
+                    )}
+                    <div className="relative">
+                      {editorElement}
+                    </div>
+                    {!focusMode && (
+                      <div className={cn('mx-auto w-full', editorMaxWidthClass, 'px-2 pb-6 sm:px-4')}>
                         <StatusBar
                           cursorPosition={editorStatus.cursorPosition}
                           selection={editorStatus.selection}
@@ -1995,8 +2142,8 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                           targetWordCount={metadata?.targetWordCount ?? undefined}
                           readingTime={Math.max(1, Math.ceil(wordCount / 225))}
                         />
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

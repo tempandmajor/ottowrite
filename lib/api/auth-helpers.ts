@@ -40,7 +40,7 @@ export async function requireAuth(request: Request): Promise<AuthResult> {
   const { data: { user }, error } = await supabase.auth.getUser()
 
   if (error || !user) {
-    throw errorResponses.unauthorized()
+    throw await errorResponses.unauthorized()
   }
 
   return { user, supabase }
@@ -83,7 +83,7 @@ export async function requireOwnership<T = any>(
 
   if (error || !data) {
     // Don't reveal whether resource exists or user just doesn't own it
-    throw errorResponses.notFound(`Resource not found`)
+    throw await errorResponses.notFound(`Resource not found`)
   }
 
   return data as T
@@ -119,7 +119,7 @@ export async function requireOwnershipCustom<T = any>(
     .single()
 
   if (error || !data) {
-    throw errorResponses.notFound(`Resource not found`)
+    throw await errorResponses.notFound(`Resource not found`)
   }
 
   return data as T
@@ -175,7 +175,7 @@ export async function requireDocumentOwnership(
     .single()
 
   if (error || !data) {
-    throw errorResponses.notFound(`Document not found`)
+    throw await errorResponses.notFound(`Document not found`)
   }
 
   return data
@@ -249,7 +249,7 @@ export async function requireAdmin(request: Request): Promise<AuthResult> {
   const isAdmin = await hasRole(auth.supabase, auth.user.id, 'admin')
 
   if (!isAdmin) {
-    throw errorResponses.forbidden('Admin access required')
+    throw await errorResponses.forbidden('Admin access required')
   }
 
   return auth
@@ -317,7 +317,7 @@ export async function requireSubmissionAccess(
     }
   }
 
-  throw errorResponses.notFound('Submission not found')
+  throw await errorResponses.notFound('Submission not found')
 }
 
 /**

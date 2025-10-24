@@ -2418,190 +2418,152 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             />
           )}
 
-          {/* Header controls */}
-          <div className="flex w-full flex-wrap items-center gap-4">
-          <div className="flex flex-1 items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/documents">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to documents
-              </Link>
-            </Button>
-            <div className="flex min-w-0 flex-1 flex-col">
+          {/* Header controls - 3-zone layout */}
+          <div className="grid w-full grid-cols-3 items-center gap-4">
+            {/* Left Zone: Navigation */}
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/dashboard/documents">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Link>
+              </Button>
+            </div>
+
+            {/* Center Zone: Document Identity */}
+            <div className="flex min-w-0 flex-col items-center justify-center">
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full truncate border-none bg-transparent text-xl font-semibold text-foreground outline-none focus-visible:ring-0"
+                className="w-full truncate border-none bg-transparent text-center text-lg font-semibold text-foreground outline-none focus-visible:ring-0"
                 placeholder="Untitled document"
               />
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                {projectTitle && (
-                  <Link
-                    href={`/dashboard/projects/${document.project_id}`}
-                    className="font-medium text-primary hover:text-primary/80"
-                  >
-                    {projectTitle}
-                  </Link>
-                )}
-                <span className="h-3 w-px bg-border" aria-hidden />
+              <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
                 <span className="capitalize">{document.type}</span>
                 <span className="h-3 w-px bg-border" aria-hidden />
-                <span>{wordCount.toLocaleString()} words</span>
-                <span className="h-3 w-px bg-border" aria-hidden />
                 <span className={isDirty ? 'text-amber-600' : 'text-muted-foreground'}>{savedMessage}</span>
-                {!isScriptType(document.type) && (
-                  <>
-                    <span className="h-3 w-px bg-border" aria-hidden />
-                    <span className={autosaveClassName}>{autosaveLabel}</span>
-                  </>
-                )}
               </div>
             </div>
-          </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3 md:ml-auto md:w-auto md:flex-row md:gap-2">
-            <TooltipProvider delayDuration={150} disableHoverableContent>
-              <div className={cn('hidden items-center gap-2 md:flex transition-opacity', focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100')}>
-                <UndoRedoControls
-                  canUndo={undoRedoAPI.canUndo}
-                  canRedo={undoRedoAPI.canRedo}
-                  undoStackSize={undoRedoAPI.undoStackSize}
-                  redoStackSize={undoRedoAPI.redoStackSize}
-                  onUndo={handleUndo}
-                  onRedo={handleRedo}
-                  getUndoHistory={undoRedoAPI.getUndoHistory}
-                  getRedoHistory={undoRedoAPI.getRedoHistory}
-              />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
-                        <Search className="mr-2 h-4 w-4" />
-                        Plot analysis
-                      </Link>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Open plot analysis</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={() => setShowVersionHistory(true)}>
-                      <History className="mr-2 h-4 w-4" />
-                      History
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Version history (Ctrl+Shift+H)</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={handleExportClick}>
-                      <FileDown className="mr-2 h-4 w-4" />
-                      Export
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Export document</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setFocusMode(false)
-                        setBinderSidebarOpen((prev) => !prev)
-                      }}
-                    >
-                      {binderSidebarOpen ? (
-                        <>
-                          <PanelLeftClose className="mr-2 h-4 w-4" />
-                          Hide binder
-                        </>
-                      ) : (
-                        <>
-                          <PanelLeftOpen className="mr-2 h-4 w-4" />
-                          Show binder
-                        </>
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Toggle binder (Ctrl+Shift+B)</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setFocusMode(false)
-                        setStructureSidebarOpen((prev) => !prev)
-                      }}
-                    >
-                      {structureSidebarOpen ? (
-                        <>
-                          <PanelLeftClose className="mr-2 h-4 w-4" />
-                          Hide outline
-                        </>
-                      ) : (
-                        <>
-                          <PanelLeftOpen className="mr-2 h-4 w-4" />
-                          Show outline
-                        </>
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Toggle outline (Ctrl+Shift+O)</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setFocusMode(false)
-                        setShowAI((prev) => !prev)
-                      }}
-                    >
-                      {showAI ? (
-                        <>
-                          <PanelRightClose className="mr-2 h-4 w-4" />
-                          Hide AI
-                        </>
-                      ) : (
-                        <>
-                          <PanelRightOpen className="mr-2 h-4 w-4" />
-                          Show AI
-                        </>
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Toggle AI assistant (Ctrl+Shift+A)</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="sm" onClick={saveDocument} disabled={saving}>
-                      <Save className="mr-2 h-4 w-4" />
-                      {saving ? 'Saving…' : 'Save'}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Save now</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={focusMode ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={toggleFocusMode}
-                    >
-                      {focusMode ? 'Exit Focus' : 'Focus Mode'}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {focusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Enter Focus Mode (Ctrl+Shift+F)'}
-                  </TooltipContent>
-                </Tooltip>
-                <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
-              </div>
-            </TooltipProvider>
-            <div className={cn('flex items-center gap-2 md:hidden', focusMode ? 'hidden' : '')}>
+
+            {/* Right Zone: Actions */}
+            <div className="flex items-center justify-end gap-2">
+              <TooltipProvider delayDuration={150} disableHoverableContent>
+                <div className={cn('hidden items-center gap-2 md:flex transition-opacity', focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100')}>
+                  {/* Primary Actions - Always Visible */}
+                  {isDirty && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button size="sm" onClick={saveDocument} disabled={saving}>
+                          <Save className="mr-2 h-4 w-4" />
+                          {saving ? 'Saving…' : 'Save'}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Save now (Ctrl+S)</TooltipContent>
+                    </Tooltip>
+                  )}
+
+                  <UndoRedoControls
+                    canUndo={undoRedoAPI.canUndo}
+                    canRedo={undoRedoAPI.canRedo}
+                    undoStackSize={undoRedoAPI.undoStackSize}
+                    redoStackSize={undoRedoAPI.redoStackSize}
+                    onUndo={handleUndo}
+                    onRedo={handleRedo}
+                    getUndoHistory={undoRedoAPI.getUndoHistory}
+                    getRedoHistory={undoRedoAPI.getRedoHistory}
+                  />
+
+                  {/* Secondary Actions - Dropdown Menu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem asChild>
+                        <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
+                          <Search className="mr-2 h-4 w-4" />
+                          Plot Analysis
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowVersionHistory(true)}>
+                        <History className="mr-2 h-4 w-4" />
+                        Version History
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleExportClick}>
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Export Document
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setFocusMode(false)
+                          setBinderSidebarOpen((prev) => !prev)
+                        }}
+                      >
+                        {binderSidebarOpen ? (
+                          <>
+                            <PanelLeftClose className="mr-2 h-4 w-4" />
+                            Hide Binder
+                          </>
+                        ) : (
+                          <>
+                            <PanelLeftOpen className="mr-2 h-4 w-4" />
+                            Show Binder
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setFocusMode(false)
+                          setStructureSidebarOpen((prev) => !prev)
+                        }}
+                      >
+                        {structureSidebarOpen ? (
+                          <>
+                            <PanelLeftClose className="mr-2 h-4 w-4" />
+                            Hide Outline
+                          </>
+                        ) : (
+                          <>
+                            <PanelLeftOpen className="mr-2 h-4 w-4" />
+                            Show Outline
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setFocusMode(false)
+                          setShowAI((prev) => !prev)
+                        }}
+                      >
+                        {showAI ? (
+                          <>
+                            <PanelRightClose className="mr-2 h-4 w-4" />
+                            Hide AI Assistant
+                          </>
+                        ) : (
+                          <>
+                            <PanelRightOpen className="mr-2 h-4 w-4" />
+                            Show AI Assistant
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={toggleFocusMode}>
+                        <Maximize2 className="mr-2 h-4 w-4" />
+                        {focusMode ? 'Exit Focus Mode' : 'Focus Mode'}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
+                </div>
+              </TooltipProvider>
+
+              {/* Mobile Actions - Simplified Dropdown */}
+              <div className={cn('flex items-center gap-2 md:hidden', focusMode ? 'hidden' : '')}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="flex items-center gap-2">
@@ -2709,12 +2671,12 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <Button onClick={saveDocument} disabled={saving} size="sm" className="sm:hidden">
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
             </div>
-            <Button onClick={saveDocument} disabled={saving} size="sm" className="w-full sm:w-auto">
-              <Save className="mr-2 h-4 w-4" />
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
+            </div>
           </div>
         </div>
       </header>

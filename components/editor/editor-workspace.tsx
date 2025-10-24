@@ -7,6 +7,7 @@ import { type TiptapEditorApi } from '@/components/editor/tiptap-editor'
 import { type ScreenplayEditorApi, type ScreenplayElement } from '@/components/editor/screenplay-editor'
 import type { Chapter } from '@/components/editor/chapter-sidebar'
 import { computeClientContentHash } from '@/lib/client-content-hash'
+import { getWorkspacePreference, setWorkspacePreference } from '@/lib/editor/workspace-state'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -377,15 +378,14 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     reset: resetEditorState,
   } = useEditorStore()
   const isWorkspaceMode = workspaceMode
-  const [showAI, setShowAI] = useState(() => true)
-  const [binderSidebarOpen, setBinderSidebarOpen] = useState(() => {
-    if (typeof window !== 'undefined' && document?.project_id) {
-      const saved = localStorage.getItem(`binder-sidebar-open-${document.project_id}`)
-      return saved !== null ? saved === 'true' : true
-    }
-    return true
-  })
-  const [structureSidebarOpen, setStructureSidebarOpen] = useState(() => true)
+  // Workspace layout state - defaults to collapsed for clean, focused writing experience
+  const [showAI, setShowAI] = useState(() => getWorkspacePreference('showUtilitySidebar', false))
+  const [binderSidebarOpen, setBinderSidebarOpen] = useState(() =>
+    getWorkspacePreference('showBinder', false)
+  )
+  const [structureSidebarOpen, setStructureSidebarOpen] = useState(() =>
+    getWorkspacePreference('showOutline', false)
+  )
   // const [binderWidth, setBinderWidth] = useState(280) // Reserved for future resize functionality
   const [leftRailWidth, setLeftRailWidth] = useState(320)
   const [rightRailWidth, setRightRailWidth] = useState(360)
@@ -439,6 +439,19 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     if (typeof window === 'undefined') return
     window.localStorage.setItem('editor:font-scale', fontScale)
   }, [fontScale])
+
+  // Persist workspace layout preferences
+  useEffect(() => {
+    setWorkspacePreference('showBinder', binderSidebarOpen)
+  }, [binderSidebarOpen])
+
+  useEffect(() => {
+    setWorkspacePreference('showOutline', structureSidebarOpen)
+  }, [structureSidebarOpen])
+
+  useEffect(() => {
+    setWorkspacePreference('showUtilitySidebar', showAI)
+  }, [showAI])
 
   const lastSceneFocusMissRef = useRef<string | null>(null)
   const tiptapApiRef = useRef<TiptapEditorApi | null>(null)
@@ -2384,7 +2397,8 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
 
   const showBinderSidebar = binderSidebarOpen && Boolean(document?.project_id) && !focusMode
   const showStructureSidebar = structureSidebarOpen && Boolean(document) && !focusMode
-  const showUtilitySidebar = !focusMode // Hide utility sidebar in focus mode
+  // AI/Utility sidebar respects user preference, but hides in focus mode
+  const showUtilitySidebar = showAI && !focusMode
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-muted/20 to-muted/40">
@@ -2708,6 +2722,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
         className={cn(
           'mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:gap-8 xl:px-8',
           'flex flex-col gap-8 xl:gap-10 bg-muted/30',
+          'transition-all duration-300 ease-in-out',
           // Enable grid layout when sidebars are present
           (showBinderSidebar || showStructureSidebar || showUtilitySidebar) && 'lg:grid',
           // Focus mode: single column only
@@ -2736,7 +2751,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
         )}
       >
         {showBinderSidebar && document?.project_id && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-in fade-in slide-in-from-left-5 duration-300">
             <DocumentTree
               projectId={document.project_id}
               nodes={binderNodes}
@@ -2754,7 +2769,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
           </div>
         )}
         {showStructureSidebar && document && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-in fade-in slide-in-from-left-5 duration-300">
             {isScriptType(document.type) ? (
               <ScreenplayActBoard
                 acts={screenplayStructure}
@@ -2820,7 +2835,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
         </div>
 
         {showUtilitySidebar && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-in fade-in slide-in-from-right-5 duration-300">
             <InlineAnalyticsPanel
               documentType={document.type}
               contentHtml={isScriptType(document.type) ? '' : content}

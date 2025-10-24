@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkDocumentQuota } from '@/lib/account/quota'
 import { errorResponses } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireAuth, handleAuthError } from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export async function POST(request: Request) {
@@ -109,6 +109,9 @@ export async function POST(request: Request) {
       { status: 201 }
     )
   } catch (error) {
+    const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Unexpected error in POST /api/documents:', error)
     return errorResponses.internalError()
   }

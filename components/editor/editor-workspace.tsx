@@ -107,7 +107,7 @@ type RecentDocument = {
 // Loading fallback component
 const EditorLoadingFallback = () => (
   <div className="flex items-center justify-center h-full">
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-4">
       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       <p className="text-sm text-muted-foreground">Loading editor...</p>
     </div>
@@ -1548,7 +1548,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Loading document...</p>
         </div>
@@ -1633,7 +1633,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     return (
       <>
         <div className="flex min-h-screen flex-col bg-background">
-          <header className="sticky top-0 z-40 border-b border-border/30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+          <header className="sticky top-0 z-40 border-b bg-background">
             <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center gap-4 px-4 sm:px-6 lg:px-8">
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" asChild>
@@ -1651,7 +1651,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                 ) : null}
               </div>
 
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -1664,7 +1664,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       <>
                         <Link
                           href={`/dashboard/projects/${document.project_id}`}
-                          className="text-primary hover:text-primary/80"
+                          className="text-primary hover:text-primary"
                         >
                           {projectTitle}
                         </Link>
@@ -1980,13 +1980,13 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             </div>
           </header>
 
-          <main className="flex flex-1 overflow-hidden bg-gradient-to-b from-muted/20 to-muted/40">
+          <main className="flex flex-1 overflow-hidden bg-muted">
             <div className="flex h-full w-full overflow-hidden">
               {structureSidebarOpen && (
                 <>
                   <aside
                     aria-label="Document outline"
-                    className="hidden h-full flex-col gap-4 overflow-y-auto border-r bg-muted/10 p-4 lg:flex"
+                    className="hidden h-full flex-col gap-4 overflow-y-auto border-r bg-background p-4 lg:flex"
                     style={{ width: leftRailWidth }}
                   >
                     {isScriptType(document.type) ? (
@@ -2024,7 +2024,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     aria-label="Resize outline panel"
                     onMouseDown={handleLeftResizeStart}
                     onKeyDown={handleLeftResizeKeyDown}
-                    className="hidden h-full w-2 cursor-col-resize select-none bg-transparent transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:flex"
+                    className="hidden h-full w-2 cursor-col-resize select-none bg-border transition-colors hover:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:flex"
                   />
                 </>
               )}
@@ -2033,9 +2033,9 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                 <div className="h-full overflow-auto">
                   <div className="mx-auto flex max-w-[1300px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
                     {!focusMode && (
-                      <div className="rounded-lg border border-border/60 bg-background/80 px-5 py-5 shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur-sm">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                      <div className="rounded-lg border bg-background px-6 py-6 shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                             <Badge variant="muted" className="capitalize">
                               {document.type}
                             </Badge>
@@ -2093,7 +2093,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                           </div>
                           <div className="space-y-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Typography</p>
-                            <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-4">
                               <div className="flex gap-2">
                                 <Button
                                   type="button"
@@ -2114,7 +2114,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                                   Sans
                                 </Button>
                               </div>
-                              <div className="flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2 py-1">
+                              <div className="flex items-center gap-2 rounded-full border bg-muted px-2 py-1">
                                 {(['sm', 'md', 'lg'] as const).map((scale) => (
                                   <Button
                                     key={scale}
@@ -2152,11 +2152,11 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     aria-label="Resize assistant panel"
                     onMouseDown={handleRightResizeStart}
                     onKeyDown={handleRightResizeKeyDown}
-                    className="hidden h-full w-2 cursor-col-resize select-none bg-transparent transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:flex"
+                    className="hidden h-full w-2 cursor-col-resize select-none bg-border transition-colors hover:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:flex"
                   />
                   <aside
                     aria-label="Assistant and analytics"
-                    className="hidden h-full flex-col gap-4 overflow-y-auto border-l bg-muted/10 p-4 lg:flex"
+                    className="hidden h-full flex-col gap-4 overflow-y-auto border-l bg-background p-4 lg:flex"
                     style={{ width: rightRailWidth }}
                   >
                     <InlineAnalyticsPanel
@@ -2166,7 +2166,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       screenplayElements={isScriptType(document.type) ? screenplayContent : undefined}
                       wordCount={wordCount}
                     />
-                    <Card className="border-none bg-card/80 shadow-card">
+                    <Card className="border-none bg-card shadow-card">
                       <CardHeader>
                         <CardTitle>AI assistant</CardTitle>
                         <CardDescription>
@@ -2174,7 +2174,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="max-h-[60vh] overflow-y-auto pr-1">
+                        <div className="max-h-[60vh] overflow-y-auto pr-2">
                           <Suspense fallback={<div className="text-sm text-muted-foreground">Loading AI assistant...</div>}>
                             <AIAssistant
                               documentId={document.id}
@@ -2217,12 +2217,12 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     <Suspense fallback={null}>
                       <ReadabilityPanel initialText={content} />
                     </Suspense>
-                    <Card className="border-none bg-card/80 shadow-card">
+                    <Card className="border-none bg-card shadow-card">
                       <CardHeader>
                         <CardTitle>Document utilities</CardTitle>
                         <CardDescription>Version history, exports, and other tools.</CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-3">
+                      <CardContent className="space-y-4">
                         <Button variant="outline" className="w-full justify-between" onClick={() => setShowVersionHistory(true)}>
                           View version history
                           <History className="h-4 w-4" />
@@ -2393,9 +2393,9 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const showUtilitySidebar = showAI && !focusMode
   
   return (
-    <div className="min-h-screen bg-gradient-to-b from-muted/20 to-muted/40">
-      <header className="sticky top-0 z-30 border-b border-border/30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto w-full max-w-[1600px] space-y-3 px-4 py-4 sm:px-6 xl:px-8">
+    <div className="min-h-screen bg-muted">
+      <header className="sticky top-0 z-30 border-b bg-background">
+        <div className="mx-auto w-full max-w-[1600px] space-y-4 px-4 py-4 sm:px-6 xl:px-8">
           {/* Breadcrumbs */}
           {document.project_id && projectTitle && (
             <BreadcrumbNav
@@ -2675,7 +2675,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
       <main
         className={cn(
           'mx-auto w-full max-w-[1800px] px-4 py-6 sm:px-6 lg:gap-8 xl:px-8',
-          'flex flex-col gap-8 xl:gap-10 bg-muted/30',
+          'flex flex-col gap-8 xl:gap-20 bg-background',
           'transition-all duration-300 ease-in-out',
           // Enable grid layout when sidebars are present
           (showBinderSidebar || showStructureSidebar || showUtilitySidebar) && 'lg:grid',
@@ -2761,7 +2761,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
               screenplayElements={isScriptType(document.type) ? screenplayContent : undefined}
               wordCount={wordCount}
             />
-            <Card className="border-none bg-card/80 shadow-card">
+            <Card className="border-none bg-card shadow-card">
               <CardHeader>
                 <CardTitle>AI assistant</CardTitle>
                 <CardDescription>
@@ -2770,7 +2770,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
               </CardHeader>
               <CardContent>
                 {showAI ? (
-                  <div className="max-h-[70vh] overflow-y-auto pr-1">
+                  <div className="max-h-[70vh] overflow-y-auto pr-2">
                     <Suspense fallback={<div className="text-sm text-muted-foreground">Loading AI assistant...</div>}>
                       <AIAssistant
                         documentId={document.id}
@@ -2781,7 +2781,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     </Suspense>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed bg-muted/50 p-4 text-sm text-muted-foreground">
+                  <div className="flex flex-col items-start gap-4 rounded-lg border border-dashed bg-muted p-4 text-sm text-muted-foreground">
                     <p>AI panel hidden. Reopen it to access brainstorming and rewriting tools.</p>
                     <Button variant="outline" size="sm" onClick={() => setShowAI(true)}>
                       <PanelRightOpen className="mr-2 h-4 w-4" />
@@ -2828,12 +2828,12 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
               <ReadabilityPanel initialText={content} />
             </Suspense>
 
-            <Card className="border-none bg-card/80 shadow-card">
+            <Card className="border-none bg-card shadow-card">
               <CardHeader>
                 <CardTitle>Document utilities</CardTitle>
                 <CardDescription>Version history, exports, and other tools.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 <Button variant="outline" className="w-full justify-between" onClick={() => setShowVersionHistory(true)}>
                   View version history
                   <History className="h-4 w-4" />
@@ -2850,8 +2850,8 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
 
       {/* Sticky Bottom Status Bar */}
       {!focusMode && (
-        <div className="sticky bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex items-center justify-between gap-4 px-4 py-1.5">
+        <div className="sticky bottom-0 z-40 border-t bg-background">
+          <div className="flex items-center justify-between gap-4 px-4 py-2">
             <StatusBar
               cursorPosition={editorStatus.cursorPosition}
               selection={editorStatus.selection}
@@ -2891,12 +2891,12 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
               screenplayElements={isScriptType(document.type) ? screenplayContent : undefined}
               wordCount={wordCount}
             />
-            <Card className="border-none bg-card/80 shadow-card">
+            <Card className="border-none bg-card shadow-card">
               <CardHeader>
                 <CardTitle>Document Information</CardTitle>
                 <CardDescription>Basic document statistics</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Document Type</span>
                   <Badge variant="muted" className="capitalize">
@@ -3114,7 +3114,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             variant="outline"
             size="sm"
             onClick={() => setShowKeyboardHelp(true)}
-            className="shadow-lg backdrop-blur-sm bg-background/95 hover:bg-accent"
+            className="shadow-lg bg-background hover:bg-accent"
           >
             <Keyboard className="mr-2 h-4 w-4" />
             <span className="hidden sm:inline">Press </span>

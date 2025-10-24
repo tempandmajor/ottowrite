@@ -7,7 +7,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 
 /**
  * GET /api/partners/submissions
@@ -92,6 +92,9 @@ export async function GET(request: NextRequest) {
       total: submissions.length,
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error fetching partner submissions:', error)
     return errorResponses.internalError('An unexpected error occurred')
   }

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
-import { requireAuth } from '@/lib/api/auth-helpers';
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers';
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers';
 import { logger } from '@/lib/monitoring/structured-logger';
 
@@ -47,6 +47,9 @@ export async function GET(
 
     return successResponse({ beatSheet: data });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Beat sheet fetch error', {
       operation: 'beat-sheets:get-by-id'
     }, error instanceof Error ? error : undefined);

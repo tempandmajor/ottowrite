@@ -9,7 +9,7 @@
 
 import { NextResponse } from 'next/server'
 import { errorResponses } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export async function GET(request: Request) {
@@ -38,6 +38,9 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Unexpected error in GET /api/v1/projects:', error)
     return errorResponses.internalError()
   }

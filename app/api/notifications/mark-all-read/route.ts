@@ -8,7 +8,7 @@
 
 import { NextResponse } from 'next/server'
 import { errorResponses } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export async function PATCH(request: Request) {
@@ -32,6 +32,9 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, count: count || 0 })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error marking all notifications as read:', error)
     return errorResponses.internalError(
       error instanceof Error ? error.message : 'Failed to mark all notifications as read',

@@ -9,7 +9,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import {
   canAccessSubmissions,
   SUBMISSION_ACCESS_MESSAGES,
@@ -129,6 +129,9 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     return errorResponses.internalError('Failed to fetch partners', {
       details: error,
       userId: user.id,

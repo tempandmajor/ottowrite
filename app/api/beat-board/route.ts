@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export const dynamic = 'force-dynamic'
@@ -27,6 +27,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ cards: data ?? [] })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error fetching beat cards:', error)
     return NextResponse.json({ error: 'Failed to fetch beat board' }, { status: 500 })
   }
@@ -62,6 +65,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ card: data }, { status: 201 })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error creating beat card:', error)
     return NextResponse.json({ error: 'Failed to create beat card' }, { status: 500 })
   }
@@ -97,6 +103,9 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ card: data })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error updating beat card:', error)
     return NextResponse.json({ error: 'Failed to update beat card' }, { status: 500 })
   }
@@ -124,6 +133,9 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error deleting beat card:', error)
     return NextResponse.json({ error: 'Failed to delete beat card' }, { status: 500 })
   }

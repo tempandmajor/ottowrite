@@ -8,7 +8,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import {
   canAccessSubmissions,
@@ -201,6 +201,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       submitted_at: new Date().toISOString(),
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     return errorResponses.internalError('Failed to submit manuscript', {
       details: error,
       userId: user.id,

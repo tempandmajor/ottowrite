@@ -9,7 +9,7 @@ import { checkAIRequestQuota } from '@/lib/account/quota'
 import { reportBackgroundTaskError, addBreadcrumb } from '@/lib/monitoring/error-reporter'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireAIRateLimit } from '@/lib/api/rate-limit-helpers'
 import { z } from 'zod'
 
@@ -71,6 +71,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse({ tasks: data ?? [] })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error fetching background tasks', {
       operation: 'background_task:get',
     }, error instanceof Error ? error : undefined)
@@ -240,7 +243,10 @@ export async function POST(request: NextRequest) {
 
       return successResponse({ task: updatedRecord })
     } catch (error) {
-      // Report background task failure to Sentry
+          const authError = handleAuthError(error)
+    if (authError) return authError
+
+    // Report background task failure to Sentry
       reportBackgroundTaskError(task_type, error instanceof Error ? error : new Error(String(error)), {
         userId: user.id,
         projectId: project_id ?? undefined,
@@ -271,6 +277,9 @@ export async function POST(request: NextRequest) {
       })
     }
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error creating background task', {
       operation: 'background_task:post',
     }, error instanceof Error ? error : undefined)
@@ -331,6 +340,9 @@ export async function PATCH(request: NextRequest) {
 
     return successResponse({ task: updated ?? task })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error refreshing background task', {
       operation: 'background_task:patch',
     }, error instanceof Error ? error : undefined)

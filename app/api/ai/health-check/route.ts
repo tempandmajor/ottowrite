@@ -12,7 +12,7 @@ import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { analyzeTemplateHealth } from '@/lib/ai/recommendations-engine';
 import type { AIModel } from '@/lib/ai/service';
-import { requireAuth } from '@/lib/api/auth-helpers';
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers';
 import { requireAIRateLimit } from '@/lib/api/rate-limit-helpers';
 import { z } from 'zod';
 import crypto from 'crypto';
@@ -158,6 +158,9 @@ export async function POST(request: NextRequest) {
       cached: false,
     });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error(
       'Error generating health check',
       {
@@ -229,6 +232,9 @@ export async function GET(request: NextRequest) {
       healthChecks: healthChecks || [],
     });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error(
       'Error fetching health checks',
       {
@@ -286,6 +292,9 @@ export async function PATCH(request: NextRequest) {
       message: 'Health check updated successfully',
     });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error(
       'Error updating health check',
       {

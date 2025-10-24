@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
@@ -75,6 +75,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse({ notes: data || [] })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error fetching research notes', {
       operation: 'research:get_notes',
     }, error instanceof Error ? error : undefined)
@@ -136,6 +139,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse({ note }, 201)
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error creating research note', {
       operation: 'research:post_note',
     }, error instanceof Error ? error : undefined)
@@ -194,6 +200,9 @@ export async function PATCH(request: NextRequest) {
 
     return successResponse({ note })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error updating research note', {
       operation: 'research:patch_note',
     }, error instanceof Error ? error : undefined)
@@ -233,6 +242,9 @@ export async function DELETE(request: NextRequest) {
 
     return successResponse({ success: true })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error deleting research note', {
       operation: 'research:delete_note',
     }, error instanceof Error ? error : undefined)

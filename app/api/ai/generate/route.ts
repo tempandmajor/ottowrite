@@ -12,7 +12,7 @@ import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { validateBody, validationErrorResponse } from '@/lib/validation/middleware'
 import { aiGenerateSchema } from '@/lib/validation/schemas'
 import { mapToAIModel } from '@/lib/validation/schemas/ai-generate'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { detectXSSPatterns, detectSQLInjection } from '@/lib/security/sanitize'
 import {
   buildContextBundle,
@@ -443,6 +443,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse(responsePayload)
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     // Log AI generation failure with structured logging
     logger.aiRequest({
       operation: command || 'generate',

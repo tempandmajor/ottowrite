@@ -8,7 +8,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import type { UserAgreement } from '@/lib/submissions/legal-documents'
 
@@ -45,6 +45,9 @@ export async function GET(request: Request) {
       agreements: userAgreements,
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error fetching legal agreements:', error)
     return errorResponses.internalError('An unexpected error occurred')
   }
@@ -105,6 +108,9 @@ export async function POST(request: NextRequest) {
       version: body.documentVersion,
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error recording legal agreement:', error)
     return errorResponses.internalError('An unexpected error occurred')
   }

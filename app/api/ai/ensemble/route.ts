@@ -5,7 +5,7 @@ import { getMonthlyAIWordLimit } from '@/lib/stripe/config'
 import { checkAIRequestQuota } from '@/lib/account/quota'
 import { checkAIRateLimit, createAIRateLimitResponse } from '@/lib/security/ai-rate-limit'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
@@ -129,6 +129,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse({ suggestions })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Ensemble generation failed', {
       operation: 'ensemble:generate',
     }, error instanceof Error ? error : undefined)

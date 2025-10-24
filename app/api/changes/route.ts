@@ -7,7 +7,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { validateBody, validateQuery, validationErrorResponse } from '@/lib/validation/middleware'
 import { z } from 'zod'
@@ -115,6 +115,9 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Unexpected error in GET /api/changes', {
       operation: 'changes:list',
     }, error instanceof Error ? error : undefined)
@@ -199,6 +202,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse({ change }, 201)
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Unexpected error in POST /api/changes', {
       operation: 'changes:create',
     }, error instanceof Error ? error : undefined)
@@ -303,6 +309,9 @@ export async function PATCH(request: NextRequest) {
 
     return successResponse({ change: updatedChange })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Unexpected error in PATCH /api/changes', {
       operation: 'changes:review',
     }, error instanceof Error ? error : undefined)
@@ -365,6 +374,9 @@ export async function DELETE(request: NextRequest) {
 
     return successResponse({ success: true })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Unexpected error in DELETE /api/changes', {
       operation: 'changes:delete',
     }, error instanceof Error ? error : undefined)

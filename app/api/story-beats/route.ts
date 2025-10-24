@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
@@ -49,6 +49,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse({ beats: data || [] })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in GET /api/story-beats', {
       operation: 'story_beats:get',
     }, error instanceof Error ? error : undefined)
@@ -134,6 +137,9 @@ export async function POST(request: NextRequest) {
       userId: user.id,
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in POST /api/story-beats', {
       operation: 'story_beats:post',
     }, error instanceof Error ? error : undefined)
@@ -179,6 +185,9 @@ export async function PATCH(request: NextRequest) {
 
     return successResponse({ beat: data })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in PATCH /api/story-beats', {
       operation: 'story_beats:patch',
     }, error instanceof Error ? error : undefined)
@@ -218,6 +227,9 @@ export async function DELETE(request: NextRequest) {
 
     return successResponse({ success: true })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in DELETE /api/story-beats', {
       operation: 'story_beats:delete',
     }, error instanceof Error ? error : undefined)

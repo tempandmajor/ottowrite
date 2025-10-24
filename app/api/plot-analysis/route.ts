@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { analyzePlotHoles, extractTextContent } from '@/lib/ai/plot-analyzer'
 import type { AnalysisType } from '@/lib/ai/plot-analyzer'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
@@ -55,6 +55,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse(data || [])
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in GET /api/plot-analysis', {
       operation: 'plot_analysis:get',
     }, error instanceof Error ? error : undefined)
@@ -205,6 +208,9 @@ export async function POST(request: NextRequest) {
       throw analysisError
     }
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error creating plot analysis', {
       operation: 'plot_analysis:post',
     }, error instanceof Error ? error : undefined)
@@ -247,6 +253,9 @@ export async function DELETE(request: NextRequest) {
 
     return successResponse({ success: true })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in DELETE /api/plot-analysis', {
       operation: 'plot_analysis:delete',
     }, error instanceof Error ? error : undefined)

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
-import { requireAuth } from '@/lib/api/auth-helpers';
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers';
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers';
 import { z } from 'zod';
 
@@ -64,6 +64,9 @@ export async function GET(
 
     return successResponse({ projectBeatSheets: data || [] });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Unexpected error fetching project beat sheets', {
       operation: 'project-beat-sheets:get'
     }, error instanceof Error ? error : undefined);
@@ -148,6 +151,9 @@ export async function POST(
 
     return successResponse({ projectBeatSheet: data });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Unexpected error creating project beat sheet', {
       operation: 'project-beat-sheets:post'
     }, error instanceof Error ? error : undefined);

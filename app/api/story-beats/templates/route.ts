@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
@@ -47,6 +47,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse({ templates: data || [] })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in GET /api/story-beats/templates', {
       operation: 'beat_templates:get',
     }, error instanceof Error ? error : undefined)

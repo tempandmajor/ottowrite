@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
-import { requireAuth } from '@/lib/api/auth-helpers';
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers';
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers';
 import { logger } from '@/lib/monitoring/structured-logger';
 
@@ -53,6 +53,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse({ beatSheets: data || [] });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Beat sheet list error', {
       operation: 'beat-sheets:get'
     }, error instanceof Error ? error : undefined);

@@ -14,7 +14,7 @@ import {
   type VoicePattern,
 } from '@/lib/ai/dialogue-analyzer'
 import { errorResponses, errorResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export const dynamic = 'force-dynamic'
@@ -200,6 +200,9 @@ export async function POST(request: NextRequest) {
       return errorResponses.badRequest('Invalid action. Must be "analyze" or "validate"')
     }
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Dialogue analysis error:', error)
     return errorResponse(error instanceof Error ? error.message : 'Failed to analyze dialogue', { status: 500 })
   }

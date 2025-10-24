@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
-import { requireAuth } from '@/lib/api/auth-helpers';
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers';
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers';
 import { z } from 'zod';
 
@@ -68,6 +68,9 @@ export async function GET(
 
     return successResponse({ projectBeatSheet: data });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Unexpected error fetching project beat sheet', {
       operation: 'project-beat-sheet:get'
     }, error instanceof Error ? error : undefined);
@@ -145,6 +148,9 @@ export async function PATCH(
 
     return successResponse({ projectBeatSheet: data });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Unexpected error updating project beat sheet', {
       operation: 'project-beat-sheet:patch'
     }, error instanceof Error ? error : undefined);
@@ -196,6 +202,9 @@ export async function DELETE(
 
     return successResponse({ success: true });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Unexpected error deleting project beat sheet', {
       operation: 'project-beat-sheet:delete'
     }, error instanceof Error ? error : undefined);

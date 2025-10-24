@@ -9,7 +9,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 
 export async function GET(request: Request) {
   try {
@@ -89,6 +89,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ submissions: enrichedSubmissions })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error fetching submissions list:', error)
     return errorResponses.internalError(
       error instanceof Error ? error.message : 'Failed to fetch submissions',

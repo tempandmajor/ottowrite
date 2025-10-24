@@ -3,7 +3,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export const dynamic = 'force-dynamic'
@@ -88,6 +88,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ commit: newCommit }, { status: 201 })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error in POST /api/branches/commit:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
@@ -134,6 +137,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ commits })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error in GET /api/branches/commit:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

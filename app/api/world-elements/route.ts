@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateWorldElement } from '@/lib/ai/world-element'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
@@ -42,6 +42,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse({ elements: data ?? [] })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error fetching world elements', {
       operation: 'world_elements:get',
     }, error instanceof Error ? error : undefined)
@@ -166,6 +169,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse({ element }, 201)
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error creating world element', {
       operation: 'world_elements:post',
     }, error instanceof Error ? error : undefined)
@@ -211,6 +217,9 @@ export async function PATCH(request: NextRequest) {
 
     return successResponse({ element })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error updating world element', {
       operation: 'world_elements:patch',
     }, error instanceof Error ? error : undefined)
@@ -249,6 +258,9 @@ export async function DELETE(request: NextRequest) {
 
     return successResponse({ success: true })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error deleting world element', {
       operation: 'world_elements:delete',
     }, error instanceof Error ? error : undefined)

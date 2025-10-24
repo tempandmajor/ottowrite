@@ -7,7 +7,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { getAccessSummary } from '@/lib/submissions/audit-trail'
 
 interface RouteParams {
@@ -51,6 +51,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       summary: result.summary,
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error fetching access summary:', error)
     return errorResponses.internalError('An unexpected error occurred')
   }

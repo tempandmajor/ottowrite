@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 import { PerformanceTimer } from '@/lib/monitoring/performance'
@@ -192,6 +192,9 @@ export async function GET(request: NextRequest) {
       sessions: sessions ?? [],
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error fetching analytics summary', {
       operation: 'analytics:get_sessions',
     }, error instanceof Error ? error : undefined)
@@ -273,6 +276,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse({ session: data })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error recording session', {
       operation: 'analytics:post_sessions',
     }, error instanceof Error ? error : undefined)

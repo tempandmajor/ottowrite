@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export async function GET(request: Request) {
@@ -45,6 +45,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ preferences })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error fetching notification preferences:', error)
     return errorResponses.internalError(
       error instanceof Error ? error.message : 'Failed to fetch preferences',
@@ -130,6 +133,9 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true, preferences: updatedPrefs })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error updating notification preferences:', error)
     return errorResponses.internalError(
       error instanceof Error ? error.message : 'Failed to update preferences',

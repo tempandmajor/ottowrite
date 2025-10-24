@@ -8,7 +8,7 @@
 
 import { NextResponse } from 'next/server'
 import { errorResponses } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export async function GET(request: Request) {
@@ -30,6 +30,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ count: count || 0 })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error fetching unread notification count:', error)
     return errorResponses.internalError(
       error instanceof Error ? error.message : 'Failed to fetch unread count',

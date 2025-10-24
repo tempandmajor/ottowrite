@@ -6,7 +6,7 @@
 
 import { NextRequest } from 'next/server';
 import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response';
-import { requireAuth } from '@/lib/api/auth-helpers';
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers';
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers';
 import { logger } from '@/lib/monitoring/structured-logger';
 
@@ -114,6 +114,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse(session);
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Unexpected error in wizard session creation', { error });
     return errorResponse('An unexpected error occurred', { status: 500 });
   }
@@ -161,6 +164,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse(sessions);
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Unexpected error fetching wizard sessions', { error });
     return errorResponse('An unexpected error occurred', { status: 500 });
   }

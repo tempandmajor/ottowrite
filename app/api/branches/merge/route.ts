@@ -3,7 +3,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { computeWordDiff, calculateDiffStats } from '@/lib/utils/text-diff'
 
@@ -208,6 +208,9 @@ export async function POST(request: Request) {
       hasConflicts,
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error in POST /api/branches/merge:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
@@ -261,6 +264,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ merges })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error in GET /api/branches/merge:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

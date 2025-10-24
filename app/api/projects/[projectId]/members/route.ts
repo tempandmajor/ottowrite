@@ -10,7 +10,7 @@ import { checkTeamSeatQuota } from '@/lib/account/quota'
 import { canAccessFeature } from '@/lib/stripe/config'
 import { isSubscriptionActive } from '@/lib/stripe/config'
 import { errorResponses } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 interface RouteContext {
@@ -179,6 +179,9 @@ export async function POST(request: Request, context: RouteContext) {
       { status: 201 }
     )
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Unexpected error in POST /api/projects/[projectId]/members:', error)
     return errorResponses.internalError()
   }
@@ -226,6 +229,9 @@ export async function GET(request: Request, context: RouteContext) {
 
     return NextResponse.json({ members })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Unexpected error in GET /api/projects/[projectId]/members:', error)
     return errorResponses.internalError()
   }

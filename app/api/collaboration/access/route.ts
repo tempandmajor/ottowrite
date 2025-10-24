@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { canAccessFeature, type SubscriptionTier, isSubscriptionActive } from '@/lib/stripe/config'
 
@@ -45,6 +45,9 @@ export async function GET(request: NextRequest) {
       minimumTier: 'studio',
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('[Collaboration Access] Unexpected error:', error)
     return NextResponse.json(
       { error: 'Internal server error', hasAccess: false },

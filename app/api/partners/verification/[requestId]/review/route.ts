@@ -7,7 +7,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import type { VerificationRedFlag } from '@/lib/submissions/partner-verification'
 
@@ -162,6 +162,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     return successResponse(result)
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error reviewing verification request:', error)
     return errorResponses.internalError('An unexpected error occurred')
   }

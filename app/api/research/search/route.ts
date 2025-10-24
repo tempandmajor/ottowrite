@@ -4,7 +4,7 @@ import { searchWeb, extractCitations } from '@/lib/search/search-service'
 import { formatSearchResultsForAI } from '@/lib/search/brave-search'
 import { generateWithAI } from '@/lib/ai/service'
 import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
@@ -168,7 +168,10 @@ Based on the search results above, provide a comprehensive answer to the user's 
         totalResults: searchResponse.totalResults,
       })
     } catch (error) {
-      logger.error('Research execution failed', {
+          const authError = handleAuthError(error)
+    if (authError) return authError
+
+    logger.error('Research execution failed', {
         userId: user.id,
         requestId: requestRecord.id,
         operation: 'research:execute',
@@ -191,6 +194,9 @@ Based on the search results above, provide a comprehensive answer to the user's 
       })
     }
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error starting research', {
       operation: 'research:post',
     }, error instanceof Error ? error : undefined)
@@ -232,6 +238,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse({ notes: data ?? [] })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error fetching research notes', {
       operation: 'research:get',
     }, error instanceof Error ? error : undefined)

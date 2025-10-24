@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
@@ -32,6 +32,9 @@ export async function GET(request: Request) {
 
     return successResponse({ folders: data ?? [] })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in GET /api/projects/folders', {
       operation: 'project_folders:get',
     }, error instanceof Error ? error : undefined)
@@ -89,6 +92,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse({ folder: data })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in POST /api/projects/folders', {
       operation: 'project_folders:post',
     }, error instanceof Error ? error : undefined)
@@ -167,6 +173,9 @@ export async function PATCH(request: NextRequest) {
 
     return successResponse({ folder: data })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in PATCH /api/projects/folders', {
       operation: 'project_folders:patch',
     }, error instanceof Error ? error : undefined)
@@ -205,6 +214,9 @@ export async function DELETE(request: NextRequest) {
 
     return successResponse({ success: true })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in DELETE /api/projects/folders', {
       operation: 'project_folders:delete',
     }, error instanceof Error ? error : undefined)

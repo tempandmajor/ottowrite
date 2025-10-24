@@ -12,7 +12,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 
 export async function GET(request: Request) {
   try {
@@ -86,6 +86,9 @@ export async function GET(request: Request) {
       stats,
     })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error fetching IP protection overview:', error)
     return errorResponses.internalError(
       error instanceof Error ? error.message : 'Failed to fetch overview data',

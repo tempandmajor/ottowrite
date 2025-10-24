@@ -7,7 +7,7 @@
 
 import { NextRequest } from 'next/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { z } from 'zod'
 import {
@@ -161,6 +161,9 @@ export async function POST(request: NextRequest) {
       201
     )
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     return errorResponses.badRequest('Invalid request body', {
       details: error,
       userId: user.id,

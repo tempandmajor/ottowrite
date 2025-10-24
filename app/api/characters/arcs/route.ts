@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
@@ -41,6 +41,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse({ arcStages })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in GET /api/characters/arcs', {
       operation: 'character_arcs:get',
     }, error instanceof Error ? error : undefined)
@@ -124,6 +127,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse({ arcStage }, 201)
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in POST /api/characters/arcs', {
       operation: 'character_arcs:post',
     }, error instanceof Error ? error : undefined)
@@ -175,6 +181,9 @@ export async function PATCH(request: NextRequest) {
 
     return successResponse({ arcStage })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in PATCH /api/characters/arcs', {
       operation: 'character_arcs:patch',
     }, error instanceof Error ? error : undefined)
@@ -214,6 +223,9 @@ export async function DELETE(request: NextRequest) {
 
     return successResponse({ success: true })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Error in DELETE /api/characters/arcs', {
       operation: 'character_arcs:delete',
     }, error instanceof Error ? error : undefined)

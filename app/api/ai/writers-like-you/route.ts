@@ -11,7 +11,7 @@ import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { getCollaborativeRecommendations, UserProfile } from '@/lib/ai/recommendations-engine';
 import type { AIModel } from '@/lib/ai/service';
-import { requireAuth } from '@/lib/api/auth-helpers';
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers';
 import { requireAIRateLimit } from '@/lib/api/rate-limit-helpers';
 import { z } from 'zod';
 
@@ -164,6 +164,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error(
       'Error generating collaborative recommendations',
       {
@@ -241,6 +244,9 @@ export async function POST(request: NextRequest) {
       message: 'Profile updated successfully',
     });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error(
       'Error updating user profile',
       {

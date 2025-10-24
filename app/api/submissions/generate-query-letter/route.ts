@@ -9,7 +9,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import {
   canAccessSubmissions,
@@ -107,6 +107,9 @@ export async function POST(request: NextRequest) {
       200
     )
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     // Handle AI generation errors
     if (error instanceof Error) {
       return errorResponses.internalError('Failed to generate query letter', {

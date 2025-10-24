@@ -6,7 +6,7 @@ import {
   getTierByPriceId,
 } from '@/lib/stripe/config'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
@@ -87,6 +87,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse({ url: session.url })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Checkout session error', {
       operation: 'checkout:create_session',
     }, error instanceof Error ? error : undefined)

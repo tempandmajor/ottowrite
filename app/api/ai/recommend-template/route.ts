@@ -11,7 +11,7 @@ import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { getSmartTemplateRecommendations } from '@/lib/ai/recommendations-engine';
 import type { AIModel } from '@/lib/ai/service';
-import { requireAuth } from '@/lib/api/auth-helpers';
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers';
 import { requireAIRateLimit } from '@/lib/api/rate-limit-helpers';
 import { z } from 'zod';
 
@@ -126,6 +126,9 @@ export async function POST(request: NextRequest) {
       recommendation: recommendations,
     });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error(
       'Error generating template recommendations',
       {
@@ -181,6 +184,9 @@ export async function GET(request: NextRequest) {
       recommendations: recommendations || [],
     });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error(
       'Error fetching template recommendations',
       {
@@ -237,6 +243,9 @@ export async function PATCH(request: NextRequest) {
       message: 'Recommendation updated successfully',
     });
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error(
       'Error updating recommendation',
       {

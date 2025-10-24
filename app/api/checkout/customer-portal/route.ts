@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getStripeClient } from '@/lib/stripe/config'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
@@ -53,6 +53,9 @@ export async function POST(request: Request) {
 
     return successResponse({ url: session.url })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Failed to create customer portal session', {
       operation: 'customer_portal:create_session',
     }, error instanceof Error ? error : undefined)

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { z } from 'zod'
 
@@ -63,6 +63,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse({ templates })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Template list error', {
       operation: 'templates:get',
     }, error instanceof Error ? error : undefined)
@@ -142,6 +145,9 @@ export async function POST(request: NextRequest) {
 
     return successResponse({ template })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Template creation error', {
       operation: 'templates:post',
     }, error instanceof Error ? error : undefined)

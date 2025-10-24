@@ -3,7 +3,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import {requireAuth, handleAuthError} from '@/lib/api/auth-helpers'
 import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export const dynamic = 'force-dynamic'
@@ -64,6 +64,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ branch: updatedBranch })
   } catch (error) {
+        const authError = handleAuthError(error)
+    if (authError) return authError
+
     console.error('Error in POST /api/branches/switch:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

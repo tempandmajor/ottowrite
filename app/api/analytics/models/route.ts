@@ -1,20 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { getModelComparison } from '@/lib/analytics/model-analytics'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     // Get model comparison data for the current user
     const comparison = await getModelComparison(user.id)

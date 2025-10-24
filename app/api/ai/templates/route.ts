@@ -1,5 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireAIRateLimit } from '@/lib/api/rate-limit-helpers'
+import { z } from 'zod'
 
 type PromptTemplate = {
   id: string
@@ -10,15 +12,22 @@ type PromptTemplate = {
 
 const TEMPLATE_KEY = 'prompt_templates'
 
-export async function GET() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+// Validation schema for prompt templates
+const promptTemplateSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  command: z.string().min(1).max(50),
+  content: z.string().min(1).max(5000),
+})
 
-  if (!user) {
-    return errorResponses.unauthorized()
-  }
+const updateTemplatesSchema = z.object({
+  templates: z.array(promptTemplateSchema).max(50),
+})
+
+export async function GET(request: Request) {
+  // Auth and rate limiting
+  const { user, supabase } = await requireAuth(request)
+  await requireAIRateLimit(request, user.id)
 
   const { data, error } = await supabase
     .from('user_profiles')
@@ -55,29 +64,21 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Auth and rate limiting
+  const { user, supabase } = await requireAuth(request)
+  await requireAIRateLimit(request, user.id)
 
-  if (!user) {
-    return errorResponses.unauthorized()
+  // Validate input
+  const body = await request.json().catch(() => null)
+  const validation = updateTemplatesSchema.safeParse(body)
+
+  if (!validation.success) {
+    return errorResponses.validationError('Invalid template data', {
+      details: validation.error.errors,
+    })
   }
 
-  const body = await request.json().catch(() => null)
-  const templates = Array.isArray(body?.templates) ? body.templates : []
-
-  const sanitized: PromptTemplate[] = templates
-    .filter(
-      (item: any): item is PromptTemplate =>
-        item &&
-        typeof item === 'object' &&
-        typeof item.id === 'string' &&
-        typeof item.name === 'string' &&
-        typeof item.command === 'string' &&
-        typeof item.content === 'string'
-    )
-    .slice(0, 50) // safety cap
+  const sanitized = validation.data.templates
 
   const { data: profileData, error: profileError } = await supabase
     .from('user_profiles')

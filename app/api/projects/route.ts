@@ -8,20 +8,13 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkProjectQuota } from '@/lib/account/quota'
 import { errorResponses } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
     // Get user profile with subscription info
     const { data: profile, error: profileError } = await supabase
@@ -63,6 +56,15 @@ export async function POST(request: Request) {
       return errorResponses.badRequest('Missing required fields: name and type')
     }
 
+    // Normalize genre to array (database expects TEXT[])
+    // Accepts: string, string[], null, undefined
+    // Returns: string[] | null
+    const normalizedGenre = genre
+      ? Array.isArray(genre)
+        ? genre.filter((g: string) => g && g.trim().length > 0)
+        : [genre].filter((g) => g && g.trim().length > 0)
+      : null
+
     // Create project
     const { data: project, error: createError } = await supabase
       .from('projects')
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
         user_id: user.id,
         name,
         type,
-        genre: genre || null,
+        genre: normalizedGenre && normalizedGenre.length > 0 ? normalizedGenre : null,
         description: description || null,
         folder_id: folder_id || null,
       })

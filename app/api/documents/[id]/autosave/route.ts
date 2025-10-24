@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateContentHash } from '@/lib/content-hash'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 import { sanitizeHTML, detectXSSPatterns } from '@/lib/security/sanitize'
 
@@ -70,14 +72,8 @@ function extractAnchorsFromHtml(html: string | undefined): string[] {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
     const { id: documentId } = await params
     if (!documentId) {

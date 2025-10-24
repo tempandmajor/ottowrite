@@ -17,10 +17,12 @@ interface HealthCheck {
   checks: {
     database: CheckStatus
     environment: CheckStatus
+    ai_provider: CheckStatus
   }
   details?: {
     database?: string
     environment?: string
+    ai_provider?: string
   }
   poolConfig?: {
     server: ReturnType<typeof getPoolConfig>
@@ -48,6 +50,7 @@ export async function GET() {
     checks: {
       database: 'healthy',
       environment: 'healthy',
+      ai_provider: 'healthy',
     },
     details: {},
   }
@@ -86,11 +89,11 @@ export async function GET() {
   }
 
   // Check 2: Critical environment variables
+  // ✅ FIX: Removed OPENAI_API_KEY - not all deployments use OpenAI
   const requiredEnvVars = [
     'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
-    'OPENAI_API_KEY',
   ]
 
   const missingEnvVars = requiredEnvVars.filter(key => !process.env[key])
@@ -104,6 +107,33 @@ export async function GET() {
       operation: 'health:check',
       missingVars: missingEnvVars,
     })
+  }
+
+  // Check 3: AI Provider availability (at least one required)
+  // Matches logic from lib/env-validation.ts:94-106
+  const hasAIProvider = !!(
+    process.env.ANTHROPIC_API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    process.env.DEEPSEEK_API_KEY
+  )
+
+  if (!hasAIProvider) {
+    checks.checks.ai_provider = 'unhealthy'
+    checks.details!.ai_provider = 'No AI provider API key configured. Need at least one of: ANTHROPIC_API_KEY, OPENAI_API_KEY, DEEPSEEK_API_KEY'
+    checks.status = 'unhealthy'
+
+    logger.warn('Health check: No AI providers configured', {
+      operation: 'health:check',
+    })
+  } else {
+    // Report which providers are available
+    const availableProviders = [
+      process.env.ANTHROPIC_API_KEY && 'anthropic',
+      process.env.OPENAI_API_KEY && 'openai',
+      process.env.DEEPSEEK_API_KEY && 'deepseek',
+    ].filter(Boolean)
+
+    checks.details!.ai_provider = `Available: ${availableProviders.join(', ')}`
   }
 
   const duration = Date.now() - startTime

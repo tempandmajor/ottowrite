@@ -7,54 +7,52 @@
  */
 
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { getSmartTemplateRecommendations } from '@/lib/ai/recommendations-engine';
 import type { AIModel } from '@/lib/ai/service';
+import { requireAuth } from '@/lib/api/auth-helpers';
+import { requireAIRateLimit } from '@/lib/api/rate-limit-helpers';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
-interface RequestBody {
-  logline: string;
-  projectId?: string;
-  additionalContext?: {
-    targetLength?: 'short' | 'feature' | 'series' | 'stage';
-    preferredMedium?: 'film' | 'tv' | 'stage' | 'audio' | 'sequential';
-  };
-  saveRecommendation?: boolean; // Save to database for tracking
-  model?: AIModel; // Allow model selection (Claude, GPT-5, DeepSeek)
-}
+// Validation schemas
+const additionalContextSchema = z.object({
+  targetLength: z.enum(['short', 'feature', 'series', 'stage']).optional(),
+  preferredMedium: z.enum(['film', 'tv', 'stage', 'audio', 'sequential']).optional(),
+});
+
+const recommendTemplateSchema = z.object({
+  logline: z.string().min(1).max(1000),
+  projectId: z.string().uuid().optional(),
+  additionalContext: additionalContextSchema.optional(),
+  saveRecommendation: z.boolean().optional(),
+  model: z.enum(['claude-opus-4', 'claude-sonnet-4.5', 'claude-haiku-4', 'gpt-5-turbo', 'gpt-4o', 'deepseek-chat', 'deepseek-reasoner']).optional(),
+});
+
+const recommendationAcceptanceSchema = z.object({
+  recommendationId: z.string().uuid(),
+  accepted: z.boolean().optional(),
+  acceptedTemplateType: z.string().max(100).optional(),
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    // Parse and validate request body
+    const body = await request.json();
+    const validation = recommendTemplateSchema.safeParse(body);
 
-    if (authError || !user) {
-      logger.warn('Unauthorized template recommendation request', {
-        operation: 'ai:recommend-template',
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid request data', {
+        details: validation.error.issues,
       });
-      return errorResponses.unauthorized();
     }
 
-    // Parse request body
-    const body: RequestBody = await request.json();
-    const { logline, projectId, additionalContext, saveRecommendation = true, model } = body;
-
-    // Validate input
-    if (!logline || logline.trim().length === 0) {
-      return errorResponses.badRequest('Logline is required');
-    }
-
-    if (logline.length > 1000) {
-      return errorResponses.badRequest('Logline must be less than 1000 characters');
-    }
+    const { logline, projectId, additionalContext, saveRecommendation = true, model } = validation.data;
 
     // Verify project ownership if projectId provided
     if (projectId) {
@@ -145,17 +143,8 @@ export async function POST(request: NextRequest) {
 // GET endpoint to retrieve past recommendations for a project
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return errorResponses.unauthorized();
-    }
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -207,24 +196,19 @@ export async function GET(request: NextRequest) {
 // PATCH endpoint to track user acceptance
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return errorResponses.unauthorized();
-    }
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
     const body = await request.json();
-    const { recommendationId, accepted, acceptedTemplateType } = body;
+    const validation = recommendationAcceptanceSchema.safeParse(body);
 
-    if (!recommendationId) {
-      return errorResponses.badRequest('Recommendation ID is required');
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid request data', {
+        details: validation.error.issues,
+      });
     }
+
+    const { recommendationId, accepted, acceptedTemplateType } = validation.data;
 
     // Update recommendation
     const { error: updateError } = await supabase

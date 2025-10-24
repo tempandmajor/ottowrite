@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import {
   createBackgroundResponse,
   retrieveBackgroundResponse,
@@ -10,28 +9,30 @@ import { checkAIRequestQuota } from '@/lib/account/quota'
 import { reportBackgroundTaskError, addBreadcrumb } from '@/lib/monitoring/error-reporter'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireAIRateLimit } from '@/lib/api/rate-limit-helpers'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-async function requireUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+// Validation schemas
+const createTaskSchema = z.object({
+  task_type: z.string().min(1).max(100),
+  prompt: z.string().min(10).max(50000),
+  project_id: z.string().uuid().nullable().optional(),
+  document_id: z.string().uuid().nullable().optional(),
+  context: z.string().max(100000).nullable().optional(),
+})
 
-  if (!user) {
-    return { supabase, user: null }
-  }
-  return { supabase, user }
-}
+const refreshTaskSchema = z.object({
+  id: z.string().uuid(),
+})
 
 export async function GET(request: NextRequest) {
   try {
-    const { supabase, user } = await requireUser()
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireAIRateLimit(request, user.id)
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -79,32 +80,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { supabase, user } = await requireUser()
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireAIRateLimit(request, user.id)
 
     const body = await request.json()
-    const {
-      task_type,
-      prompt,
-      project_id,
-      document_id,
-      context,
-    }: {
-      task_type?: string
-      prompt?: string
-      project_id?: string | null
-      document_id?: string | null
-      context?: string | null
-    } = body ?? {}
+    const validation = createTaskSchema.safeParse(body)
 
-    if (!task_type || !prompt || prompt.trim().length < 10) {
-      return errorResponses.badRequest(
-        'task_type and a prompt of at least 10 characters are required',
-        { userId: user.id }
-      )
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid request data', {
+        details: validation.error.issues,
+      })
     }
+
+    const { task_type, prompt, project_id, document_id, context } = validation.data
 
     const { data: profile } = await supabase
       .from('user_profiles')
@@ -292,17 +280,19 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { supabase, user } = await requireUser()
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireAIRateLimit(request, user.id)
 
     const body = await request.json()
-    const { id } = body ?? {}
+    const validation = refreshTaskSchema.safeParse(body)
 
-    if (!id) {
-      return errorResponses.badRequest('Task id is required', { userId: user.id })
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid request data', {
+        details: validation.error.issues,
+      })
     }
+
+    const { id } = validation.data
 
     const { data: task, error } = await supabase
       .from('ai_background_tasks')

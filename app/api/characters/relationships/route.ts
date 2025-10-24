@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 import { validateQuery, validateBody, validationErrorResponse, commonValidators } from '@/lib/validation/middleware'
 import { z } from 'zod'
@@ -77,14 +79,8 @@ const relationshipDeleteQuerySchema = z.object({
 // GET - List relationships for a project or character
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
     // Validate query parameters
     const validation = validateQuery(request, relationshipListQuerySchema)
@@ -151,14 +147,7 @@ export async function GET(request: NextRequest) {
 // POST - Create a new relationship
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     // Validate request body
     const validation = await validateBody(request, relationshipCreateSchema)
@@ -239,14 +228,7 @@ export async function POST(request: NextRequest) {
 // PATCH - Update a relationship
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     // Validate request body
     const validation = await validateBody(request, relationshipUpdateSchema)
@@ -300,14 +282,7 @@ export async function PATCH(request: NextRequest) {
 // DELETE - Delete a relationship
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     // Validate query parameters
     const validation = validateQuery(request, relationshipDeleteQuerySchema)

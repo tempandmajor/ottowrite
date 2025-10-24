@@ -6,29 +6,38 @@
  */
 
 import { NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
+import { z } from 'zod'
 import {
   canAccessSubmissions,
   SUBMISSION_ACCESS_MESSAGES,
   SUBMISSIONS_UPGRADE_URL,
 } from '@/lib/submissions/access'
 
+// Validation schema for submission creation
+const createSubmissionSchema = z.object({
+  partner_id: z.string().uuid().optional(),
+  project_id: z.string().uuid().optional(),
+  title: z.string().min(1).max(500),
+  genre: z.string().min(1).max(100),
+  word_count: z.number().int().min(1).max(1000000),
+  type: z.enum(['novel', 'novella', 'short_story', 'memoir', 'non_fiction']),
+  query_letter: z.string().max(10000).optional(),
+  synopsis: z.string().max(10000).optional(),
+  author_bio: z.string().max(5000).optional(),
+  sample_pages_count: z.number().int().min(0).max(100).optional(),
+  sample_pages_content: z.string().max(100000).optional(),
+  status: z.enum(['draft', 'active', 'paused', 'closed']).optional(),
+})
+
 /**
  * GET /api/submissions
  * List user's manuscript submissions
  */
-export async function GET() {
-  const supabase = await createClient()
-
-  // Check authentication
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return errorResponses.unauthorized()
-  }
+export async function GET(request: Request) {
+  const { user, supabase } = await requireAuth(request)
 
   // Check Studio subscription
   const { data: profile } = await supabase
@@ -71,16 +80,8 @@ export async function GET() {
  * Create a new manuscript submission
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-
-  // Check authentication
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return errorResponses.unauthorized()
-  }
+  const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
   // Check Studio subscription
   const { data: profile } = await supabase
@@ -110,38 +111,37 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // Parse request body
+  // Parse and validate request body
   try {
     const body = await request.json()
 
-    // Validate required fields
-    if (!body.title || !body.genre || !body.word_count || !body.type) {
-      return errorResponses.badRequest('Missing required fields', {
-        details: {
-          required: ['title', 'genre', 'word_count', 'type', 'query_letter', 'synopsis'],
-        },
-        userId: user.id,
+    const validation = createSubmissionSchema.safeParse(body)
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid submission data', {
+        details: validation.error.errors,
       })
     }
+
+    const data = validation.data
 
     // Create submission (draft status by default)
     const { data: submission, error: insertError } = await supabase
       .from('manuscript_submissions')
       .insert({
         user_id: user.id,
-        partner_id: body.partner_id || null, // Will be set during partner selection
-        project_id: body.project_id || null,
-        title: body.title,
-        genre: body.genre,
-        word_count: parseInt(body.word_count),
-        type: body.type,
-        query_letter: body.query_letter || '',
-        synopsis: body.synopsis || '',
-        author_bio: body.author_bio || null,
-        sample_pages_count: body.sample_pages_count ? parseInt(body.sample_pages_count) : 0,
-        sample_pages_content: body.sample_pages_content || null,
-        status: body.status || 'draft',
-        priority_review: profile?.subscription_tier === 'studio', // Auto-set for Studio users
+        partner_id: data.partner_id || null,
+        project_id: data.project_id || null,
+        title: data.title,
+        genre: data.genre,
+        word_count: data.word_count,
+        type: data.type,
+        query_letter: data.query_letter || '',
+        synopsis: data.synopsis || '',
+        author_bio: data.author_bio || null,
+        sample_pages_count: data.sample_pages_count || 0,
+        sample_pages_content: data.sample_pages_content || null,
+        status: data.status || 'draft',
+        priority_review: profile?.subscription_tier === 'studio',
       })
       .select()
       .single()

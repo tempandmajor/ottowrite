@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireAIRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
@@ -8,14 +10,8 @@ export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+  await requireAIRateLimit(request, user.id)
 
     const body = (await request.json()) as {
       project_id?: string | null

@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
@@ -13,14 +15,8 @@ type NoteCategory = 'reference' | 'character' | 'worldbuilding' | 'plot' | 'sett
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
@@ -92,14 +88,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     const body = await request.json()
     const {
@@ -160,14 +149,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     const body = await request.json()
     const { id, title, content, tags, category, is_pinned, sources } = body
@@ -225,14 +207,7 @@ export async function PATCH(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

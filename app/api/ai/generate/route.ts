@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase/server'
 import { generateWithAI, type AIModel } from '@/lib/ai/service'
 import { getMonthlyAIWordLimit, isSubscriptionActive, getInactiveSubscriptionError } from '@/lib/stripe/config'
 import { checkAIRequestQuota } from '@/lib/account/quota'
@@ -11,7 +10,8 @@ import { checkAIRateLimit, createAIRateLimitResponse } from '@/lib/security/ai-r
 import { routeAIRequest } from '@/lib/ai/router'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { validateBody, validationErrorResponse } from '@/lib/validation/middleware'
-import { aiGenerateSchema } from '@/lib/validation/schemas'
+import { aiGenerateSchema, mapToAIModel } from '@/lib/validation/schemas'
+import { requireAuth } from '@/lib/api/auth-helpers'
 import { detectXSSPatterns, detectSQLInjection } from '@/lib/security/sanitize'
 import {
   buildContextBundle,
@@ -52,7 +52,6 @@ export async function POST(request: NextRequest) {
     return createAIRateLimitResponse(rateLimitCheck.retryAfter)
   }
 
-  const supabase = await createClient()
   let classification: ReturnType<typeof classifyIntent> | null = null
   let selectedModel: AIModel | null = null
   let command: AICommand | null = null
@@ -76,13 +75,9 @@ export async function POST(request: NextRequest) {
   const timer = new PerformanceTimer('ai_generation', 'ai_generation')
 
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    // Check authentication with proper error handling
+    const authResult = await requireAuth(request)
+    const { user, supabase } = authResult
     userId = user.id
 
     // Get user profile to check subscription and usage
@@ -174,7 +169,8 @@ export async function POST(request: NextRequest) {
     sanitizedContext = context ? context.trim() : undefined
     const commandHintValue = commandHint
     selectionValue = selection
-    explicitModel = model as AIModel | null
+    // ✅ FIX: Map simplified model names to full AI model identifiers
+    explicitModel = mapToAIModel(model)
     documentIdValue = documentId || null
 
     classification = classifyIntent({

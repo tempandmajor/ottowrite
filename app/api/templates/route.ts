@@ -1,21 +1,37 @@
 import { NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { logger } from '@/lib/monitoring/structured-logger'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
-// GET - List templates
+// Validation schema for template creation
+const createTemplateSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(1000).optional(),
+  type: z.string().min(1).max(50),
+  category: z.string().min(1).max(50),
+  content: z.string().min(1),
+}).refine(data => data.name || data.title, {
+  message: 'Either name or title must be provided',
+})
+
+// GET - List templates (user's own + official templates)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const { user, supabase } = await requireAuth(request)
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const category = searchParams.get('category')
 
+    // Show user's own templates + official templates
     let query = supabase
       .from('document_templates')
       .select('*')
+      .or(`created_by.eq.${user.id},is_official.eq.true`)
       .order('usage_count', { ascending: false })
       .order('created_at', { ascending: false })
 
@@ -57,24 +73,21 @@ export async function GET(request: NextRequest) {
 // POST - Create template from document
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const body = await request.json()
-    const { name, title, description, type, category, content } = body
-    const templateTitle = title || name
 
-    if (!templateTitle || !type || !category || !content) {
-      return errorResponses.badRequest('Missing required fields: title/name, type, category, content', {
-        userId: user.id,
+    // Validate input
+    const validation = createTemplateSchema.safeParse(body)
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid template data', {
+        details: validation.error.errors,
       })
     }
+
+    const { name, title, description, type, category, content } = validation.data
+    const templateTitle = title || name
 
     let insertPayload: Record<string, unknown> = {
       description,

@@ -14,6 +14,8 @@ import {
   type VoicePattern,
 } from '@/lib/ai/dialogue-analyzer'
 import { errorResponses, errorResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -23,14 +25,8 @@ export const maxDuration = 60
  * Retrieve the latest voice analysis for a character
  */
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return errorResponses.unauthorized()
-  }
+  const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
   const { searchParams } = new URL(request.url)
   const characterId = searchParams.get('characterId')
@@ -73,14 +69,7 @@ export async function GET(request: NextRequest) {
  * Analyze character dialogue and create voice profile
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return errorResponses.unauthorized()
-  }
+  const { user, supabase } = await requireAuth(request)
 
   const body = await request.json()
   const { characterId, action, dialogueSamples, newDialogue, context } = body
@@ -221,14 +210,7 @@ export async function POST(request: NextRequest) {
  * Clear dialogue samples and analyses for a character
  */
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return errorResponses.unauthorized()
-  }
+  const { user, supabase } = await requireAuth(request)
 
   const { searchParams } = new URL(request.url)
   const characterId = searchParams.get('characterId')

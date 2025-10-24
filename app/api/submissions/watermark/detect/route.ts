@@ -8,6 +8,8 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { canAccessSubmissions } from '@/lib/submissions/access'
 import { detectWatermark, createDocumentFingerprint } from '@/lib/submissions/watermark'
 
@@ -16,16 +18,8 @@ import { detectWatermark, createDocumentFingerprint } from '@/lib/submissions/wa
  * Detect watermarks in potentially leaked content
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-
-  // Check authentication
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return errorResponses.unauthorized()
-  }
+  const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
   // Check Studio subscription
   const { data: profile } = await supabase

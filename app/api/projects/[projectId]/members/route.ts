@@ -10,6 +10,8 @@ import { checkTeamSeatQuota } from '@/lib/account/quota'
 import { canAccessFeature } from '@/lib/stripe/config'
 import { isSubscriptionActive } from '@/lib/stripe/config'
 import { errorResponses } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 interface RouteContext {
   params: Promise<{
@@ -20,17 +22,8 @@ interface RouteContext {
 export async function POST(request: Request, context: RouteContext) {
   try {
     const { projectId } = await context.params
-    const supabase = await createClient()
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
     // Get user profile with subscription info
     const { data: profile, error: profileError } = await supabase
@@ -194,17 +187,7 @@ export async function POST(request: Request, context: RouteContext) {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { projectId } = await context.params
-    const supabase = await createClient()
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     // Verify user has access to the project
     const { data: project, error: projectError } = await supabase

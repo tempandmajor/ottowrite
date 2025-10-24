@@ -9,20 +9,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return errorResponses.unauthorized('Authentication required')
-    }
+    const { user, supabase } = await requireAuth(request)
 
     // Get unread count using RPC function
     const { data: count, error: countError } = await supabase.rpc(

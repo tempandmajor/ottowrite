@@ -68,6 +68,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Thread not found or access denied' }, { status: 404 })
     }
 
+    // Validate document ownership - users can only comment on their own documents
+    if (!thread.document || thread.document.user_id !== user.id) {
+      return NextResponse.json({
+        error: 'Access denied. You can only comment on your own documents.'
+      }, { status: 403 })
+    }
+
     // Create the comment
     const { data: comment, error: commentError } = await supabase
       .from('comments')

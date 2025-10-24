@@ -1,8 +1,10 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
-import { createPaginatedResponse, paginationQuerySchema } from '@/lib/api/pagination'
+import { createPaginatedResponse, paginationQuerySchema, validateCursorByType } from '@/lib/api/pagination'
 import { validateQuery, validationErrorResponse, commonValidators } from '@/lib/validation/middleware'
 import { z } from 'zod'
 
@@ -18,14 +20,8 @@ const locationsListQuerySchema = z.object({
 // GET locations for a project
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
     // Validate query parameters
     const validation = validateQuery(request, locationsListQuerySchema)
@@ -34,6 +30,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { project_id: projectId, category, search, limit, cursor } = validation.data!
+
+    // ✅ FIX: Validate cursor as timestamp (this endpoint uses updated_at for pagination)
+    const validatedCursor = validateCursorByType(cursor, 'timestamp')
 
     let query = supabase
       .from('locations')
@@ -67,8 +66,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Apply cursor pagination
-    if (cursor) {
-      query = query.lt('updated_at', cursor)
+    if (validatedCursor) {
+      query = query.lt('updated_at', validatedCursor)
     }
     query = query.limit(limit + 1)
 
@@ -105,14 +104,7 @@ export async function GET(request: NextRequest) {
 // POST - create location
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     const body = await request.json()
     const {
@@ -190,14 +182,7 @@ export async function POST(request: NextRequest) {
 // PATCH update location
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     const body = await request.json()
     const { id, ...updates } = body
@@ -243,14 +228,7 @@ export async function PATCH(request: NextRequest) {
 // DELETE location
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { analyzePlotHoles, extractTextContent } from '@/lib/ai/plot-analyzer'
 import type { AnalysisType } from '@/lib/ai/plot-analyzer'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
@@ -11,14 +13,8 @@ export const maxDuration = 60 // Allow up to 60 seconds for AI analysis
 // GET - List analyses for a document
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
     const { searchParams } = new URL(request.url)
     const documentId = searchParams.get('document_id')
@@ -69,14 +65,7 @@ export async function GET(request: NextRequest) {
 // POST - Create new analysis
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     const body = await request.json()
     const { document_id, analysis_type = 'full' } = body
@@ -229,14 +218,7 @@ export async function POST(request: NextRequest) {
 // DELETE - Delete analysis
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

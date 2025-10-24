@@ -7,30 +7,26 @@
  */
 
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { getCollaborativeRecommendations, UserProfile } from '@/lib/ai/recommendations-engine';
 import type { AIModel } from '@/lib/ai/service';
+import { requireAuth } from '@/lib/api/auth-helpers';
+import { requireAIRateLimit } from '@/lib/api/rate-limit-helpers';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
+// Validation schemas
+const updateProfileSchema = z.object({
+  preferredGenres: z.array(z.string().max(100)).max(20).optional(),
+  writingStyle: z.string().max(500).optional(),
+});
+
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      logger.warn('Unauthorized collaborative filtering request', {
-        operation: 'ai:writers-like-you',
-      });
-      return errorResponses.unauthorized();
-    }
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -185,20 +181,19 @@ export async function GET(request: NextRequest) {
 // POST endpoint to update user writing profile
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return errorResponses.unauthorized();
-    }
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
     const body = await request.json();
-    const { preferredGenres, writingStyle } = body;
+    const validation = updateProfileSchema.safeParse(body);
+
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid request data', {
+        details: validation.error.issues,
+      });
+    }
+
+    const { preferredGenres, writingStyle } = validation.data;
 
     // Update user profile
     const updateData: any = {};

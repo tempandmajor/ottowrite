@@ -7,52 +7,48 @@
  */
 
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { generateAutoTags } from '@/lib/ai/recommendations-engine';
 import type { AIModel } from '@/lib/ai/service';
+import { requireAuth } from '@/lib/api/auth-helpers';
+import { requireAIRateLimit } from '@/lib/api/rate-limit-helpers';
+import { z } from 'zod';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
-interface RequestBody {
-  projectId: string;
-  content: string;
-  logline?: string;
-  regenerate?: boolean; // Force regenerate even if tags exist
-  model?: AIModel; // Multi-provider support
-}
+// Validation schemas
+const autoTagSchema = z.object({
+  projectId: z.string().uuid(),
+  content: z.string().min(1).max(100000),
+  logline: z.string().max(1000).optional(),
+  regenerate: z.boolean().optional(),
+  model: z.enum(['claude-opus-4', 'claude-sonnet-4.5', 'claude-haiku-4', 'gpt-5-turbo', 'gpt-4o', 'deepseek-chat', 'deepseek-reasoner']).optional(),
+});
+
+const patchTagSchema = z.object({
+  projectId: z.string().uuid(),
+  userAddedTags: z.array(z.string()).optional(),
+  userRemovedTags: z.array(z.string()).optional(),
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    // Parse and validate request body
+    const body = await request.json();
+    const validation = autoTagSchema.safeParse(body);
 
-    if (authError || !user) {
-      logger.warn('Unauthorized auto-tag request', {
-        operation: 'ai:auto-tag',
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid request data', {
+        details: validation.error.issues,
       });
-      return errorResponses.unauthorized();
     }
 
-    // Parse request body
-    const body: RequestBody = await request.json();
-    const { projectId, content, logline, regenerate = false, model } = body;
-
-    // Validate input
-    if (!projectId) {
-      return errorResponses.badRequest('Project ID is required');
-    }
-
-    if (!content || content.trim().length === 0) {
-      return errorResponses.badRequest('Content is required');
-    }
+    const { projectId, content, logline, regenerate = false, model } = validation.data;
 
     // Verify project ownership
     const { data: project, error: projectError } = await supabase
@@ -176,17 +172,8 @@ export async function POST(request: NextRequest) {
 // GET endpoint to retrieve tags for a project
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return errorResponses.unauthorized();
-    }
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -248,24 +235,19 @@ export async function GET(request: NextRequest) {
 // PATCH endpoint to update user-modified tags
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return errorResponses.unauthorized();
-    }
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
     const body = await request.json();
-    const { projectId, userAddedTags, userRemovedTags } = body;
+    const validation = patchTagSchema.safeParse(body);
 
-    if (!projectId) {
-      return errorResponses.badRequest('Project ID is required');
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid request data', {
+        details: validation.error.issues,
+      });
     }
+
+    const { projectId, userAddedTags, userRemovedTags } = validation.data;
 
     // Verify project ownership
     const { data: project, error: projectError } = await supabase
@@ -332,17 +314,8 @@ export async function PATCH(request: NextRequest) {
 // DELETE endpoint to remove tags for a project
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return errorResponses.unauthorized();
-    }
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
     // Get query parameters
     const { searchParams } = new URL(request.url);

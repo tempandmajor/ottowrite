@@ -1,9 +1,17 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
+import { requireAuth } from '@/lib/api/auth-helpers';
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
+
+// Validation schema for PATCH
+const updateBeatSheetSchema = z.object({
+  beat_data: z.record(z.any()).optional(),
+  completed_beats: z.number().int().min(0).optional(),
+});
 
 interface RouteParams {
   params: Promise<{
@@ -22,8 +30,22 @@ export async function GET(
   { params }: RouteParams
 ) {
   try {
-    const supabase = await createClient();
+    const { user, supabase } = await requireAuth(request);
+    await requireDefaultRateLimit(request, user.id);
+
     const { id: projectId, beatSheetId } = await params;
+
+    // Verify project ownership first
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', projectId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (projectError || !project) {
+      return errorResponses.notFound('Project not found');
+    }
 
     const { data, error } = await supabase
       .from('project_beat_sheets')
@@ -64,16 +86,28 @@ export async function PATCH(
   { params }: RouteParams
 ) {
   try {
-    const supabase = await createClient();
+    const { user, supabase } = await requireAuth(request);
+    await requireDefaultRateLimit(request, user.id);
+
     const { id: projectId, beatSheetId } = await params;
+
     const body = await request.json();
-    const { beat_data, completed_beats } = body;
+    const validation = updateBeatSheetSchema.safeParse(body);
+
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid request data', {
+        details: validation.error.issues,
+      });
+    }
+
+    const { beat_data, completed_beats } = validation.data;
 
     // Verify project ownership
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
+      .eq('user_id', user.id)
       .single();
 
     if (projectError || !project) {
@@ -128,7 +162,9 @@ export async function DELETE(
   { params }: RouteParams
 ) {
   try {
-    const supabase = await createClient();
+    const { user, supabase } = await requireAuth(request);
+    await requireDefaultRateLimit(request, user.id);
+
     const { id: projectId, beatSheetId } = await params;
 
     // Verify project ownership
@@ -136,6 +172,7 @@ export async function DELETE(
       .from('projects')
       .select('id')
       .eq('id', projectId)
+      .eq('user_id', user.id)
       .single();
 
     if (projectError || !project) {

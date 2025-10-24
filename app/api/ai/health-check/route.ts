@@ -8,61 +8,57 @@
  */
 
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
 import { logger } from '@/lib/monitoring/structured-logger';
 import { analyzeTemplateHealth } from '@/lib/ai/recommendations-engine';
 import type { AIModel } from '@/lib/ai/service';
+import { requireAuth } from '@/lib/api/auth-helpers';
+import { requireAIRateLimit } from '@/lib/api/rate-limit-helpers';
+import { z } from 'zod';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
-interface RequestBody {
-  projectId: string;
-  documentId?: string;
-  content: string;
-  templateType: string;
-  metadata?: {
-    totalPages?: number;
-    actBreaks?: Array<{ act: string; startPage: number; endPage: number }>;
-    genre?: string;
-  };
-  model?: AIModel; // Multi-provider support
-}
+// Validation schemas
+const healthCheckSchema = z.object({
+  projectId: z.string().uuid(),
+  documentId: z.string().uuid().optional(),
+  content: z.string().min(1).max(100000),
+  templateType: z.string().min(1).max(50),
+  metadata: z.object({
+    totalPages: z.number().int().min(1).optional(),
+    actBreaks: z.array(z.object({
+      act: z.string(),
+      startPage: z.number().int(),
+      endPage: z.number().int(),
+    })).optional(),
+    genre: z.string().max(100).optional(),
+  }).optional(),
+  model: z.enum(['claude-opus-4', 'claude-sonnet-4.5', 'claude-haiku-4', 'gpt-5-turbo', 'gpt-4o', 'deepseek-chat', 'deepseek-reasoner']).optional(),
+});
+
+const patchHealthCheckSchema = z.object({
+  healthCheckId: z.string().uuid(),
+  viewed: z.boolean().optional(),
+  dismissed: z.boolean().optional(),
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    // Parse and validate request body
+    const body = await request.json();
+    const validation = healthCheckSchema.safeParse(body);
 
-    if (authError || !user) {
-      logger.warn('Unauthorized health check request', {
-        operation: 'ai:health-check',
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid request data', {
+        details: validation.error.issues,
       });
-      return errorResponses.unauthorized();
     }
 
-    // Parse request body
-    const body: RequestBody = await request.json();
-    const { projectId, documentId, content, templateType, metadata, model } = body;
-
-    // Validate input
-    if (!projectId) {
-      return errorResponses.badRequest('Project ID is required');
-    }
-
-    if (!content || content.trim().length === 0) {
-      return errorResponses.badRequest('Content is required');
-    }
-
-    if (!templateType) {
-      return errorResponses.badRequest('Template type is required');
-    }
+    const { projectId, documentId, content, templateType, metadata, model } = validation.data;
 
     // Verify project ownership
     const { data: project, error: projectError } = await supabase
@@ -177,17 +173,8 @@ export async function POST(request: NextRequest) {
 // GET endpoint to retrieve health checks for a project
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return errorResponses.unauthorized();
-    }
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
     // Get query parameters
     const { searchParams } = new URL(request.url);
@@ -257,24 +244,19 @@ export async function GET(request: NextRequest) {
 // PATCH endpoint to mark health check as viewed/dismissed
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return errorResponses.unauthorized();
-    }
+    const { user, supabase } = await requireAuth(request);
+    await requireAIRateLimit(request, user.id);
 
     const body = await request.json();
-    const { healthCheckId, viewed, dismissed } = body;
+    const validation = patchHealthCheckSchema.safeParse(body);
 
-    if (!healthCheckId) {
-      return errorResponses.badRequest('Health check ID is required');
+    if (!validation.success) {
+      return errorResponses.validationError('Invalid request data', {
+        details: validation.error.issues,
+      });
     }
+
+    const { healthCheckId, viewed, dismissed } = validation.data;
 
     // Update health check
     const updateData: any = {};

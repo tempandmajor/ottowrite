@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 import { validateQuery, validateBody, validationErrorResponse, commonValidators } from '@/lib/validation/middleware'
-import { createPaginatedResponse, paginationQuerySchema } from '@/lib/api/pagination'
+import { createPaginatedResponse, paginationQuerySchema, validateCursorByType } from '@/lib/api/pagination'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -79,14 +81,8 @@ const characterDeleteQuerySchema = z.object({
 // GET - List characters for a project
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
     // Validate query parameters
     const validation = validateQuery(request, characterListQuerySchema)
@@ -95,6 +91,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { project_id: projectId, role, limit, cursor } = validation.data!
+
+    // ✅ FIX: Validate cursor as timestamp (this endpoint uses created_at for pagination)
+    const validatedCursor = validateCursorByType(cursor, 'timestamp')
 
     let query = supabase
       .from('characters')
@@ -110,8 +109,8 @@ export async function GET(request: NextRequest) {
 
     // Apply cursor pagination
     // Fetch limit + 1 to determine if there are more results
-    if (cursor) {
-      query = query.lt('created_at', cursor)
+    if (validatedCursor) {
+      query = query.lt('created_at', validatedCursor)
     }
     query = query.limit(limit + 1)
 
@@ -148,14 +147,7 @@ export async function GET(request: NextRequest) {
 // POST - Create a new character
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     // Validate request body
     const validation = await validateBody(request, characterCreateSchema)
@@ -262,14 +254,7 @@ export async function POST(request: NextRequest) {
 // PATCH - Update a character
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     // Validate request body
     const validation = await validateBody(request, characterUpdateSchema)
@@ -321,14 +306,7 @@ export async function PATCH(request: NextRequest) {
 // DELETE - Delete a character
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     // Validate query parameters
     const validation = validateQuery(request, characterDeleteQuerySchema)

@@ -6,6 +6,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
 import { validateQuery, validationErrorResponse } from '@/lib/validation/middleware'
 import { z } from 'zod'
 import { logger } from '@/lib/monitoring/structured-logger'
@@ -27,14 +28,7 @@ const historyQuerySchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return errorResponses.unauthorized()
-    }
+    const { user, supabase } = await requireAuth(request)
 
     // Validate query parameters
     const validation = validateQuery(request, historyQuerySchema)

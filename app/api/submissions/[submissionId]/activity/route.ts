@@ -9,23 +9,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ submissionId: string }> }
 ) {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return errorResponses.unauthorized('Authentication required')
-    }
+    const { user, supabase } = await requireAuth(request)
 
     const { submissionId } = await params
 

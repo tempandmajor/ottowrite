@@ -88,6 +88,7 @@ import { InlineAnalyticsPanel } from '@/components/editor/inline-analytics-panel
 import type { ScreenplayAct } from '@/types/screenplay'
 import { ReadingTimeWidget } from '@/components/editor/reading-time-widget'
 import { CharacterSceneIndex } from '@/components/editor/character-scene-index'
+import { TabbedOutlineSidebar } from '@/components/editor/tabbed-outline-sidebar'
 import { BreadcrumbNav } from '@/components/dashboard/breadcrumb-nav'
 import { DocumentTree } from '@/components/editor/document-tree'
 import { useDocumentTree } from '@/hooks/use-document-tree'
@@ -2777,27 +2778,17 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                 sceneMeta={screenplaySceneMeta}
               />
             ) : (
-              <>
-                <ChapterSidebar
-                  chapters={structure}
-                  onChange={handleStructureChange}
-                  activeSceneId={activeSceneId}
-                  onSelectScene={handleSceneSelect}
-                  onCreateScene={handleSceneCreated}
-                  onInsertAnchor={handleInsertAnchor}
-                  missingAnchors={missingAnchors}
-                />
-                <ReadingTimeWidget
-                  content={content}
-                  wordCount={wordCount}
-                  structure={structure}
-                />
-                <CharacterSceneIndex
-                  content={content}
-                  structure={structure}
-                  onNavigateToScene={handleSceneSelect}
-                />
-              </>
+              <TabbedOutlineSidebar
+                structure={structure}
+                content={content}
+                wordCount={wordCount}
+                activeSceneId={activeSceneId}
+                missingAnchors={missingAnchors}
+                onStructureChange={handleStructureChange}
+                onSelectScene={handleSceneSelect}
+                onCreateScene={handleSceneCreated}
+                onInsertAnchor={handleInsertAnchor}
+              />
             )}
           </div>
         )}

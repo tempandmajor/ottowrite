@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Input } from '@/components/ui/input'
 import { exportDocument, ExportFormat } from '@/lib/export/utils'
-import { FileDown, FileText, FileType, File, Film } from 'lucide-react'
+import { FileDown, FileText, FileType, File, Film, Loader2 } from 'lucide-react'
 
 interface ExportModalProps {
   open: boolean
@@ -178,7 +178,11 @@ export function ExportModal({
             Cancel
           </Button>
           <Button onClick={handleExport} disabled={isExporting}>
-            <FileDown className="h-4 w-4 mr-2" />
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4 mr-2" />
+            )}
             {isExporting ? 'Exporting...' : 'Export'}
           </Button>
         </DialogFooter>

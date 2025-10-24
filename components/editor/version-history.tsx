@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Clock, RotateCcw, Eye } from 'lucide-react'
+import { Clock, RotateCcw, Eye, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 type Version = {
@@ -39,6 +39,7 @@ export function VersionHistory({
 }: VersionHistoryProps) {
   const [versions, setVersions] = useState<Version[]>([])
   const [loading, setLoading] = useState(false)
+  const [restoringId, setRestoringId] = useState<string | null>(null)
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const { toast } = useToast()
@@ -75,13 +76,18 @@ export function VersionHistory({
     }
   }, [open, loadVersions])
 
-  const handleRestore = (version: Version) => {
-    onRestoreVersion(version.content, version.title)
-    onOpenChange(false)
-    toast({
-      title: 'Version Restored',
-      description: `Restored to version ${version.version_number} from ${formatDate(version.created_at)}`,
-    })
+  const handleRestore = async (version: Version) => {
+    setRestoringId(version.id)
+    try {
+      await onRestoreVersion(version.content, version.title)
+      onOpenChange(false)
+      toast({
+        title: 'Version Restored',
+        description: `Restored to version ${version.version_number} from ${formatDate(version.created_at)}`,
+      })
+    } finally {
+      setRestoringId(null)
+    }
   }
 
   const handlePreview = (version: Version) => {
@@ -138,8 +144,9 @@ export function VersionHistory({
           </DialogHeader>
 
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <p className="text-muted-foreground">Loading versions...</p>
+            <div className="flex flex-col items-center justify-center py-8 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Loading versions...</p>
             </div>
           ) : versions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -190,9 +197,14 @@ export function VersionHistory({
                           variant="outline"
                           size="sm"
                           onClick={() => handleRestore(version)}
+                          disabled={restoringId === version.id}
                         >
-                          <RotateCcw className="h-4 w-4 mr-1" />
-                          Restore
+                          {restoringId === version.id ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                          )}
+                          {restoringId === version.id ? 'Restoring...' : 'Restore'}
                         </Button>
                       </div>
                     </div>

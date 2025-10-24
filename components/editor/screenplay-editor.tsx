@@ -450,7 +450,7 @@ export function ScreenplayEditor({
           </div>
           <div>
             <span className="font-semibold">Pages:</span> {pageCount}
-            <span className="ml-4 text-gray-400">≈ {pageCount} min screen time</span>
+            <span className="ml-4 text-gray-600">≈ {pageCount} min screen time</span>
           </div>
         </div>
       </div>
@@ -492,7 +492,7 @@ export function ScreenplayEditor({
             {/* Element type indicator */}
             {editable && (
               <div className="absolute -left-24 top-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-xs text-gray-400 uppercase">{element.type}</span>
+                <span className="text-xs text-gray-600 uppercase">{element.type}</span>
               </div>
             )}
             </div>

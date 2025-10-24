@@ -819,12 +819,12 @@ export function DocumentTree({
           <div className="flex-1 overflow-y-auto p-2">
             {filteredTree.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-8 text-center">
-                <Folder className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                <Folder className="h-12 w-12 text-muted-foreground mb-3" />
                 <p className="text-sm text-muted-foreground mb-1">
                   {searchQuery.trim() ? 'No documents found' : 'No documents yet'}
                 </p>
                 {!searchQuery.trim() && (
-                  <p className="text-xs text-muted-foreground/70 mb-4">
+                  <p className="text-xs text-muted-foreground mb-4">
                     Create your first document or folder to get started
                   </p>
                 )}

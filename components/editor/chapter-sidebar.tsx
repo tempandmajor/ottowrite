@@ -304,7 +304,7 @@ export function ChapterSidebar({
 
         <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
           {chapters.length === 0 ? (
-            <div className="rounded-lg border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed bg-muted/50 p-4 text-sm text-muted-foreground">
               Start by adding your first chapter. Scenes can be nested under each chapter,
               and you can capture POV, pacing, and tension for each section.
             </div>
@@ -401,7 +401,7 @@ export function ChapterSidebar({
                   {isExpanded && (
                     <div className="space-y-3 px-3 py-3">
                       {chapter.scenes.length === 0 ? (
-                        <div className="rounded-lg border border-dashed bg-muted/40 p-3 text-xs text-muted-foreground">
+                        <div className="rounded-lg border border-dashed bg-muted/50 p-3 text-xs text-muted-foreground">
                           No scenes yet. Add one to break this chapter into focused beats.
                         </div>
                       ) : (

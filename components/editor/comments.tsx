@@ -253,12 +253,12 @@ function CommentThreadCard({ thread, userId, onUpdate }: CommentThreadCardProps)
               {thread.is_resolved ? (
                 <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
               ) : (
-                <Circle className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <Circle className="h-4 w-4 text-gray-600 flex-shrink-0" />
               )}
-              <span className="text-sm text-gray-500 truncate">
+              <span className="text-sm text-gray-600 truncate">
                 {thread.comments[0]?.user?.email || 'Unknown'}
               </span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-gray-600">
                 {formatDistanceToNow(new Date(thread.created_at), { addSuffix: true })}
               </span>
             </div>
@@ -422,7 +422,7 @@ function CommentItem({ comment, userId, onUpdate }: CommentItemProps) {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">{comment.user.email}</span>
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-gray-600">
               {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
             </span>
             {comment.is_edited && (

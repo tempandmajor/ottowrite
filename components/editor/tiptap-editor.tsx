@@ -63,7 +63,6 @@ interface TiptapEditorProps {
   layoutMode?: 'page' | 'wide' | 'typewriter'
   theme?: 'serif' | 'sans'
   fontScale?: 'sm' | 'md' | 'lg'
-  showRuler?: boolean
   documentType?: string
   focusScene?: {
     id: string
@@ -89,7 +88,6 @@ export function TiptapEditor({
   layoutMode = 'page',
   theme = 'sans',
   fontScale = 'md',
-  showRuler = false,
   documentType,
   focusScene = null,
   onSceneFocusResult,
@@ -126,7 +124,7 @@ export function TiptapEditor({
       'editor-body prose max-w-none focus:outline-none leading-relaxed selection:bg-primary/20 selection:text-primary-foreground',
       scaleClass,
       fontClass,
-      'prose-headings:font-semibold prose-headings:tracking-tight prose-p:leading-relaxed prose-li:leading-relaxed prose-blockquote:border-l-4 prose-blockquote:border-primary/40 prose-blockquote:bg-muted/40 prose-blockquote:pl-6 prose-strong:font-semibold'
+      'prose-headings:font-semibold prose-headings:tracking-tight prose-p:leading-relaxed prose-li:leading-relaxed prose-blockquote:border-l-4 prose-blockquote:border-primary/50 prose-blockquote:bg-muted/50 prose-blockquote:pl-6 prose-strong:font-semibold'
     )
   }, [fontScale, theme, documentType])
 
@@ -376,16 +374,24 @@ export function TiptapEditor({
       case 'wide':
         return 'rounded-lg border border-border bg-white px-10 py-12 shadow-lg'
       case 'typewriter':
-        return 'rounded-lg border border-primary/20 bg-white px-8 py-12 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]'
+        return 'rounded-lg border border-border bg-white px-8 py-12 shadow-lg'
       default:
         return 'rounded-lg border border-border/60 bg-white px-12 py-14 shadow-[0_40px_120px_-60px_rgba(15,23,42,0.3)] sm:px-14 sm:py-16'
     }
   }, [layoutMode])
 
+  // Subtle paper texture using SVG noise pattern
+  const paperTextureStyle = useMemo(
+    () => ({
+      backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E")`,
+    }),
+    []
+  )
+
   const toolbarWrapperClass = useMemo(
     () =>
       cn(
-        'sticky top-0 z-10 mx-auto flex w-full flex-wrap items-center gap-2 rounded-md border border-border bg-background/95 px-4 py-2.5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/90',
+        'sticky top-0 z-10 mx-auto flex w-full flex-wrap items-center gap-2 rounded-md border border-border/30 bg-background/80 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/70',
         maxWidthClass
       ),
     [maxWidthClass]
@@ -397,9 +403,6 @@ export function TiptapEditor({
         'relative mx-auto w-full',
         maxWidthClass,
         outerPaddingClass,
-        layoutMode === 'typewriter'
-          ? "before:absolute before:inset-y-6 before:left-1/2 before:w-[min(680px,calc(100%-2rem))] before:-translate-x-1/2 before:rounded-lg before:border before:border-primary/10 before:bg-primary/5 before:opacity-40 before:blur-sm before:content-['']"
-          : '',
         layoutMode === 'page' ? 'px-2 sm:px-4' : 'px-2'
       ),
     [layoutMode, maxWidthClass, outerPaddingClass]
@@ -414,8 +417,6 @@ export function TiptapEditor({
       ),
     [layoutMode, maxWidthClass]
   )
-
-  const rulerMarks = useMemo(() => Array.from({ length: 12 }, (_, index) => index + 1), [])
 
   if (!editor) {
     return null
@@ -433,14 +434,14 @@ export function TiptapEditor({
     <div className="flex flex-col gap-4">
       {editable && (
         <div className={toolbarWrapperClass}>
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-0.5 rounded-md border border-border/50 bg-muted/50 p-0.5">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               aria-label="Bold"
               onClick={() => editor.chain().focus().toggleBold().run()}
-              className={cn('rounded-full', editor.isActive('bold') && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', editor.isActive('bold') && 'bg-background shadow-sm')}
             >
               <Bold className="h-4 w-4" />
             </Button>
@@ -450,7 +451,7 @@ export function TiptapEditor({
               size="sm"
               aria-label="Italic"
               onClick={() => editor.chain().focus().toggleItalic().run()}
-              className={cn('rounded-full', editor.isActive('italic') && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', editor.isActive('italic') && 'bg-background shadow-sm')}
             >
               <Italic className="h-4 w-4" />
             </Button>
@@ -460,7 +461,7 @@ export function TiptapEditor({
               size="sm"
               aria-label="Strikethrough"
               onClick={() => editor.chain().focus().toggleStrike().run()}
-              className={cn('rounded-full', editor.isActive('strike') && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', editor.isActive('strike') && 'bg-background shadow-sm')}
             >
               <Strikethrough className="h-4 w-4" />
             </Button>
@@ -470,7 +471,7 @@ export function TiptapEditor({
               size="sm"
               aria-label="Code"
               onClick={() => editor.chain().focus().toggleCode().run()}
-              className={cn('rounded-full', editor.isActive('code') && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', editor.isActive('code') && 'bg-background shadow-sm')}
             >
               <Code className="h-4 w-4" />
             </Button>
@@ -480,22 +481,22 @@ export function TiptapEditor({
               size="sm"
               aria-label="Highlight"
               onClick={() => editor.chain().focus().toggleHighlight().run()}
-              className={cn('rounded-full', editor.isActive('highlight') && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', editor.isActive('highlight') && 'bg-background shadow-sm')}
             >
               <Highlighter className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className="hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
+          <div className="hidden h-5 w-px bg-border/50 sm:block" aria-hidden="true" />
 
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-0.5 rounded-md border border-border/50 bg-muted/50 p-0.5">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               aria-label="Heading 1"
               onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-              className={cn('rounded-full', editor.isActive('heading', { level: 1 }) && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', editor.isActive('heading', { level: 1 }) && 'bg-background shadow-sm')}
             >
               <Heading1 className="h-4 w-4" />
             </Button>
@@ -505,7 +506,7 @@ export function TiptapEditor({
               size="sm"
               aria-label="Heading 2"
               onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-              className={cn('rounded-full', editor.isActive('heading', { level: 2 }) && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', editor.isActive('heading', { level: 2 }) && 'bg-background shadow-sm')}
             >
               <Heading2 className="h-4 w-4" />
             </Button>
@@ -515,7 +516,7 @@ export function TiptapEditor({
               size="sm"
               aria-label="Bullet list"
               onClick={() => editor.chain().focus().toggleBulletList().run()}
-              className={cn('rounded-full', editor.isActive('bulletList') && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', editor.isActive('bulletList') && 'bg-background shadow-sm')}
             >
               <List className="h-4 w-4" />
             </Button>
@@ -525,7 +526,7 @@ export function TiptapEditor({
               size="sm"
               aria-label="Numbered list"
               onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              className={cn('rounded-full', editor.isActive('orderedList') && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', editor.isActive('orderedList') && 'bg-background shadow-sm')}
             >
               <ListOrdered className="h-4 w-4" />
             </Button>
@@ -535,22 +536,22 @@ export function TiptapEditor({
               size="sm"
               aria-label="Quote"
               onClick={() => editor.chain().focus().toggleBlockquote().run()}
-              className={cn('rounded-full', editor.isActive('blockquote') && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', editor.isActive('blockquote') && 'bg-background shadow-sm')}
             >
               <Quote className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className="hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
+          <div className="hidden h-5 w-px bg-border/50 sm:block" aria-hidden="true" />
 
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-0.5 rounded-md border border-border/50 bg-muted/50 p-0.5">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               aria-label="Align left"
               onClick={() => editor.chain().focus().setTextAlign('left').run()}
-              className={cn('rounded-full', currentAlignment === 'left' && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', currentAlignment === 'left' && 'bg-background shadow-sm')}
             >
               <AlignLeft className="h-4 w-4" />
             </Button>
@@ -560,7 +561,7 @@ export function TiptapEditor({
               size="sm"
               aria-label="Align center"
               onClick={() => editor.chain().focus().setTextAlign('center').run()}
-              className={cn('rounded-full', currentAlignment === 'center' && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', currentAlignment === 'center' && 'bg-background shadow-sm')}
             >
               <AlignCenter className="h-4 w-4" />
             </Button>
@@ -570,7 +571,7 @@ export function TiptapEditor({
               size="sm"
               aria-label="Align right"
               onClick={() => editor.chain().focus().setTextAlign('right').run()}
-              className={cn('rounded-full', currentAlignment === 'right' && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', currentAlignment === 'right' && 'bg-background shadow-sm')}
             >
               <AlignRight className="h-4 w-4" />
             </Button>
@@ -580,15 +581,15 @@ export function TiptapEditor({
               size="sm"
               aria-label="Justify"
               onClick={() => editor.chain().focus().setTextAlign('justify').run()}
-              className={cn('rounded-full', currentAlignment === 'justify' && 'bg-muted')}
+              className={cn('h-7 rounded-sm transition-all duration-150', currentAlignment === 'justify' && 'bg-background shadow-sm')}
             >
               <AlignJustify className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className="hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
+          <div className="hidden h-5 w-px bg-border/50 sm:block" aria-hidden="true" />
 
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-0.5 rounded-md border border-border/50 bg-muted/50 p-0.5">
             <Button
               type="button"
               variant="ghost"
@@ -596,7 +597,7 @@ export function TiptapEditor({
               aria-label="Undo"
               onClick={() => editor.chain().focus().undo().run()}
               disabled={!editor.can().undo()}
-              className="rounded-full"
+              className="h-7 rounded-sm transition-all duration-150"
             >
               <Undo className="h-4 w-4" />
             </Button>
@@ -607,7 +608,7 @@ export function TiptapEditor({
               aria-label="Redo"
               onClick={() => editor.chain().focus().redo().run()}
               disabled={!editor.can().redo()}
-              className="rounded-full"
+              className="h-7 rounded-sm transition-all duration-150"
             >
               <Redo className="h-4 w-4" />
             </Button>
@@ -615,28 +616,8 @@ export function TiptapEditor({
         </div>
       )}
 
-      {showRuler && (
-        <div
-          className={cn(
-            'mx-auto hidden w-full items-center text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground sm:flex',
-            maxWidthClass
-          )}
-        >
-          <div className="flex w-full overflow-hidden rounded-full border border-dashed border-border/60 bg-muted/40 px-4 py-1">
-            {rulerMarks.map((mark) => (
-              <div
-                key={mark}
-                className="flex-1 border-l border-border/40 text-center first:border-0"
-              >
-                {mark}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className={pageOuterClass}>
-        <div className={cn('relative z-[1]', pageFrameClass)}>
+        <div className={cn('relative z-[1]', pageFrameClass)} style={paperTextureStyle}>
           <EditorContent editor={editor} />
         </div>
       </div>
@@ -657,7 +638,7 @@ export function TiptapEditor({
                 This document was modified in another session. Choose whether to keep your local edits or replace them with the latest saved version.
               </DialogDescription>
             </DialogHeader>
-            <div className="max-h-[300px] overflow-auto rounded-md border bg-muted/40 p-3 text-sm font-mono">
+            <div className="max-h-[300px] overflow-auto rounded-md border bg-muted/50 p-3 text-sm font-mono">
               <div className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Latest saved version</div>
               <div
                 className="prose prose-sm max-w-none text-foreground"

@@ -139,7 +139,7 @@ export function CommentTrigger({ documentId, onCommentCreate }: CommentTriggerPr
           </div>
 
           <div className="text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded">
-            <p className="text-gray-600 dark:text-gray-400 italic line-clamp-2">
+            <p className="text-gray-700 dark:text-gray-300 italic line-clamp-2">
               &ldquo;{selection.text}&rdquo;
             </p>
           </div>

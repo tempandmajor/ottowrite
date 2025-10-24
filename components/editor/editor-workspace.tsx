@@ -30,7 +30,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
-import { Switch } from '@/components/ui/switch'
 import {
   ArrowLeft,
   Save,
@@ -50,6 +49,7 @@ import {
   Maximize2,
   Command,
   Type,
+  Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
@@ -103,8 +103,8 @@ type RecentDocument = {
 // Loading fallback component
 const EditorLoadingFallback = () => (
   <div className="flex items-center justify-center h-full">
-    <div className="text-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4" />
+    <div className="flex flex-col items-center gap-3">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       <p className="text-sm text-muted-foreground">Loading editor...</p>
     </div>
   </div>
@@ -377,15 +377,15 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     reset: resetEditorState,
   } = useEditorStore()
   const isWorkspaceMode = workspaceMode
-  const [showAI, setShowAI] = useState(() => !isWorkspaceMode)
+  const [showAI, setShowAI] = useState(() => true)
   const [binderSidebarOpen, setBinderSidebarOpen] = useState(() => {
     if (typeof window !== 'undefined' && document?.project_id) {
       const saved = localStorage.getItem(`binder-sidebar-open-${document.project_id}`)
-      return saved !== null ? saved === 'true' : !isWorkspaceMode
+      return saved !== null ? saved === 'true' : true
     }
-    return !isWorkspaceMode
+    return true
   })
-  const [structureSidebarOpen, setStructureSidebarOpen] = useState(() => !isWorkspaceMode)
+  const [structureSidebarOpen, setStructureSidebarOpen] = useState(() => true)
   // const [binderWidth, setBinderWidth] = useState(280) // Reserved for future resize functionality
   const [leftRailWidth, setLeftRailWidth] = useState(320)
   const [rightRailWidth, setRightRailWidth] = useState(360)
@@ -405,11 +405,6 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     const stored = window.localStorage.getItem('editor:font-scale')
     return stored === 'sm' || stored === 'lg' ? (stored as 'sm' | 'lg') : 'md'
   })
-  const [showRuler, setShowRuler] = useState(() => {
-    if (typeof window === 'undefined') return true
-    const stored = window.localStorage.getItem('editor:show-ruler')
-    return stored === null ? true : stored === 'true'
-  })
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>([])
   const [recentsLoading, setRecentsLoading] = useState(false)
@@ -422,6 +417,13 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [screenplayStructure, setScreenplayStructure] = useState<ScreenplayAct[]>([])
+
+  // Detect platform for keyboard shortcuts
+  const isMac = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    return /Mac|iPhone|iPod|iPad/i.test(navigator.platform)
+  }, [])
+  const cmdKey = isMac ? 'Cmd' : 'Ctrl'
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -438,10 +440,6 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     window.localStorage.setItem('editor:font-scale', fontScale)
   }, [fontScale])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    window.localStorage.setItem('editor:show-ruler', showRuler ? 'true' : 'false')
-  }, [showRuler])
   const lastSceneFocusMissRef = useRef<string | null>(null)
   const tiptapApiRef = useRef<TiptapEditorApi | null>(null)
   const screenplayApiRef = useRef<ScreenplayEditorApi | null>(null)
@@ -741,7 +739,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
           }
           default:
         }
-      } else if (event.ctrlKey && key === 'k') {
+      } else if ((event.ctrlKey || event.metaKey) && key === 'k') {
         event.preventDefault()
         setCommandPaletteOpen(true)
       }
@@ -1533,7 +1531,10 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   if (loading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Loading document...</p>
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Loading document...</p>
+        </div>
       </div>
     )
   }
@@ -1560,7 +1561,6 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
           layoutMode={layoutMode}
           theme={editorTheme}
           fontScale={fontScale}
-          showRuler={showRuler && !focusMode}
           documentType={document.type}
           focusScene={activeSceneInfo}
           onAnchorsChange={handleAnchorsChange}
@@ -1616,7 +1616,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     return (
       <>
         <div className="flex min-h-screen flex-col bg-background">
-          <header className="sticky top-0 z-40 border-b bg-background">
+          <header className="sticky top-0 z-40 border-b border-border/30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
             <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center gap-4 px-4 sm:px-6 lg:px-8">
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" asChild>
@@ -1683,7 +1683,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                         <span className="sr-only">Command palette</span>
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Command palette (Ctrl+K)</TooltipContent>
+                    <TooltipContent>Command palette ({cmdKey}+K)</TooltipContent>
                   </Tooltip>
 
                   {/* Undo/Redo - High frequency */}
@@ -1872,7 +1872,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     >
                       <Command className="h-4 w-4" />
                       Command palette
-                      <span className="ml-auto text-xs text-muted-foreground">Ctrl+K</span>
+                      <span className="ml-auto text-xs text-muted-foreground">{cmdKey}+K</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={(event) => {
@@ -1963,7 +1963,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             </div>
           </header>
 
-          <main className="flex flex-1 overflow-hidden bg-muted/30">
+          <main className="flex flex-1 overflow-hidden bg-gradient-to-b from-muted/20 to-muted/40">
             <div className="flex h-full w-full overflow-hidden">
               {structureSidebarOpen && (
                 <>
@@ -2116,15 +2116,6 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                                   </Button>
                                 ))}
                               </div>
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Guides</p>
-                            <div className="flex items-center gap-3 rounded-full border border-border/60 bg-muted/30 px-3 py-2">
-                              <Switch id="editor-ruler" checked={showRuler} onCheckedChange={(checked) => setShowRuler(checked === true)} />
-                              <label htmlFor="editor-ruler" className="text-sm text-muted-foreground">
-                                Page ruler
-                              </label>
                             </div>
                           </div>
                         </div>
@@ -2281,6 +2272,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
               activeSceneId={activeSceneId}
               recentDocuments={recentDocuments}
               recentsLoading={recentsLoading}
+              cmdKey={cmdKey}
               onToggleOutline={() => {
                 setFocusMode(false)
                 setStructureSidebarOpen((prev) => !prev)
@@ -2395,8 +2387,8 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const showUtilitySidebar = !focusMode // Hide utility sidebar in focus mode
   
   return (
-    <div className="min-h-screen bg-muted/30">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+    <div className="min-h-screen bg-gradient-to-b from-muted/20 to-muted/40">
+      <header className="sticky top-0 z-30 border-b border-border/30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="mx-auto w-full max-w-[1600px] space-y-3 px-4 py-4 sm:px-6 xl:px-8">
           {/* Breadcrumbs */}
           {document.project_id && projectTitle && (
@@ -2856,7 +2848,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     </Suspense>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed bg-muted/40 p-4 text-sm text-muted-foreground">
+                  <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed bg-muted/50 p-4 text-sm text-muted-foreground">
                     <p>AI panel hidden. Reopen it to access brainstorming and rewriting tools.</p>
                     <Button variant="outline" size="sm" onClick={() => setShowAI(true)}>
                       <PanelRightOpen className="mr-2 h-4 w-4" />

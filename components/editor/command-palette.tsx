@@ -61,6 +61,7 @@ export type CommandPaletteProps = {
   activeSceneId: string | null
   recentDocuments: RecentDocument[]
   recentsLoading: boolean
+  cmdKey?: string
   onToggleOutline: () => void
   onToggleAI: () => void
   onToggleFocus: () => void
@@ -76,6 +77,7 @@ export function CommandPalette({
   activeSceneId,
   recentDocuments,
   recentsLoading,
+  cmdKey = 'Ctrl',
   onToggleOutline,
   onToggleAI,
   onToggleFocus,
@@ -96,7 +98,7 @@ export function CommandPalette({
         label: 'Toggle Outline Sidebar',
         description: 'Show or hide the chapter/scene outline',
         icon: <PanelLeftOpen className="h-4 w-4" />,
-        shortcut: 'Ctrl+Shift+O',
+        shortcut: `${cmdKey}+Shift+O`,
         action: 'toggle-outline',
         category: 'Panels',
       },
@@ -105,7 +107,7 @@ export function CommandPalette({
         label: 'Toggle AI Assistant',
         description: 'Show or hide the AI writing assistant',
         icon: <Sparkles className="h-4 w-4" />,
-        shortcut: 'Ctrl+Shift+A',
+        shortcut: `${cmdKey}+Shift+A`,
         action: 'toggle-ai',
         category: 'Panels',
       },
@@ -115,7 +117,7 @@ export function CommandPalette({
         label: 'Toggle Focus Mode',
         description: 'Enter distraction-free writing mode',
         icon: <Maximize2 className="h-4 w-4" />,
-        shortcut: 'Ctrl+Shift+F',
+        shortcut: `${cmdKey}+Shift+F`,
         action: 'toggle-focus',
         category: 'Navigation',
       },
@@ -125,7 +127,7 @@ export function CommandPalette({
         label: 'View Version History',
         description: 'Browse and restore previous versions',
         icon: <History className="h-4 w-4" />,
-        shortcut: 'Ctrl+Shift+H',
+        shortcut: `${cmdKey}+Shift+H`,
         action: 'version-history',
         category: 'Actions',
       },
@@ -140,7 +142,7 @@ export function CommandPalette({
     ]
 
     return commands
-  }, [])
+  }, [cmdKey])
 
   // Build scene navigation commands
   const sceneCommands = useMemo<CommandItem[]>(() => {

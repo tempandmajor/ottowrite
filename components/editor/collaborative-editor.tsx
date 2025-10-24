@@ -256,7 +256,7 @@ export function CollaborativeEditor({
           <div className="mt-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
             <div className="flex items-center gap-3">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600" />
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-gray-700 dark:text-gray-300">
                 Checking collaboration access...
               </span>
             </div>

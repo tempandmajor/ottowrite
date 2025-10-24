@@ -369,3 +369,30 @@ export async function hasCollaborationAccess(
 export function throwResponse(response: NextResponse): never {
   throw response
 }
+
+/**
+ * Handle API route errors properly
+ *
+ * Detects if error is already a NextResponse (thrown by auth helpers)
+ * and returns it directly. Otherwise returns null to let the route
+ * handle the error with its own error response.
+ *
+ * @example
+ * try {
+ *   const { user, supabase } = await requireAuth(request)
+ *   // ... route logic
+ * } catch (error) {
+ *   const authError = handleAuthError(error)
+ *   if (authError) return authError
+ *
+ *   // Handle other errors
+ *   return errorResponse('Something went wrong', { status: 500 })
+ * }
+ */
+export function handleAuthError(error: unknown): NextResponse | null {
+  // If error is already a NextResponse (from requireAuth, etc.), return it
+  if (error && typeof error === 'object' && 'status' in error && 'headers' in error) {
+    return error as NextResponse
+  }
+  return null
+}

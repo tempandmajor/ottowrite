@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
-import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireAuth, handleAuthError } from '@/lib/api/auth-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 import { projectQuerySchema } from '@/lib/validation/schemas/projects'
 import { detectSQLInjection } from '@/lib/security/sanitize'
@@ -265,6 +265,9 @@ export async function GET(request: NextRequest) {
       availableTags: availableTags ?? [],
     })
   } catch (error) {
+    const authError = handleAuthError(error)
+    if (authError) return authError
+
     logger.error('Project query failed', {
       operation: 'projects:query',
     }, error instanceof Error ? error : undefined)

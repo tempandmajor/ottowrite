@@ -7,13 +7,14 @@
  */
 
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { errorResponses } from '@/lib/api/error-response'
 import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export async function GET(request: Request) {
   try {
     const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     // Get unread count using RPC function
     const { data: count, error: countError } = await supabase.rpc(

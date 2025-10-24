@@ -2883,6 +2883,23 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
         )}
       </main>
 
+      {/* Floating AI Assistant Pill - appears when AI is hidden */}
+      {!showAI && !focusMode && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-right-5 fade-in duration-300">
+          <Button
+            onClick={() => {
+              setShowAI(true)
+              setWorkspacePreference('showUtilitySidebar', true)
+            }}
+            size="lg"
+            className="shadow-lg hover:shadow-xl transition-shadow"
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Open AI Assistant
+          </Button>
+        </div>
+      )}
+
       {showExportModal && (
         <Suspense fallback={null}>
           <ExportModal

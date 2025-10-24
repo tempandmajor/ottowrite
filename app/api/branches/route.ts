@@ -3,20 +3,17 @@
  * Handles creating, listing, and managing document branches
  */
 
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/branches?documentId={id} - List all branches for a document
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const { searchParams } = new URL(request.url)
     const documentId = searchParams.get('documentId')
@@ -59,12 +56,8 @@ export async function GET(request: Request) {
 // POST /api/branches - Create a new branch
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const body = await request.json()
     const { documentId, branchName, fromBranchId } = body
@@ -157,12 +150,8 @@ export async function POST(request: Request) {
 // DELETE /api/branches?branchId={id} - Delete a branch
 export async function DELETE(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const { searchParams } = new URL(request.url)
     const branchId = searchParams.get('branchId')

@@ -1,27 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-async function requireUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { supabase, user: null }
-  }
-  return { supabase, user }
-}
-
 export async function GET(request: NextRequest) {
   try {
-    const { supabase, user } = await requireUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
@@ -47,10 +34,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { supabase, user } = await requireUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const body = await request.json()
     const { project_id, title, description, beat_type, color, position } = body ?? {}
@@ -84,10 +69,8 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { supabase, user } = await requireUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const body = await request.json()
     const { id, ...updates } = body ?? {}
@@ -121,10 +104,8 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { supabase, user } = await requireUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

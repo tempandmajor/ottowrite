@@ -2,20 +2,17 @@
  * API endpoint for switching active branch
  */
 
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 export const dynamic = 'force-dynamic'
 
 // POST /api/branches/switch - Switch to a different branch
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const body = await request.json()
     const { branchId, documentId } = body

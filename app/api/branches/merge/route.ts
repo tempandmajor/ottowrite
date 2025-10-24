@@ -2,8 +2,9 @@
  * API endpoint for merging branches with conflict detection
  */
 
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { computeWordDiff, calculateDiffStats } from '@/lib/utils/text-diff'
 
 export const dynamic = 'force-dynamic'
@@ -52,12 +53,8 @@ function detectConflicts(sourceContent: any, targetContent: any) {
 // POST /api/branches/merge - Merge source branch into target branch
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const body = await request.json()
     const { sourceBranchId, targetBranchId, resolvedContent } = body
@@ -236,12 +233,8 @@ async function calculateWordCount(content: any): Promise<number> {
 // GET /api/branches/merge?documentId={id} - Get merge history for a document
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const { searchParams } = new URL(request.url)
     const documentId = searchParams.get('documentId')

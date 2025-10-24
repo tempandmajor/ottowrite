@@ -4,8 +4,43 @@ import { checkAuthThrottle } from './lib/security/auth-throttle'
 import { getOrGenerateRequestId, REQUEST_ID_HEADER } from './lib/request-id'
 import { applyRateLimit, addRateLimitHeaders } from './lib/security/api-rate-limiter'
 import { logRequest, startRequestTimer, shouldLogRequest } from './lib/middleware/request-logger'
-import { validateSession, generateSessionFingerprint } from './lib/security/session-manager'
+import {
+  validateSessionDetailed,
+  generateSessionFingerprint,
+  storeSessionMetadata,
+  updateSessionActivity,
+} from './lib/security/session-manager'
 import { generateCSRFToken, CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from './lib/security/csrf'
+
+/**
+ * CORS Configuration Helper (PROD-011)
+ * Checks if an origin is allowed to make requests to the API
+ */
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return false
+
+  const allowedOrigins = [
+    process.env.NEXT_PUBLIC_APP_URL,
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://localhost:3000',
+  ].filter((url): url is string => Boolean(url))
+
+  return allowedOrigins.some(allowed =>
+    allowed === origin || origin.endsWith(allowed.replace(/^https?:\/\//, ''))
+  )
+}
+
+/**
+ * Add CORS headers to response for API routes
+ */
+function addCORSHeaders(response: NextResponse, origin: string | null): void {
+  if (isOriginAllowed(origin) && origin) {
+    response.headers.set('Access-Control-Allow-Origin', origin)
+    response.headers.set('Access-Control-Allow-Credentials', 'true')
+    response.headers.set('Vary', 'Origin')
+  }
+}
 
 export async function middleware(request: NextRequest) {
   // Start request timer for logging
@@ -13,6 +48,29 @@ export async function middleware(request: NextRequest) {
 
   // Generate or extract request ID for tracing
   const requestId = getOrGenerateRequestId(request)
+
+  // ===== CORS Configuration (PROD-011) =====
+  // Handle CORS for API routes to allow legitimate requests while blocking unauthorized origins
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    const origin = request.headers.get('origin')
+
+    // Handle preflight OPTIONS requests
+    if (request.method === 'OPTIONS') {
+      const allowed = isOriginAllowed(origin)
+      return new NextResponse(null, {
+        status: 204, // No Content
+        headers: {
+          'Access-Control-Allow-Origin': allowed && origin ? origin : '',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-ID, X-CSRF-Token',
+          'Access-Control-Allow-Credentials': 'true',
+          'Access-Control-Max-Age': '86400', // 24 hours
+          'Vary': 'Origin',
+          [REQUEST_ID_HEADER]: requestId,
+        },
+      })
+    }
+  }
 
   // Apply authentication throttling to auth routes (legacy, now handled by API rate limiter)
   if (request.nextUrl.pathname.startsWith('/auth/')) {
@@ -133,14 +191,28 @@ export async function middleware(request: NextRequest) {
       })
       supabaseResponse.headers.set(CSRF_HEADER_NAME, csrfToken)
 
-      // Validate session fingerprint for security
+      // ✅ FIX (SEC-003): Validate and store session fingerprint for security
       const fingerprint = generateSessionFingerprint(request)
-      const isValidSession = await validateSession(user.id, fingerprint)
+      const validationResult = await validateSessionDetailed(user.id, fingerprint)
 
-      if (!isValidSession) {
-        console.warn(`Session validation failed for user ${user.id}`)
-        // Log suspicious activity but don't block yet - just warn
-        // In production, you might want to force re-authentication
+      if (!validationResult.valid) {
+        if (validationResult.needsStorage && validationResult.reason === 'no_fingerprint') {
+          // First-time session - store fingerprint for future validation
+          await storeSessionMetadata(user.id, request)
+          console.log(`Stored session fingerprint for user ${user.id}`)
+        } else {
+          // Suspicious activity - fingerprint mismatch or session expired
+          console.warn(`Session validation failed for user ${user.id}`, {
+            reason: validationResult.reason,
+            ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+            userAgent: request.headers.get('user-agent'),
+          })
+          // Log suspicious activity but don't block yet - just warn
+          // In production, you might want to force re-authentication for fingerprint_mismatch
+        }
+      } else {
+        // Valid session - update last_seen_at to track activity
+        await updateSessionActivity(user.id, fingerprint)
       }
     }
 
@@ -160,6 +232,11 @@ export async function middleware(request: NextRequest) {
     if (shouldLogRequest(request)) {
       logRequest(request, supabaseResponse, startTime)
     }
+  }
+
+  // Add CORS headers to API routes (PROD-011)
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    addCORSHeaders(supabaseResponse, request.headers.get('origin'))
   }
 
   return supabaseResponse

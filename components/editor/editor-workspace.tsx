@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useToast } from '@/hooks/use-toast'
 import { useAutosave } from '@/hooks/use-autosave'
 import { useDocumentSnapshots } from '@/hooks/use-document-snapshots'
@@ -51,6 +52,7 @@ import {
   Command,
   Type,
   Loader2,
+  Activity,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
@@ -381,6 +383,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const isWorkspaceMode = workspaceMode
   // Workspace layout state - defaults to collapsed for clean, focused writing experience
   const [showAI, setShowAI] = useState(() => getWorkspacePreference('showUtilitySidebar', false))
+  const [showAnalyticsDrawer, setShowAnalyticsDrawer] = useState(false)
   const [binderSidebarOpen, setBinderSidebarOpen] = useState(() =>
     getWorkspacePreference('showBinder', false)
   )
@@ -2138,18 +2141,6 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     <div className="relative">
                       {editorElement}
                     </div>
-                    {!focusMode && (
-                      <div className={cn('mx-auto w-full', editorMaxWidthClass, 'px-2 pb-6 sm:px-4')}>
-                        <StatusBar
-                          cursorPosition={editorStatus.cursorPosition}
-                          selection={editorStatus.selection}
-                          sessionWordCount={editorStatus.sessionWordCount}
-                          totalWordCount={wordCount}
-                          targetWordCount={metadata?.targetWordCount ?? undefined}
-                          readingTime={Math.max(1, Math.ceil(wordCount / 225))}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -2754,36 +2745,10 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             )}
           </div>
         )}
-        <div className="space-y-6">
-          <Card className="border-none bg-card/80 shadow-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                Writing cockpit
-              </CardTitle>
-              <CardDescription>
-                Stay aligned with your outline, track word count, and jump to plot analysis.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              <Badge variant="muted" className="capitalize">
-                {document.type}
-              </Badge>
-              <span className="h-4 w-px bg-border" aria-hidden />
-              <span>{wordCount.toLocaleString()} words</span>
-              <span className="h-4 w-px bg-border" aria-hidden />
-              <Button variant="link" className="p-0" asChild>
-                <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
-                  Open plot analysis
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <div className="overflow-hidden rounded-lg border bg-card shadow-card">
-            <div className="p-4 sm:p-6 lg:p-8">
-              {editorElement}
-            </div>
+        {/* Editor - immediately visible on load */}
+        <div className="overflow-hidden rounded-lg border bg-card shadow-card">
+          <div className="p-4 sm:p-6 lg:p-8">
+            {editorElement}
           </div>
         </div>
 
@@ -2882,6 +2847,85 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
           </div>
         )}
       </main>
+
+      {/* Sticky Bottom Status Bar */}
+      {!focusMode && (
+        <div className="sticky bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex items-center justify-between gap-4 px-4 py-1.5">
+            <StatusBar
+              cursorPosition={editorStatus.cursorPosition}
+              selection={editorStatus.selection}
+              sessionWordCount={editorStatus.sessionWordCount}
+              totalWordCount={wordCount}
+              targetWordCount={metadata?.targetWordCount ?? undefined}
+              readingTime={Math.max(1, Math.ceil(wordCount / 225))}
+              className="flex-1 border-none bg-transparent p-0"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAnalyticsDrawer(!showAnalyticsDrawer)}
+              className="shrink-0"
+            >
+              <Activity className="mr-2 h-4 w-4" />
+              Analytics
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Analytics Drawer - Bottom Sheet */}
+      <Sheet open={showAnalyticsDrawer} onOpenChange={setShowAnalyticsDrawer}>
+        <SheetContent side="bottom" className="h-[80vh] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Document Analytics</SheetTitle>
+            <SheetDescription>
+              Real-time metrics and insights for your document
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-6">
+            <InlineAnalyticsPanel
+              documentType={document.type}
+              contentHtml={isScriptType(document.type) ? '' : content}
+              structure={isScriptType(document.type) ? undefined : structure}
+              screenplayElements={isScriptType(document.type) ? screenplayContent : undefined}
+              wordCount={wordCount}
+            />
+            <Card className="border-none bg-card/80 shadow-card">
+              <CardHeader>
+                <CardTitle>Document Information</CardTitle>
+                <CardDescription>Basic document statistics</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Document Type</span>
+                  <Badge variant="muted" className="capitalize">
+                    {document.type}
+                  </Badge>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Words</span>
+                  <span className="font-medium">{wordCount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Reading Time</span>
+                  <span className="font-medium">
+                    {Math.max(1, Math.ceil(wordCount / 225))} min
+                  </span>
+                </div>
+                {metadata?.targetWordCount && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="font-medium">
+                      {Math.round((wordCount / metadata.targetWordCount) * 100)}%
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Floating AI Assistant Pill - appears when AI is hidden */}
       {!showAI && !focusMode && (

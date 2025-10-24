@@ -45,6 +45,27 @@ export const aiGenerateSchema = z.object({
 export type AIGenerateInput = z.infer<typeof aiGenerateSchema>
 
 /**
+ * Map simplified model names to full AI model identifiers
+ *
+ * The API accepts user-friendly names ('claude', 'gpt', 'deepseek') but the
+ * AI service requires full model identifiers.
+ *
+ * @param shortModel - Simplified model name from user input
+ * @returns Full AI model identifier, or null if not provided
+ */
+export function mapToAIModel(shortModel?: string): 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-chat' | null {
+  if (!shortModel) return null
+
+  const mapping: Record<string, 'claude-sonnet-4.5' | 'gpt-5' | 'deepseek-chat'> = {
+    'claude': 'claude-sonnet-4.5',
+    'gpt': 'gpt-5',
+    'deepseek': 'deepseek-chat',
+  }
+
+  return mapping[shortModel] || null
+}
+
+/**
  * Schema for AI template operations
  */
 export const aiTemplateSchema = z.object({

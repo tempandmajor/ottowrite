@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate document ownership - users can only comment on their own documents
-    if (!thread.document || thread.document.user_id !== user.id) {
+    const document = Array.isArray(thread.document) ? thread.document[0] : thread.document
+    if (!document || document.user_id !== user.id) {
       return NextResponse.json({
         error: 'Access denied. You can only comment on your own documents.'
       }, { status: 403 })

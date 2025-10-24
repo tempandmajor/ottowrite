@@ -32,7 +32,7 @@ const placeholderSchema = z.object({
   elementType: z.enum(['scene_heading', 'action', 'character', 'dialogue', 'transition']),
   context: placeholderContextSchema,
   useCache: z.boolean().optional(),
-  model: z.enum(['claude-opus-4', 'claude-sonnet-4.5', 'claude-haiku-4', 'gpt-5-turbo', 'gpt-4o', 'deepseek-chat', 'deepseek-reasoner']).optional(),
+  model: z.enum(['claude-sonnet-4.5', 'gpt-5', 'deepseek-chat']).optional(),
 });
 
 const placeholderAcceptanceSchema = z.object({

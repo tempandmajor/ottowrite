@@ -74,7 +74,7 @@ export async function PUT(request: Request) {
 
   if (!validation.success) {
     return errorResponses.validationError('Invalid template data', {
-      details: validation.error.errors,
+      details: validation.error.issues,
     })
   }
 

@@ -10,7 +10,8 @@ import { checkAIRateLimit, createAIRateLimitResponse } from '@/lib/security/ai-r
 import { routeAIRequest } from '@/lib/ai/router'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
 import { validateBody, validationErrorResponse } from '@/lib/validation/middleware'
-import { aiGenerateSchema, mapToAIModel } from '@/lib/validation/schemas'
+import { aiGenerateSchema } from '@/lib/validation/schemas'
+import { mapToAIModel } from '@/lib/validation/schemas/ai-generate'
 import { requireAuth } from '@/lib/api/auth-helpers'
 import { detectXSSPatterns, detectSQLInjection } from '@/lib/security/sanitize'
 import {
@@ -71,13 +72,15 @@ export async function POST(request: NextRequest) {
   let explicitContextTokens = 0
   let selectionTokensEstimate = 0
   let userId: string | null = null
+  let supabase: SupabaseClient | null = null
   const startedAt = Date.now()
   const timer = new PerformanceTimer('ai_generation', 'ai_generation')
 
   try {
     // Check authentication with proper error handling
     const authResult = await requireAuth(request)
-    const { user, supabase } = authResult
+    const { user, supabase: supabaseClient } = authResult
+    supabase = supabaseClient
     userId = user.id
 
     // Get user profile to check subscription and usage
@@ -470,7 +473,7 @@ export async function POST(request: NextRequest) {
       errorMessage: error instanceof Error ? error.message : String(error),
     })
 
-    if (classification && selectedModel && userId) {
+    if (classification && selectedModel && userId && supabase) {
       try {
         await supabase.from('ai_requests').insert({
           user_id: userId,

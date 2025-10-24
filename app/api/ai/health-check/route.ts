@@ -34,7 +34,7 @@ const healthCheckSchema = z.object({
     })).optional(),
     genre: z.string().max(100).optional(),
   }).optional(),
-  model: z.enum(['claude-opus-4', 'claude-sonnet-4.5', 'claude-haiku-4', 'gpt-5-turbo', 'gpt-4o', 'deepseek-chat', 'deepseek-reasoner']).optional(),
+  model: z.enum(['claude-sonnet-4.5', 'gpt-5', 'deepseek-chat']).optional(),
 });
 
 const patchHealthCheckSchema = z.object({

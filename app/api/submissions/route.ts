@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     const validation = createSubmissionSchema.safeParse(body)
     if (!validation.success) {
       return errorResponses.validationError('Invalid submission data', {
-        details: validation.error.errors,
+        details: validation.error.issues,
       })
     }
 

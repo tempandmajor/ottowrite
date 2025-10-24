@@ -1,24 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { TemplateDialog } from '@/components/dashboard/template-dialog'
-import { QuickActions } from '@/components/dashboard/quick-actions'
-import { StatCard } from '@/components/dashboard/stat-card'
-import { EmptyState } from '@/components/dashboard/empty-state'
 import { DashboardLoading } from '@/components/dashboard/loading-state'
 import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard'
-import { GettingStartedChecklist } from '@/components/dashboard/getting-started-checklist'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import { ArrowUpRight, FileText, PenSquare, Sparkles, HelpCircle } from 'lucide-react'
+import { NewUserDashboard } from '@/components/dashboard/new-user-dashboard'
+import { BeginnerDashboard } from '@/components/dashboard/beginner-dashboard'
+import { ExperiencedDashboard } from '@/components/dashboard/experienced-dashboard'
+import { getUserExperienceLevel, type ExperienceLevel } from '@/lib/dashboard/experience-level'
 
 interface Project {
   id: string
@@ -43,9 +32,9 @@ const DEFAULT_CHECKLIST: OnboardingChecklist = {
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
-  const [showTemplateDialog, setShowTemplateDialog] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [checklistProgress, setChecklistProgress] = useState<OnboardingChecklist | undefined>()
+  const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>('new')
   const [stats, setStats] = useState({
     projectCount: 0,
     documentCount: 0,
@@ -76,7 +65,7 @@ export default function DashboardPage() {
         return
       }
 
-      const [projectsResponse, documentsResponse, aiUsageResponse, profileResponse] = await Promise.all([
+      const [projectsResponse, documentsResponse, aiUsageResponse, profileResponse, authUserResponse] = await Promise.all([
         supabase
           .from('projects')
           .select('*', { count: 'exact' })
@@ -96,6 +85,7 @@ export default function DashboardPage() {
           .select('has_completed_onboarding, onboarding_checklist')
           .eq('id', user.id)
           .maybeSingle(),
+        supabase.auth.getUser(),
       ])
 
       if (projectsResponse.error) {
@@ -121,6 +111,15 @@ export default function DashboardPage() {
         totalWordsGenerated,
       })
       setProjects(projectsResponse.data ?? [])
+
+      // Determine experience level for progressive disclosure
+      if (authUserResponse.data?.user?.created_at) {
+        const level = getUserExperienceLevel({
+          projectCount,
+          accountCreatedAt: authUserResponse.data.user.created_at,
+        })
+        setExperienceLevel(level)
+      }
 
       // Check if user needs onboarding (gracefully handle missing columns)
       if (profileResponse.error) {
@@ -168,179 +167,31 @@ export default function DashboardPage() {
     loadDashboard()
   }
 
-  return (
-    <div className="space-y-12">
-      {/* Onboarding Wizard - shown for first-time users */}
-      <OnboardingWizard
-        open={showOnboarding}
-        onComplete={handleOnboardingComplete}
-      />
-
-      {/* Getting Started Checklist - shown until all tasks completed */}
-      {!showOnboarding && checklistProgress && (
-        <GettingStartedChecklist initialProgress={checklistProgress} />
-      )}
-
-      <section className="flex flex-col gap-6 rounded-2xl bg-gradient-to-br from-primary/10 via-background to-accent/5 p-10 shadow-lg md:flex-row md:items-center md:justify-between">
-        <div className="space-y-5">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
-            <Sparkles className="h-4 w-4" />
-            Workspace Overview
-          </div>
-          <div className="space-y-3">
-            <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-              Welcome back, storyteller.
-            </h1>
-            <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
-              Keep your narratives, characters, and outlines aligned. Here&apos;s what&apos;s happening across your workspace today.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Button size="lg" className="h-12 px-6 text-base font-semibold shadow-md" onClick={() => setShowTemplateDialog(true)}>
-              <PenSquare className="h-5 w-5 mr-2" />
-              New from Template
-            </Button>
-            <Button variant="outline" size="lg" className="h-12 px-6" asChild>
-              <Link href="/dashboard/projects">
-                View Projects
-                <ArrowUpRight className="h-4 w-4 ml-2" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-        <div className="flex flex-col gap-3 rounded-2xl border border-border/50 bg-card/50 p-5 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground/80">Recent milestones</p>
-          <ul className="space-y-2.5 text-sm text-muted-foreground">
-            <li className="flex items-center justify-between">
-              <span>Projects created</span>
-              <Badge variant="outline" className="text-xs text-primary">
-                {stats.projectCount}
-              </Badge>
-            </li>
-            <li className="flex items-center justify-between">
-              <span>Active documents</span>
-              <Badge variant="outline" className="text-xs">{stats.documentCount}</Badge>
-            </li>
-            <li className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                AI words generated
-                <TooltipProvider delayDuration={300}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="inline-flex text-muted-foreground/60 transition hover:text-muted-foreground"
-                        aria-label="Information about AI words generated"
-                      >
-                        <HelpCircle className="h-3 w-3" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs">
-                      <p className="text-xs">Total words generated by Ottowrite&apos;s AI assistant across all documents, including outlines, character descriptions, dialogue suggestions, and prose</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </span>
-              <Badge variant="outline" className="text-xs">{stats.totalWordsGenerated.toLocaleString()}</Badge>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <StatCard
-          label="Projects"
-          value={stats.projectCount}
-          helper="Across all genres"
-          icon={<PenSquare className="h-6 w-6" />}
-          delta={{ value: '+2 this month', positive: true }}
-          tone="primary"
-          priority="high"
-          tooltip="Total number of writing projects you've created across all genres (novels, screenplays, series, plays, and short stories)"
-        />
-        <StatCard
-          label="Documents"
-          value={stats.documentCount}
-          helper="Works in progress"
-          icon={<FileText className="h-5 w-5" />}
-          tone="secondary"
-          tooltip="Active documents across all your projects, including chapters, scenes, outlines, and character profiles"
-        />
-        <StatCard
-          label="AI words"
-          value={stats.totalWordsGenerated.toLocaleString()}
-          helper="Saved via Ottowrite"
-          icon={<Sparkles className="h-5 w-5" />}
-          tone="accent"
-          tooltip="Total words generated by Ottowrite's AI assistant across all documents, including outlines, character descriptions, dialogue suggestions, and prose"
-        />
-      </section>
-
-      <section className="space-y-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold">Recent projects</h2>
-            <p className="text-sm text-muted-foreground">
-              Resume where you left off or spin up something new.
-            </p>
-          </div>
-          <Button variant="ghost" asChild>
-            <Link href="/dashboard/projects" className="flex items-center gap-2 text-sm font-medium">
-              View all projects
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-        {projects.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {projects.map((project) => (
-              <div key={project.id} className="rounded-2xl border bg-card/80 p-6 shadow-card transition hover:shadow-lg">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-foreground">{project.name}</h3>
-                    <Badge variant="muted" className="capitalize">
-                      {project.type.replace('_', ' ')}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Last updated {new Date(project.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="mt-5 flex items-center gap-3">
-                  <Button asChild>
-                    <Link href={`/dashboard/projects/${project.id}`}>Open project</Link>
-                  </Button>
-                  <Button variant="outline" asChild>
-                    <Link href={`/dashboard/projects/${project.id}/characters`}>Characters</Link>
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            icon={PenSquare}
-            title="No projects yet"
-            description="Start your first project to unlock AI-assisted outlining, character management, and scene planning."
-            action={{ label: 'Create project', href: '/dashboard/projects?new=true' }}
-            secondaryAction={{ label: 'Browse templates', href: '/dashboard/projects' }}
+  // Render progressive dashboard based on experience level
+  const renderDashboard = () => {
+    switch (experienceLevel) {
+      case 'new':
+        return <NewUserDashboard />
+      case 'beginner':
+        return (
+          <BeginnerDashboard
+            projects={projects}
+            stats={stats}
+            checklistProgress={checklistProgress}
           />
-        )}
-      </section>
+        )
+      case 'experienced':
+        return <ExperiencedDashboard projects={projects} stats={stats} />
+    }
+  }
 
-      <section className="space-y-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold">Quick actions</h2>
-            <p className="text-sm text-muted-foreground">
-              Accelerate your writing workflow with these shortcuts.
-            </p>
-          </div>
-        </div>
-        <QuickActions />
-      </section>
+  return (
+    <>
+      {/* Onboarding Wizard - shown for first-time users */}
+      <OnboardingWizard open={showOnboarding} onComplete={handleOnboardingComplete} />
 
-      <TemplateDialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog} />
-    </div>
+      {/* Progressive Dashboard */}
+      {renderDashboard()}
+    </>
   )
 }

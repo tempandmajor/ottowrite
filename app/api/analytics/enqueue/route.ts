@@ -13,17 +13,9 @@ import type { AnalyticsJobInput, JobPriority } from '@/lib/analytics/worker-cont
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Get authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return errorResponses.unauthorized()
-    }
+    // Check authentication and rate limit
+    await requireDefaultRateLimit(req)
+    const { user, supabase } = await requireAuth(req)
 
     // Parse request body
     const body = await req.json()

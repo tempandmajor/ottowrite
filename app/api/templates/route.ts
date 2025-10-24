@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     const validation = createTemplateSchema.safeParse(body)
     if (!validation.success) {
       return errorResponses.validationError('Invalid template data', {
-        details: validation.error.errors,
+        details: validation.error.issues,
       })
     }
 

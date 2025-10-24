@@ -26,20 +26,9 @@ interface WizardSessionData {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      logger.warn('Unauthorized wizard session request', {
-        operation: 'wizard:create',
-      });
-      return errorResponses.unauthorized();
-    }
+    // Check authentication and rate limit
+    await requireDefaultRateLimit(request);
+    const { user, supabase } = await requireAuth(request);
 
     // Parse request body
     const body: WizardSessionData = await request.json();
@@ -132,17 +121,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return errorResponses.unauthorized();
-    }
+    // Check authentication and rate limit
+    await requireDefaultRateLimit(request);
+    const { user, supabase } = await requireAuth(request);
 
     // Get query parameters
     const { searchParams } = new URL(request.url);

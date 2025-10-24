@@ -1,18 +1,18 @@
 # API Security Audit Report
 
-**Date:** 2025-10-24T14:36:18.462Z
+**Date:** 2025-10-24T15:06:52.803Z
 **Routes Audited:** 116
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Total Issues | 116 |
+| Total Issues | 102 |
 | CRITICAL | 0 |
-| HIGH | 51 |
+| HIGH | 36 |
 | MEDIUM | 60 |
-| LOW | 5 |
-| Clean Routes | 27 |
+| LOW | 6 |
+| Clean Routes | 29 |
 
 ## Security Coverage
 
@@ -20,168 +20,36 @@
 |-----------------|--------|------------|
 | Authentication | 111/116 | 95.7% |
 | Input Validation | 17/116 | 14.7% |
-| Rate Limiting | 56/116 | 48.3% |
+| Rate Limiting | 73/116 | 62.9% |
 
 ## Top 20 High-Risk Routes
 
 | Route | Risk Score | Issues |
 |-------|------------|--------|
-| `/api/auth/sessions/[sessionId]` | 33 | HIGH, HIGH, LOW |
-| `/api/beat-sheets` | 30 | HIGH, HIGH |
-| `/api/v1/projects` | 30 | HIGH, HIGH |
-| `/api/templates/recent` | 30 | HIGH, HIGH |
-| `/api/story-beats/templates` | 30 | HIGH, HIGH |
-| `/api/collaboration/access` | 30 | HIGH, HIGH |
-| `/api/beat-sheets/[id]` | 30 | HIGH, HIGH |
-| `/api/admin/rate-limits` | 30 | HIGH, HIGH |
 | `/api/submissions/view/[token]` | 30 | HIGH, HIGH |
-| `/api/branches` | 22 | HIGH, MEDIUM |
-| `/api/beat-board` | 22 | HIGH, MEDIUM |
 | `/api/templates/wizard` | 22 | HIGH, MEDIUM |
 | `/api/research/search` | 22 | HIGH, MEDIUM |
 | `/api/notifications/mark-all-read` | 22 | HIGH, MEDIUM |
-| `/api/branches/switch` | 22 | HIGH, MEDIUM |
-| `/api/branches/merge` | 22 | HIGH, MEDIUM |
-| `/api/branches/commit` | 22 | HIGH, MEDIUM |
 | `/api/analytics/sessions` | 22 | HIGH, MEDIUM |
 | `/api/analytics/enqueue` | 22 | HIGH, MEDIUM |
+| `/api/projects/[projectId]/members` | 22 | HIGH, MEDIUM |
 | `/api/projects/[id]/apply-template` | 22 | HIGH, MEDIUM |
+| `/api/notifications/[notificationId]/read` | 22 | HIGH, MEDIUM |
+| `/api/templates/recent` | 18 | HIGH, LOW |
+| `/api/auth/sessions` | 18 | HIGH, LOW |
+| `/api/account/ai-telemetry` | 18 | HIGH, LOW |
+| `/api/auth/sessions/[sessionId]` | 18 | HIGH, LOW |
+| `/api/templates` | 15 | HIGH |
+| `/api/submissions` | 15 | HIGH |
+| `/api/health` | 15 | HIGH |
+| `/api/comments` | 15 | HIGH |
+| `/api/beat-sheets` | 15 | HIGH |
+| `/api/submissions/partners` | 15 | HIGH |
+| `/api/story-beats/templates` | 15 | HIGH |
 
 ## Detailed Findings
 
 ### HIGH Priority Issues
-
-#### /api/auth/sessions/[sessionId]
-
-- **File:** `./app/api/auth/sessions/[sessionId]/route.ts`
-- **Methods:** DELETE
-- **Risk Score:** 33/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[HIGH] Authorization**
-   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
-   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
-
-3. **[LOW] Error Handling**
-   - **Issue:** No try-catch blocks for error handling
-   - **Recommendation:** Add try-catch blocks to handle errors gracefully and prevent information leakage
-
-#### /api/beat-sheets
-
-- **File:** `./app/api/beat-sheets/route.ts`
-- **Methods:** GET
-- **Risk Score:** 30/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[HIGH] Authorization**
-   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
-   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
-
-#### /api/v1/projects
-
-- **File:** `./app/api/v1/projects/route.ts`
-- **Methods:** GET
-- **Risk Score:** 30/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[HIGH] Authorization**
-   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
-   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
-
-#### /api/templates/recent
-
-- **File:** `./app/api/templates/recent/route.ts`
-- **Methods:** GET
-- **Risk Score:** 30/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[HIGH] Authorization**
-   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
-   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
-
-#### /api/story-beats/templates
-
-- **File:** `./app/api/story-beats/templates/route.ts`
-- **Methods:** GET
-- **Risk Score:** 30/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[HIGH] Authorization**
-   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
-   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
-
-#### /api/collaboration/access
-
-- **File:** `./app/api/collaboration/access/route.ts`
-- **Methods:** GET
-- **Risk Score:** 30/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[HIGH] Authorization**
-   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
-   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
-
-#### /api/beat-sheets/[id]
-
-- **File:** `./app/api/beat-sheets/[id]/route.ts`
-- **Methods:** GET
-- **Risk Score:** 30/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[HIGH] Authorization**
-   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
-   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
-
-#### /api/admin/rate-limits
-
-- **File:** `./app/api/admin/rate-limits/route.ts`
-- **Methods:** GET
-- **Risk Score:** 30/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[HIGH] Authorization**
-   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
-   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
 
 #### /api/submissions/view/[token]
 
@@ -198,38 +66,6 @@
 2. **[HIGH] Authorization**
    - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
    - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
-
-#### /api/branches
-
-- **File:** `./app/api/branches/route.ts`
-- **Methods:** GET, POST, DELETE
-- **Risk Score:** 22/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[MEDIUM] Input Validation**
-   - **Issue:** Missing input validation with Zod
-   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
-
-#### /api/beat-board
-
-- **File:** `./app/api/beat-board/route.ts`
-- **Methods:** GET, POST, PATCH, DELETE
-- **Risk Score:** 22/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[MEDIUM] Input Validation**
-   - **Issue:** Missing input validation with Zod
-   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
 #### /api/templates/wizard
 
@@ -279,54 +115,6 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/branches/switch
-
-- **File:** `./app/api/branches/switch/route.ts`
-- **Methods:** POST
-- **Risk Score:** 22/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[MEDIUM] Input Validation**
-   - **Issue:** Missing input validation with Zod
-   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
-
-#### /api/branches/merge
-
-- **File:** `./app/api/branches/merge/route.ts`
-- **Methods:** GET, POST
-- **Risk Score:** 22/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[MEDIUM] Input Validation**
-   - **Issue:** Missing input validation with Zod
-   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
-
-#### /api/branches/commit
-
-- **File:** `./app/api/branches/commit/route.ts`
-- **Methods:** GET, POST
-- **Risk Score:** 22/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[MEDIUM] Input Validation**
-   - **Issue:** Missing input validation with Zod
-   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
-
 #### /api/analytics/sessions
 
 - **File:** `./app/api/analytics/sessions/route.ts`
@@ -359,22 +147,6 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/projects/[id]/apply-template
-
-- **File:** `./app/api/projects/[id]/apply-template/route.ts`
-- **Methods:** POST
-- **Risk Score:** 22/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
-2. **[MEDIUM] Input Validation**
-   - **Issue:** Missing input validation with Zod
-   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
-
 #### /api/projects/[projectId]/members
 
 - **File:** `./app/api/projects/[projectId]/members/route.ts`
@@ -386,6 +158,22 @@
 1. **[HIGH] Authorization**
    - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
    - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
+
+2. **[MEDIUM] Input Validation**
+   - **Issue:** Missing input validation with Zod
+   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
+
+#### /api/projects/[id]/apply-template
+
+- **File:** `./app/api/projects/[id]/apply-template/route.ts`
+- **Methods:** POST
+- **Risk Score:** 22/100
+
+**Issues:**
+
+1. **[HIGH] Authentication**
+   - **Issue:** Auth check present but error handling missing
+   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
 
 2. **[MEDIUM] Input Validation**
    - **Issue:** Missing input validation with Zod
@@ -406,6 +194,22 @@
 2. **[MEDIUM] Input Validation**
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
+
+#### /api/templates/recent
+
+- **File:** `./app/api/templates/recent/route.ts`
+- **Methods:** GET
+- **Risk Score:** 18/100
+
+**Issues:**
+
+1. **[HIGH] Authorization**
+   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
+   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
+
+2. **[LOW] Error Handling**
+   - **Issue:** Error handling present but may leak sensitive information
+   - **Recommendation:** Use `errorResponses.*` helpers to return safe error messages
 
 #### /api/auth/sessions
 
@@ -439,6 +243,22 @@
    - **Issue:** No try-catch blocks for error handling
    - **Recommendation:** Add try-catch blocks to handle errors gracefully and prevent information leakage
 
+#### /api/auth/sessions/[sessionId]
+
+- **File:** `./app/api/auth/sessions/[sessionId]/route.ts`
+- **Methods:** DELETE
+- **Risk Score:** 18/100
+
+**Issues:**
+
+1. **[HIGH] Authorization**
+   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
+   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
+
+2. **[LOW] Error Handling**
+   - **Issue:** No try-catch blocks for error handling
+   - **Recommendation:** Add try-catch blocks to handle errors gracefully and prevent information leakage
+
 #### /api/templates
 
 - **File:** `./app/api/templates/route.ts`
@@ -463,18 +283,6 @@
    - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
    - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
 
-#### /api/comments
-
-- **File:** `./app/api/comments/route.ts`
-- **Methods:** POST, PATCH, DELETE
-- **Risk Score:** 15/100
-
-**Issues:**
-
-1. **[HIGH] Authentication**
-   - **Issue:** Auth check present but error handling missing
-   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
-
 #### /api/health
 
 - **File:** `./app/api/health/route.ts`
@@ -487,9 +295,45 @@
    - **Issue:** Auth check present but error handling missing
    - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
 
+#### /api/comments
+
+- **File:** `./app/api/comments/route.ts`
+- **Methods:** POST, PATCH, DELETE
+- **Risk Score:** 15/100
+
+**Issues:**
+
+1. **[HIGH] Authentication**
+   - **Issue:** Auth check present but error handling missing
+   - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
+
+#### /api/beat-sheets
+
+- **File:** `./app/api/beat-sheets/route.ts`
+- **Methods:** GET
+- **Risk Score:** 15/100
+
+**Issues:**
+
+1. **[HIGH] Authorization**
+   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
+   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
+
 #### /api/submissions/partners
 
 - **File:** `./app/api/submissions/partners/route.ts`
+- **Methods:** GET
+- **Risk Score:** 15/100
+
+**Issues:**
+
+1. **[HIGH] Authorization**
+   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
+   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
+
+#### /api/story-beats/templates
+
+- **File:** `./app/api/story-beats/templates/route.ts`
 - **Methods:** GET
 - **Risk Score:** 15/100
 
@@ -547,6 +391,18 @@
    - **Issue:** Auth check present but error handling missing
    - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
 
+#### /api/collaboration/access
+
+- **File:** `./app/api/collaboration/access/route.ts`
+- **Methods:** GET
+- **Risk Score:** 15/100
+
+**Issues:**
+
+1. **[HIGH] Authorization**
+   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
+   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
+
 #### /api/beat-sheets/ai-populate
 
 - **File:** `./app/api/beat-sheets/ai-populate/route.ts`
@@ -558,6 +414,18 @@
 1. **[HIGH] Authentication**
    - **Issue:** Auth check present but error handling missing
    - **Recommendation:** Add `if (error || !user) { return errorResponses.unauthorized() }`
+
+#### /api/analytics/models
+
+- **File:** `./app/api/analytics/models/route.ts`
+- **Methods:** GET
+- **Risk Score:** 15/100
+
+**Issues:**
+
+1. **[HIGH] Authorization**
+   - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
+   - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
 
 #### /api/ai/templates
 
@@ -571,9 +439,9 @@
    - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
    - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
 
-#### /api/analytics/models
+#### /api/admin/rate-limits
 
-- **File:** `./app/api/analytics/models/route.ts`
+- **File:** `./app/api/admin/rate-limits/route.ts`
 - **Methods:** GET
 - **Risk Score:** 15/100
 
@@ -607,9 +475,9 @@
    - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
    - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
 
-#### /api/submissions/analytics/funnel
+#### /api/submissions/analytics/partners
 
-- **File:** `./app/api/submissions/analytics/funnel/route.ts`
+- **File:** `./app/api/submissions/analytics/partners/route.ts`
 - **Methods:** GET
 - **Risk Score:** 15/100
 
@@ -619,9 +487,9 @@
    - **Issue:** Potential IDOR vulnerability - missing user_id ownership check
    - **Recommendation:** Add `.eq('user_id', user.id)` to database queries to ensure users can only access their own data
 
-#### /api/submissions/analytics/partners
+#### /api/submissions/analytics/funnel
 
-- **File:** `./app/api/submissions/analytics/partners/route.ts`
+- **File:** `./app/api/submissions/analytics/funnel/route.ts`
 - **Methods:** GET
 - **Risk Score:** 15/100
 
@@ -773,6 +641,18 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
+#### /api/characters
+
+- **File:** `./app/api/characters/route.ts`
+- **Methods:** GET, POST, PATCH, DELETE
+- **Risk Score:** 7/100
+
+**Issues:**
+
+1. **[MEDIUM] Input Validation**
+   - **Issue:** Missing input validation with Zod
+   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
+
 #### /api/changes
 
 - **File:** `./app/api/changes/route.ts`
@@ -785,9 +665,21 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/characters
+#### /api/branches
 
-- **File:** `./app/api/characters/route.ts`
+- **File:** `./app/api/branches/route.ts`
+- **Methods:** GET, POST, DELETE
+- **Risk Score:** 7/100
+
+**Issues:**
+
+1. **[MEDIUM] Input Validation**
+   - **Issue:** Missing input validation with Zod
+   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
+
+#### /api/beat-board
+
+- **File:** `./app/api/beat-board/route.ts`
 - **Methods:** GET, POST, PATCH, DELETE
 - **Risk Score:** 7/100
 
@@ -809,9 +701,9 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/telemetry/autosave-failure
+#### /api/telemetry/ui
 
-- **File:** `./app/api/telemetry/autosave-failure/route.ts`
+- **File:** `./app/api/telemetry/ui/route.ts`
 - **Methods:** POST
 - **Risk Score:** 7/100
 
@@ -821,9 +713,9 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/telemetry/ui
+#### /api/telemetry/autosave-failure
 
-- **File:** `./app/api/telemetry/ui/route.ts`
+- **File:** `./app/api/telemetry/autosave-failure/route.ts`
 - **Methods:** POST
 - **Risk Score:** 7/100
 
@@ -849,6 +741,18 @@
 
 - **File:** `./app/api/submissions/generate-synopsis/route.ts`
 - **Methods:** POST
+- **Risk Score:** 7/100
+
+**Issues:**
+
+1. **[MEDIUM] Input Validation**
+   - **Issue:** Missing input validation with Zod
+   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
+
+#### /api/research/notes
+
+- **File:** `./app/api/research/notes/route.ts`
+- **Methods:** GET, POST, PATCH, DELETE
 - **Risk Score:** 7/100
 
 **Issues:**
@@ -905,9 +809,21 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/research/notes
+#### /api/notifications/preferences
 
-- **File:** `./app/api/research/notes/route.ts`
+- **File:** `./app/api/notifications/preferences/route.ts`
+- **Methods:** GET, PATCH
+- **Risk Score:** 7/100
+
+**Issues:**
+
+1. **[MEDIUM] Input Validation**
+   - **Issue:** Missing input validation with Zod
+   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
+
+#### /api/locations/events
+
+- **File:** `./app/api/locations/events/route.ts`
 - **Methods:** GET, POST, PATCH, DELETE
 - **Risk Score:** 7/100
 
@@ -929,18 +845,6 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/locations/events
-
-- **File:** `./app/api/locations/events/route.ts`
-- **Methods:** GET, POST, PATCH, DELETE
-- **Risk Score:** 7/100
-
-**Issues:**
-
-1. **[MEDIUM] Input Validation**
-   - **Issue:** Missing input validation with Zod
-   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
-
 #### /api/documents/duplicate
 
 - **File:** `./app/api/documents/duplicate/route.ts`
@@ -953,10 +857,10 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/notifications/preferences
+#### /api/checkout/customer-portal
 
-- **File:** `./app/api/notifications/preferences/route.ts`
-- **Methods:** GET, PATCH
+- **File:** `./app/api/checkout/customer-portal/route.ts`
+- **Methods:** POST
 - **Risk Score:** 7/100
 
 **Issues:**
@@ -968,18 +872,6 @@
 #### /api/checkout/create-session
 
 - **File:** `./app/api/checkout/create-session/route.ts`
-- **Methods:** POST
-- **Risk Score:** 7/100
-
-**Issues:**
-
-1. **[MEDIUM] Input Validation**
-   - **Issue:** Missing input validation with Zod
-   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
-
-#### /api/checkout/customer-portal
-
-- **File:** `./app/api/checkout/customer-portal/route.ts`
 - **Methods:** POST
 - **Risk Score:** 7/100
 
@@ -1013,10 +905,34 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/ai/generate-coverage
+#### /api/branches/switch
 
-- **File:** `./app/api/ai/generate-coverage/route.ts`
+- **File:** `./app/api/branches/switch/route.ts`
 - **Methods:** POST
+- **Risk Score:** 7/100
+
+**Issues:**
+
+1. **[MEDIUM] Input Validation**
+   - **Issue:** Missing input validation with Zod
+   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
+
+#### /api/branches/merge
+
+- **File:** `./app/api/branches/merge/route.ts`
+- **Methods:** GET, POST
+- **Risk Score:** 7/100
+
+**Issues:**
+
+1. **[MEDIUM] Input Validation**
+   - **Issue:** Missing input validation with Zod
+   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
+
+#### /api/branches/commit
+
+- **File:** `./app/api/branches/commit/route.ts`
+- **Methods:** GET, POST
 - **Risk Score:** 7/100
 
 **Issues:**
@@ -1029,6 +945,30 @@
 
 - **File:** `./app/api/analysis/dialogue-voice/route.ts`
 - **Methods:** GET, POST, DELETE
+- **Risk Score:** 7/100
+
+**Issues:**
+
+1. **[MEDIUM] Input Validation**
+   - **Issue:** Missing input validation with Zod
+   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
+
+#### /api/ai/generate-coverage
+
+- **File:** `./app/api/ai/generate-coverage/route.ts`
+- **Methods:** POST
+- **Risk Score:** 7/100
+
+**Issues:**
+
+1. **[MEDIUM] Input Validation**
+   - **Issue:** Missing input validation with Zod
+   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
+
+#### /api/webhooks/stripe/test
+
+- **File:** `./app/api/webhooks/stripe/test/route.ts`
+- **Methods:** GET, POST
 - **Risk Score:** 7/100
 
 **Issues:**
@@ -1061,18 +1001,6 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/webhooks/stripe/test
-
-- **File:** `./app/api/webhooks/stripe/test/route.ts`
-- **Methods:** GET, POST
-- **Risk Score:** 7/100
-
-**Issues:**
-
-1. **[MEDIUM] Input Validation**
-   - **Issue:** Missing input validation with Zod
-   - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
-
 #### /api/submissions/[submissionId]/submit
 
 - **File:** `./app/api/submissions/[submissionId]/submit/route.ts`
@@ -1097,10 +1025,10 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/ip-protection/alerts/[alertId]
+#### /api/ip-protection/dmca/requests
 
-- **File:** `./app/api/ip-protection/alerts/[alertId]/route.ts`
-- **Methods:** PATCH
+- **File:** `./app/api/ip-protection/dmca/requests/route.ts`
+- **Methods:** GET, POST
 - **Risk Score:** 7/100
 
 **Issues:**
@@ -1109,10 +1037,10 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/ip-protection/dmca/requests
+#### /api/ip-protection/alerts/[alertId]
 
-- **File:** `./app/api/ip-protection/dmca/requests/route.ts`
-- **Methods:** GET, POST
+- **File:** `./app/api/ip-protection/alerts/[alertId]/route.ts`
+- **Methods:** PATCH
 - **Risk Score:** 7/100
 
 **Issues:**
@@ -1133,9 +1061,9 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/ai/ensemble/feedback
+#### /api/documents/[id]/autosave
 
-- **File:** `./app/api/ai/ensemble/feedback/route.ts`
+- **File:** `./app/api/documents/[id]/autosave/route.ts`
 - **Methods:** POST
 - **Risk Score:** 7/100
 
@@ -1145,9 +1073,9 @@
    - **Issue:** Missing input validation with Zod
    - **Recommendation:** Add Zod schema validation for request body: `const validation = schema.safeParse(body)`
 
-#### /api/documents/[id]/autosave
+#### /api/ai/ensemble/feedback
 
-- **File:** `./app/api/documents/[id]/autosave/route.ts`
+- **File:** `./app/api/ai/ensemble/feedback/route.ts`
 - **Methods:** POST
 - **Risk Score:** 7/100
 
@@ -1210,7 +1138,7 @@
 ### Immediate Actions (Critical/High)
 
 1. Fix all CRITICAL issues immediately (0 found)
-2. Address all HIGH priority issues (51 found)
+2. Address all HIGH priority issues (36 found)
 3. Re-run security audit to verify fixes
 
 ### Short-term Improvements

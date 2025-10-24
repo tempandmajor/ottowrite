@@ -180,12 +180,39 @@ export async function storeSessionMetadata(
 }
 
 /**
+ * Detailed session validation result
+ */
+export interface SessionValidationResult {
+  valid: boolean
+  reason?: 'no_fingerprint' | 'fingerprint_mismatch' | 'session_expired' | 'session_inactive'
+  needsStorage?: boolean // True if this is a first-time session that needs fingerprint stored
+}
+
+/**
  * Validate session fingerprint against stored data
+ *
+ * Returns detailed validation result to distinguish between:
+ * - No fingerprint stored (first-time session)
+ * - Fingerprint mismatch (suspicious activity)
+ * - Session expired (old session)
+ *
+ * @deprecated Use validateSessionDetailed() instead for better error handling
  */
 export async function validateSession(
   userId: string,
   fingerprintHash: string
 ): Promise<boolean> {
+  const result = await validateSessionDetailed(userId, fingerprintHash)
+  return result.valid
+}
+
+/**
+ * Validate session fingerprint with detailed results
+ */
+export async function validateSessionDetailed(
+  userId: string,
+  fingerprintHash: string
+): Promise<SessionValidationResult> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -196,15 +223,68 @@ export async function validateSession(
     .eq('is_active', true)
     .single()
 
-  if (error || !data) {
-    return false
+  // No fingerprint stored - this is a first-time session
+  if (error?.code === 'PGRST116' || !data) {
+    return {
+      valid: false,
+      reason: 'no_fingerprint',
+      needsStorage: true,
+    }
+  }
+
+  // Other database errors
+  if (error) {
+    console.error('Error validating session:', error)
+    return {
+      valid: false,
+      reason: 'fingerprint_mismatch',
+    }
+  }
+
+  // Session is inactive
+  if (!data.is_active) {
+    return {
+      valid: false,
+      reason: 'session_inactive',
+    }
   }
 
   // Check if session is recent (within 14 days)
   const lastSeen = new Date(data.last_seen_at)
   const daysSinceLastSeen = (Date.now() - lastSeen.getTime()) / (1000 * 60 * 60 * 24)
 
-  return daysSinceLastSeen <= 14
+  if (daysSinceLastSeen > 14) {
+    return {
+      valid: false,
+      reason: 'session_expired',
+    }
+  }
+
+  // Session is valid
+  return {
+    valid: true,
+  }
+}
+
+/**
+ * Update the last_seen_at timestamp for an active session
+ */
+export async function updateSessionActivity(
+  userId: string,
+  fingerprintHash: string
+): Promise<void> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('session_fingerprints')
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('fingerprint_hash', fingerprintHash)
+    .eq('is_active', true)
+
+  if (error) {
+    console.error('Error updating session activity:', error)
+  }
 }
 
 /**

@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { rateLimit, getClientIdentifier, RateLimitConfig } from './rate-limiter'
+import { rateLimit, getRateLimitStatus, getClientIdentifier, RateLimitConfig } from './rate-limiter'
 import { logger } from '../monitoring/structured-logger'
 
 /**
@@ -157,6 +157,9 @@ export async function applyRateLimit(
 /**
  * Add rate limit headers to a response
  * These headers inform clients about their rate limit status
+ *
+ * IMPORTANT: Uses getRateLimitStatus() which is read-only and does NOT consume tokens.
+ * This prevents the double-decrement bug where every request consumed 2 tokens.
  */
 export function addRateLimitHeaders(
   response: NextResponse,
@@ -170,10 +173,11 @@ export function addRateLimitHeaders(
   }
 
   const identifier = getClientIdentifier(request, userId)
-  const result = rateLimit(identifier, config)
+  // ✅ FIX: Use read-only status check - does NOT consume tokens
+  const status = getRateLimitStatus(identifier, config)
 
-  // Add rate limit headers
-  const headers = createRateLimitHeaders(result, config)
+  // Add rate limit headers with current status
+  const headers = createRateLimitHeaders(status, config)
   Object.entries(headers).forEach(([key, value]) => {
     response.headers.set(key, value)
   })
@@ -211,18 +215,5 @@ function parseRequest(request: NextRequest): { pathname: string; method: string 
   }
 }
 
-/**
- * Get rate limit status for a user (useful for displaying in UI)
- */
-export function getRateLimitStatus(
-  identifier: string,
-  config: RateLimitConfig
-): { limit: number; remaining: number; resetAt: number } {
-  const result = rateLimit(identifier, config)
-
-  return {
-    limit: config.max,
-    remaining: Math.max(0, result.remaining),
-    resetAt: result.resetAt,
-  }
-}
+// getRateLimitStatus is imported from rate-limiter.ts and re-exported
+// No need to redefine it here - use the imported version which is read-only

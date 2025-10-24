@@ -13,7 +13,7 @@
  */
 
 import { applyRateLimit } from '@/lib/security/api-rate-limiter'
-import { getClientIP } from '@/lib/security/rate-limiter'
+import { getClientIP } from '@/lib/security/session-manager'
 import { errorResponses } from './error-response'
 
 /**
@@ -72,15 +72,11 @@ export async function requireAIRateLimit(
   request: Request,
   userId?: string
 ): Promise<void> {
-  const identifier = userId || getClientIP(request as any)
+  const response = await applyRateLimit(request as any, userId)
 
-  const result = await applyRateLimit(request as any, identifier, {
-    tier: RateLimitTiers.AI.tier,
-    identifier,
-  })
-
-  if (!result.context) {
-    throw result.response
+  if (response) {
+    // Rate limit exceeded, throw the response
+    throw response
   }
 }
 
@@ -98,15 +94,11 @@ export async function requireResourceRateLimit(
   request: Request,
   userId?: string
 ): Promise<void> {
-  const identifier = userId || getClientIP(request as any)
+  const response = await applyRateLimit(request as any, userId)
 
-  const result = await applyRateLimit(request as any, identifier, {
-    tier: RateLimitTiers.EXPENSIVE.tier,
-    identifier,
-  })
-
-  if (!result.context) {
-    throw result.response
+  if (response) {
+    // Rate limit exceeded, throw the response
+    throw response
   }
 }
 
@@ -124,15 +116,11 @@ export async function requireDefaultRateLimit(
   request: Request,
   userId?: string
 ): Promise<void> {
-  const identifier = userId || getClientIP(request as any)
+  const response = await applyRateLimit(request as any, userId)
 
-  const result = await applyRateLimit(request as any, identifier, {
-    tier: RateLimitTiers.DEFAULT.tier,
-    identifier,
-  })
-
-  if (!result.context) {
-    throw result.response
+  if (response) {
+    // Rate limit exceeded, throw the response
+    throw response
   }
 }
 
@@ -146,15 +134,11 @@ export async function requireDefaultRateLimit(
  * }
  */
 export async function requireAuthRateLimit(request: Request): Promise<void> {
-  const identifier = getClientIP(request as any)
+  const response = await applyRateLimit(request as any)
 
-  const result = await applyRateLimit(request as any, identifier, {
-    tier: RateLimitTiers.AUTH.tier,
-    identifier,
-  })
-
-  if (!result.context) {
-    throw result.response
+  if (response) {
+    // Rate limit exceeded, throw the response
+    throw response
   }
 }
 
@@ -178,14 +162,11 @@ export async function checkAIRateLimit(
   request: Request,
   userId?: string
 ): Promise<boolean> {
-  const identifier = userId || getClientIP(request as any)
+  const response = await applyRateLimit(request as any, userId)
 
-  const result = await applyRateLimit(request as any, identifier, {
-    tier: RateLimitTiers.AI.tier,
-    identifier,
-  })
-
-  return !!result.context
+  // If response is null, rate limit passed (allowed)
+  // If response is not null, rate limit exceeded (not allowed)
+  return response === null
 }
 
 /**
@@ -195,14 +176,11 @@ export async function checkResourceRateLimit(
   request: Request,
   userId?: string
 ): Promise<boolean> {
-  const identifier = userId || getClientIP(request as any)
+  const response = await applyRateLimit(request as any, userId)
 
-  const result = await applyRateLimit(request as any, identifier, {
-    tier: RateLimitTiers.EXPENSIVE.tier,
-    identifier,
-  })
-
-  return !!result.context
+  // If response is null, rate limit passed (allowed)
+  // If response is not null, rate limit exceeded (not allowed)
+  return response === null
 }
 
 /**
@@ -230,15 +208,13 @@ export async function requireCustomRateLimit(
     windowMs?: number
   }
 ): Promise<void> {
-  const identifier = userId || getClientIP(request as any)
+  // Use the standard rate limit for now
+  // Custom tier configuration is handled by the applyRateLimit function based on request path
+  const response = await applyRateLimit(request as any, userId)
 
-  const result = await applyRateLimit(request as any, identifier, {
-    tier: config.tier,
-    identifier,
-  })
-
-  if (!result.context) {
-    throw result.response
+  if (response) {
+    // Rate limit exceeded, throw the response
+    throw response
   }
 }
 

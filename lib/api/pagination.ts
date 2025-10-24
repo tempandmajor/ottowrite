@@ -18,10 +18,13 @@ export const MAX_PAGE_LIMIT = 100
 
 /**
  * Pagination query schema for validating query parameters
+ *
+ * Note: Cursor validation is relaxed to support different cursor types (UUID, timestamp, string).
+ * Specific validation happens in validateCursorByType() based on endpoint requirements.
  */
 export const paginationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_LIMIT).optional().default(DEFAULT_PAGE_LIMIT),
-  cursor: z.string().uuid().optional(),
+  cursor: z.string().min(1).optional(), // ✅ FIX: Accept any non-empty string, validate later
 })
 
 /**
@@ -147,18 +150,76 @@ export function applyCursorPagination(
 }
 
 /**
- * Validate and normalize cursor parameter
- * Prevents injection attacks and ensures cursor is valid UUID
+ * Cursor type options for different pagination scenarios
  */
-export function validateCursor(cursor: string | null): string | undefined {
+export type CursorType = 'uuid' | 'timestamp' | 'string'
+
+/**
+ * Validate cursor by type
+ *
+ * Supports different cursor formats based on what the endpoint uses:
+ * - 'uuid': For ID-based pagination (e.g., primary keys)
+ * - 'timestamp': For time-based pagination (e.g., created_at, updated_at)
+ * - 'string': For text-based pagination (e.g., names, slugs)
+ *
+ * @param cursor - The cursor value to validate
+ * @param type - The expected cursor type
+ * @returns The validated cursor, or undefined if null/empty
+ * @throws Error if cursor format is invalid for the specified type
+ */
+export function validateCursorByType(
+  cursor: string | null | undefined,
+  type: CursorType = 'uuid'
+): string | undefined {
   if (!cursor) return undefined
 
-  // Basic UUID format validation
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  switch (type) {
+    case 'uuid': {
+      // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(cursor)) {
+        throw new Error('Invalid UUID cursor format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')
+      }
+      return cursor
+    }
 
-  if (!uuidRegex.test(cursor)) {
-    throw new Error('Invalid cursor format')
+    case 'timestamp': {
+      // ISO 8601 timestamp format (supports various valid formats)
+      const date = new Date(cursor)
+      if (isNaN(date.getTime())) {
+        throw new Error('Invalid timestamp cursor format. Expected ISO 8601 format (e.g., 2025-01-24T10:30:00.000Z)')
+      }
+      // Return normalized ISO string for consistent comparisons
+      return date.toISOString()
+    }
+
+    case 'string': {
+      // String cursors: allow any non-empty string, sanitize for SQL safety
+      const sanitized = cursor.trim()
+      if (sanitized.length === 0) {
+        throw new Error('Invalid string cursor: cannot be empty or whitespace-only')
+      }
+      // Basic SQL injection prevention (Supabase uses parameterized queries, but extra safety)
+      if (sanitized.includes(';') || sanitized.includes('--') || sanitized.includes('/*')) {
+        throw new Error('Invalid string cursor: contains potentially unsafe characters')
+      }
+      return sanitized
+    }
+
+    default: {
+      throw new Error(`Unsupported cursor type: ${type}`)
+    }
   }
+}
 
-  return cursor
+/**
+ * @deprecated Use validateCursorByType() instead
+ * Validate and normalize cursor parameter
+ * Prevents injection attacks and ensures cursor is valid UUID
+ *
+ * This function is deprecated in favor of validateCursorByType() which supports
+ * multiple cursor types (UUID, timestamp, string).
+ */
+export function validateCursor(cursor: string | null): string | undefined {
+  return validateCursorByType(cursor, 'uuid')
 }

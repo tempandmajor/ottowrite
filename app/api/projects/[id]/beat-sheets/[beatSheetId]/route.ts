@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 // Validation schema for PATCH
 const updateBeatSheetSchema = z.object({
-  beat_data: z.record(z.any()).optional(),
+  beat_data: z.record(z.string(), z.any()).optional(),
   completed_beats: z.number().int().min(0).optional(),
 });
 

@@ -1,10 +1,20 @@
 import { z } from 'zod'
 import { commonValidators, VALIDATION_LIMITS } from '../middleware'
+import type { DocumentType } from '@/lib/document-types'
+import { DOCUMENT_TYPE_METADATA } from '@/lib/document-types'
 
 /**
  * Validation schemas for project operations
  * Protects against SQL injection in query endpoint
+ *
+ * IMPORTANT: Document types are imported from lib/document-types.ts
+ * to ensure validation stays in sync with database constraints.
  */
+
+/**
+ * Get all valid document types as a tuple for Zod enum
+ */
+const ALL_DOCUMENT_TYPES = Object.keys(DOCUMENT_TYPE_METADATA) as [DocumentType, ...DocumentType[]]
 
 export const projectQuerySchema = z.object({
   /** Search query (sanitized to prevent SQL injection) */
@@ -19,18 +29,8 @@ export const projectQuerySchema = z.object({
     .max(20)
     .optional(),
 
-  /** Type filter */
-  type: z
-    .enum([
-      'screenplay',
-      'novel',
-      'short_story',
-      'tv_series',
-      'stage_play',
-      'podcast',
-      'other',
-    ])
-    .optional(),
+  /** Type filter (accepts all 28 document types from lib/document-types.ts) */
+  type: z.enum(ALL_DOCUMENT_TYPES).optional(),
 
   /** Genre filter */
   genre: z.string().max(100).optional(),
@@ -64,24 +64,22 @@ export const projectCreateSchema = z.object({
   /** Project title */
   title: commonValidators.nonEmptyString(VALIDATION_LIMITS.MAX_SHORT_TEXT),
 
-  /** Project type */
-  type: z.enum([
-    'screenplay',
-    'novel',
-    'short_story',
-    'tv_series',
-    'stage_play',
-    'podcast',
-    'other',
-  ]),
+  /** Project type (accepts all 28 document types from lib/document-types.ts) */
+  type: z.enum(ALL_DOCUMENT_TYPES),
 
   /** Project description */
   description: commonValidators.optionalString(VALIDATION_LIMITS.MAX_MEDIUM_TEXT),
 
-  /** Genre */
-  genre: commonValidators.optionalString(200),
+  /** Genre (accepts string or array, normalizes to array for database) */
+  genre: z
+    .union([
+      z.string().min(1).max(200),
+      z.array(z.string().min(1).max(50)).max(10),
+    ])
+    .optional()
+    .nullable(),
 
-  /** Genre tags (array) */
+  /** Genre tags (array) - deprecated, use genre field */
   genreTags: z
     .array(z.string().max(50))
     .max(10)
@@ -123,13 +121,22 @@ export const projectUpdateSchema = z.object({
   /** Updated title */
   title: commonValidators.optionalString(VALIDATION_LIMITS.MAX_SHORT_TEXT),
 
+  /** Updated type */
+  type: z.enum(ALL_DOCUMENT_TYPES).optional(),
+
   /** Updated description */
   description: commonValidators.optionalString(VALIDATION_LIMITS.MAX_MEDIUM_TEXT),
 
-  /** Updated genre */
-  genre: commonValidators.optionalString(200),
+  /** Updated genre (accepts string or array, normalizes to array for database) */
+  genre: z
+    .union([
+      z.string().min(1).max(200),
+      z.array(z.string().min(1).max(50)).max(10),
+    ])
+    .optional()
+    .nullable(),
 
-  /** Updated genre tags */
+  /** Updated genre tags - deprecated, use genre field */
   genreTags: z.array(z.string().max(50)).max(10).optional(),
 
   /** Updated logline */

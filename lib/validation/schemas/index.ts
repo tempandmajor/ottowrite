@@ -7,6 +7,7 @@
 
 // AI validation schemas
 export * from './ai-generate'
+export { mapToAIModel } from './ai-generate'
 
 // Document validation schemas
 export * from './documents'

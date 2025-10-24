@@ -24,7 +24,7 @@ const autoTagSchema = z.object({
   content: z.string().min(1).max(100000),
   logline: z.string().max(1000).optional(),
   regenerate: z.boolean().optional(),
-  model: z.enum(['claude-opus-4', 'claude-sonnet-4.5', 'claude-haiku-4', 'gpt-5-turbo', 'gpt-4o', 'deepseek-chat', 'deepseek-reasoner']).optional(),
+  model: z.enum(['claude-sonnet-4.5', 'gpt-5', 'deepseek-chat']).optional(),
 });
 
 const patchTagSchema = z.object({

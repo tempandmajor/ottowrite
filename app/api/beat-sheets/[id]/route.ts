@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { errorResponses, successResponse } from '@/lib/api/error-response';
+import { requireAuth } from '@/lib/api/auth-helpers';
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers';
 import { logger } from '@/lib/monitoring/structured-logger';
 
 export const dynamic = 'force-dynamic';
@@ -21,18 +23,23 @@ export async function GET(
   { params }: RouteParams
 ) {
   try {
-    const supabase = await createClient();
+    const { user, supabase } = await requireAuth(request);
+    await requireDefaultRateLimit(request, user.id);
+
     const { id } = await params;
 
+    // Add ownership check to prevent IDOR
     const { data, error } = await supabase
       .from('beat_sheets')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single();
 
     if (error) {
       logger.error('Beat sheet fetch error', {
         beat_sheet_id: id,
+        user_id: user.id,
         operation: 'beat-sheets:fetch-single'
       }, error);
       return errorResponses.notFound('Beat sheet not found');

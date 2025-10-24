@@ -123,6 +123,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .from('projects')
       .select('id, user_id')
       .eq('id', projectId)
+      .eq('user_id', user.id)
       .single()
 
     if (projectError || !project) {

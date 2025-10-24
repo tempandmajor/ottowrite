@@ -5,24 +5,19 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 
 /**
  * DELETE /api/auth/sessions/[sessionId]
  * Invalidate a specific session
  */
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ sessionId: string }> }
 ) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const { user, supabase } = await requireAuth(request)
+  await requireDefaultRateLimit(request, user.id)
 
   const { sessionId } = await context.params
 

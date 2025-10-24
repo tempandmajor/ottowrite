@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { errorResponses, successResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'
@@ -8,7 +9,8 @@ export const dynamic = 'force-dynamic'
 // GET - List available beat templates
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const { user, supabase } = await requireAuth(request)
+    await requireDefaultRateLimit(request, user.id)
 
     const { searchParams } = new URL(request.url)
     const suitableFor = searchParams.get('suitable_for')

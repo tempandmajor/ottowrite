@@ -4,6 +4,8 @@ import { searchWeb, extractCitations } from '@/lib/search/search-service'
 import { formatSearchResultsForAI } from '@/lib/search/brave-search'
 import { generateWithAI } from '@/lib/ai/service'
 import { errorResponses, successResponse, errorResponse } from '@/lib/api/error-response'
+import { requireAuth } from '@/lib/api/auth-helpers'
+import { requireDefaultRateLimit } from '@/lib/api/rate-limit-helpers'
 import { logger } from '@/lib/monitoring/structured-logger'
 
 export const dynamic = 'force-dynamic'

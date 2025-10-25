@@ -166,10 +166,13 @@ The linter checks for:
 - Hardcoded UUIDs
 - RLS policy presence
 - File size (warns if >200 lines)
+- **Index naming conventions** (must use `idx_` prefix)
 
 ### Full Documentation
 
-For comprehensive migration guidelines, see: [Database Migration Guidelines](docs/database/migration-guidelines.md)
+For comprehensive migration guidelines, see:
+- **[Database Migration Guidelines](docs/database/migration-guidelines.md)** - Best practices for migrations
+- **[Naming Conventions](docs/database/naming-conventions.md)** - Standards for database objects
 
 ---
 

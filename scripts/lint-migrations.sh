@@ -275,6 +275,25 @@ check_naming_conventions() {
   if echo "$filename" | grep -qiE "_update|_fix|_misc|_temp|_test"; then
     print_warning "$file" "Filename is not descriptive - use specific action/target"
   fi
+
+  # Check index naming convention: idx_{table}_{columns}
+  # Find CREATE INDEX statements and check if they follow the pattern
+  local bad_indexes=$(grep -i "CREATE INDEX" "$file" | grep -v "^--" | grep -v "idx_" | grep -v "CONCURRENTLY")
+  if [ -n "$bad_indexes" ]; then
+    print_warning "$file" "Index names should follow pattern: idx_{table}_{columns}"
+    echo "$bad_indexes" | while read -r line; do
+      echo "    Found: $line"
+    done
+  fi
+
+  # Warn about suffix-style index names (legacy pattern)
+  local suffix_indexes=$(grep -iE "CREATE INDEX[^;]*_idx\s+(ON|CONCURRENTLY)" "$file" | grep -v "^--")
+  if [ -n "$suffix_indexes" ]; then
+    print_warning "$file" "Found legacy suffix-style index names (*_idx) - prefer idx_* prefix"
+    echo "$suffix_indexes" | while read -r line; do
+      echo "    Legacy: $line"
+    done
+  fi
 }
 
 # ============================================================================

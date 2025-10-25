@@ -1143,13 +1143,13 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
       if (typedData.project_id) {
         const { data: projectData, error: projectError } = await supabase
           .from('projects')
-          .select('title')
+          .select('name')
           .eq('id', typedData.project_id)
           .eq('user_id', user.id)
           .maybeSingle()
 
-        if (!projectError && projectData?.title) {
-          resolvedProjectTitle = projectData.title
+        if (!projectError && projectData?.name) {
+          resolvedProjectTitle = projectData.name
         }
       }
       setProjectTitle(resolvedProjectTitle)
@@ -2190,115 +2190,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
               <div className="flex-1 min-w-0 overflow-hidden">
                 <div className="h-full overflow-auto">
                   <div className="mx-auto flex max-w-[1300px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
-                    {!focusMode && (
-                      <div className="rounded-lg border bg-background px-6 py-6 shadow-sm">
-                        <div className="flex flex-wrap items-center justify-between gap-4">
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                            <Badge variant="muted" className="capitalize">
-                              {document.type}
-                            </Badge>
-                            <span className="hidden h-4 w-px bg-border sm:inline-flex" aria-hidden />
-                            <span>{wordCount.toLocaleString()} words</span>
-                            {wordProgress !== null && (
-                              <>
-                                <span className="hidden h-4 w-px bg-border sm:inline-flex" aria-hidden />
-                                <span>{wordProgress}% of target</span>
-                              </>
-                            )}
-                          </div>
-                          <Button variant="ghost" size="sm" className="gap-2" asChild>
-                            <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
-                              <Sparkles className="h-4 w-4" />
-                              Plot analysis
-                            </Link>
-                          </Button>
-                        </div>
-                        <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Layout</p>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={layoutMode === 'page' ? 'default' : 'outline'}
-                                className="gap-2 rounded-full"
-                                onClick={() => setLayoutMode('page')}
-                              >
-                                <FileText className="h-4 w-4" />
-                                Page
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={layoutMode === 'wide' ? 'default' : 'outline'}
-                                className="gap-2 rounded-full"
-                                onClick={() => setLayoutMode('wide')}
-                              >
-                                <Maximize2 className="h-4 w-4" />
-                                Wide
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={layoutMode === 'typewriter' ? 'default' : 'outline'}
-                                className="gap-2 rounded-full"
-                                onClick={() => setLayoutMode('typewriter')}
-                              >
-                                <Type className="h-4 w-4" />
-                                Typewriter
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Typography</p>
-                            <div className="flex flex-wrap items-center gap-4">
-                              <div className="flex gap-2">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant={editorTheme === 'serif' ? 'default' : 'outline'}
-                                  className="rounded-full"
-                                  onClick={() => setEditorTheme('serif')}
-                                >
-                                  Serif
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant={editorTheme === 'sans' ? 'default' : 'outline'}
-                                  className="rounded-full"
-                                  onClick={() => setEditorTheme('sans')}
-                                >
-                                  Sans
-                                </Button>
-                              </div>
-                              <div className="flex items-center gap-2 rounded-full border bg-muted px-2 py-1">
-                                {(['sm', 'md', 'lg'] as const).map((scale) => (
-                                  <Button
-                                    key={scale}
-                                    type="button"
-                                    size="sm"
-                                    variant={fontScale === scale ? 'default' : 'ghost'}
-                                    className={cn(
-                                      'h-8 w-8 rounded-full p-0 transition-all',
-                                      scale === 'sm' && 'text-xs',
-                                      scale === 'md' && 'text-sm',
-                                      scale === 'lg' && 'text-base'
-                                    )}
-                                    onClick={() => setFontScale(scale)}
-                                  >
-                                    Aa
-                                  </Button>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="relative">
-                      {editorElement}
-                    </div>
+                    <div className="relative">{editorElement}</div>
                   </div>
                 </div>
               </div>

@@ -7,7 +7,15 @@ import { type TiptapEditorApi } from '@/components/editor/tiptap-editor'
 import { type ScreenplayEditorApi, type ScreenplayElement } from '@/components/editor/screenplay-editor'
 import type { Chapter } from '@/components/editor/chapter-sidebar'
 import { computeClientContentHash } from '@/lib/client-content-hash'
-import { getWorkspacePreference, setWorkspacePreference } from '@/lib/editor/workspace-state'
+import {
+  getWorkspacePreference,
+  setWorkspacePreference,
+  migrateToPresetSystem,
+  getCurrentLayoutPreset,
+  LAYOUT_PRESETS,
+  type WorkspaceLayoutPreset,
+} from '@/lib/editor/workspace-state'
+import { useLayoutShortcuts, useLayoutChangeListener } from '@/hooks/use-layout-shortcuts'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -87,6 +95,7 @@ import { AutosaveErrorAlert } from '@/components/editor/autosave-error-alert'
 import { UndoRedoControls } from '@/components/editor/undo-redo-controls'
 import { DocumentMetadataForm } from '@/components/editor/document-metadata-form'
 import { InlineAnalyticsPanel } from '@/components/editor/inline-analytics-panel'
+import { LayoutPresetSwitcherCompact } from '@/components/editor/layout-preset-switcher'
 import type { ScreenplayAct } from '@/types/screenplay'
 import { ReadingTimeWidget } from '@/components/editor/reading-time-widget'
 import { CharacterSceneIndex } from '@/components/editor/character-scene-index'
@@ -491,6 +500,25 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   } = useDocumentTree({
     projectId: document?.project_id || '',
     enabled: Boolean(document?.project_id && binderSidebarOpen),
+  })
+
+  // Migrate to preset system on first mount
+  useEffect(() => {
+    migrateToPresetSystem()
+  }, [])
+
+  // Layout preset keyboard shortcuts (Cmd+1, 2, 3, 4)
+  useLayoutShortcuts(() => {
+    // The shortcut hook will dispatch 'workspace-layout-changed' event
+    // which we handle below
+  })
+
+  // Listen for layout preset changes and update sidebar states
+  useLayoutChangeListener((preset) => {
+    const config = LAYOUT_PRESETS[preset]
+    setBinderSidebarOpen(config.showBinder)
+    setStructureSidebarOpen(config.showOutline)
+    setShowAI(config.showUtilitySidebar)
   })
 
   useEffect(() => {
@@ -2463,6 +2491,16 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     getUndoHistory={undoRedoAPI.getUndoHistory}
                     getRedoHistory={undoRedoAPI.getRedoHistory}
                   />
+
+                  {/* Layout Preset Switcher */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <LayoutPresetSwitcherCompact />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>Switch workspace layout (⌘1-4)</TooltipContent>
+                  </Tooltip>
 
                   {/* Secondary Actions - Dropdown Menu */}
                   <DropdownMenu>

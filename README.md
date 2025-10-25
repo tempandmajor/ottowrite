@@ -131,6 +131,8 @@ For detailed schema documentation, see:
 - **[ER Diagram](docs/database/schema-er-diagram.md)** - Visual entity-relationship diagram
 - **[Data Dictionary](docs/database/data-dictionary.md)** - Enums, constraints, and business rules
 - **[API-Schema Mapping](docs/database/api-schema-mapping.md)** - How API routes interact with the database
+- **[RLS Policy Guidelines](docs/database/rls-policy-guidelines.md)** - Row-Level Security policy standards and best practices
+- **[Naming Conventions](docs/database/naming-conventions.md)** - Database object naming standards
 - **[Migration Guidelines](docs/database/migration-guidelines.md)** - Best practices for schema changes
 
 ## Project Structure

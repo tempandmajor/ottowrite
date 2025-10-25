@@ -31,7 +31,7 @@ import {
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
 import type { Chapter } from '@/components/editor/chapter-sidebar'
 
-type CommandAction = 'toggle-outline' | 'toggle-ai' | 'toggle-focus' | 'version-history' | 'export' | 'navigate-document' | 'navigate-scene'
+type CommandAction = 'toggle-outline' | 'toggle-ai' | 'toggle-focus' | 'version-history' | 'export' | 'plot-analysis' | 'navigate-document' | 'navigate-scene'
 
 type CommandItem = {
   id: string
@@ -62,6 +62,7 @@ export type CommandPaletteProps = {
   recentDocuments: RecentDocument[]
   recentsLoading: boolean
   cmdKey?: string
+  documentId?: string
   onToggleOutline: () => void
   onToggleAI: () => void
   onToggleFocus: () => void
@@ -78,6 +79,7 @@ export function CommandPalette({
   recentDocuments,
   recentsLoading,
   cmdKey = 'Ctrl',
+  documentId,
   onToggleOutline,
   onToggleAI,
   onToggleFocus,
@@ -122,6 +124,14 @@ export function CommandPalette({
         category: 'Navigation',
       },
       // Actions
+      {
+        id: 'plot-analysis',
+        label: 'Plot Analysis',
+        description: 'Analyze plot structure and pacing',
+        icon: <Search className="h-4 w-4" />,
+        action: 'plot-analysis',
+        category: 'Actions',
+      },
       {
         id: 'version-history',
         label: 'View Version History',
@@ -248,6 +258,11 @@ export function CommandPalette({
         case 'toggle-focus':
           onToggleFocus()
           break
+        case 'plot-analysis':
+          if (documentId) {
+            router.push(`/dashboard/editor/${documentId}/plot-analysis`)
+          }
+          break
         case 'version-history':
           onShowVersionHistory()
           break
@@ -274,6 +289,7 @@ export function CommandPalette({
       onShowVersionHistory,
       onShowExport,
       onNavigateToScene,
+      documentId,
       router,
       onOpenChange,
     ]

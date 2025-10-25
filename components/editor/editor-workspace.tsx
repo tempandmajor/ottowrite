@@ -2306,6 +2306,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
               recentDocuments={recentDocuments}
               recentsLoading={recentsLoading}
               cmdKey={cmdKey}
+              documentId={document?.id}
               onToggleOutline={() => {
                 setFocusMode(false)
                 setStructureSidebarOpen((prev) => !prev)
@@ -2502,90 +2503,35 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     <TooltipContent>Switch workspace layout (⌘1-4)</TooltipContent>
                   </Tooltip>
 
-                  {/* Secondary Actions - Dropdown Menu */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
+                  {/* Command Palette Button */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCommandPaletteOpen(true)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Command className="h-4 w-4" />
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/editor/${document.id}/plot-analysis`}>
-                          <Search className="mr-2 h-4 w-4" />
-                          Plot Analysis
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setShowVersionHistory(true)}>
-                        <History className="mr-2 h-4 w-4" />
-                        Version History
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleExportClick}>
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Export Document
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setFocusMode(false)
-                          setBinderSidebarOpen((prev) => !prev)
-                        }}
+                    </TooltipTrigger>
+                    <TooltipContent>Command Palette (⌘K)</TooltipContent>
+                  </Tooltip>
+
+                  {/* Focus Mode Button */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={focusMode ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={toggleFocusMode}
+                        className="h-8 w-8 p-0"
                       >
-                        {binderSidebarOpen ? (
-                          <>
-                            <PanelLeftClose className="mr-2 h-4 w-4" />
-                            Hide Binder
-                          </>
-                        ) : (
-                          <>
-                            <PanelLeftOpen className="mr-2 h-4 w-4" />
-                            Show Binder
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setFocusMode(false)
-                          setStructureSidebarOpen((prev) => !prev)
-                        }}
-                      >
-                        {structureSidebarOpen ? (
-                          <>
-                            <PanelLeftClose className="mr-2 h-4 w-4" />
-                            Hide Outline
-                          </>
-                        ) : (
-                          <>
-                            <PanelLeftOpen className="mr-2 h-4 w-4" />
-                            Show Outline
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setFocusMode(false)
-                          setShowAI((prev) => !prev)
-                        }}
-                      >
-                        {showAI ? (
-                          <>
-                            <PanelRightClose className="mr-2 h-4 w-4" />
-                            Hide AI Assistant
-                          </>
-                        ) : (
-                          <>
-                            <PanelRightOpen className="mr-2 h-4 w-4" />
-                            Show AI Assistant
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={toggleFocusMode}>
-                        <Maximize2 className="mr-2 h-4 w-4" />
-                        {focusMode ? 'Exit Focus Mode' : 'Focus Mode'}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{focusMode ? 'Exit Focus Mode' : 'Enter Focus Mode'} (⌘Shift+F)</TooltipContent>
+                  </Tooltip>
 
                   <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
                 </div>

@@ -105,15 +105,33 @@ This ensures the world-building tables (`locations`, `location_events`) from mig
 
 ## Database Schema
 
-The application uses the following tables in Supabase:
+The application uses PostgreSQL via Supabase with comprehensive Row-Level Security (RLS) for multi-tenant data isolation.
 
-- `user_profiles` - User subscription tiers, billing identifiers, and AI usage
-- `projects` - Writing projects (novels, screenplays, etc.)
-- `documents` - Individual documents within projects
-- `ai_usage` - AI model usage tracking
-- `ai_requests` - AI orchestration telemetry (intent, model choice, latency)
+### Core Tables
 
-Row Level Security (RLS) is enforced on every table with policies limiting access to the authenticated user. Background jobs and Stripe webhooks use the Supabase service role key to perform privileged updates.
+- `user_profiles` - User subscription tiers, billing identifiers, and AI usage tracking
+- `projects` - Writing projects (novels, screenplays, short stories, etc.)
+- `documents` - Individual documents within projects (ProseMirror JSON content)
+- `project_folders` - Hierarchical folder system for organizing projects
+- `project_tags` - User-defined tags for categorizing projects
+- `project_tag_links` - Many-to-many relationships between projects and tags
+- `ai_usage` - AI model usage tracking for billing and analytics
+- `user_plan_usage` - Aggregated usage snapshots per billing period
+- `subscription_plan_limits` - Feature limits for each subscription tier
+
+### Security & Access Control
+
+Row Level Security (RLS) is enforced on every user-scoped table with policies limiting access to the authenticated user (`auth.uid() = user_id`). Background jobs and Stripe webhooks use the Supabase service role key to perform privileged updates.
+
+### Documentation
+
+For detailed schema documentation, see:
+
+- **[Schema Overview](docs/database/schema-overview.md)** - Comprehensive table and column documentation
+- **[ER Diagram](docs/database/schema-er-diagram.md)** - Visual entity-relationship diagram
+- **[Data Dictionary](docs/database/data-dictionary.md)** - Enums, constraints, and business rules
+- **[API-Schema Mapping](docs/database/api-schema-mapping.md)** - How API routes interact with the database
+- **[Migration Guidelines](docs/database/migration-guidelines.md)** - Best practices for schema changes
 
 ## Project Structure
 

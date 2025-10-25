@@ -62,12 +62,19 @@ CREATE POLICY "Users can manage their tags" ON public.project_tags
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
 
+-- NOTE: Schema Drift Documentation (DB-004)
+-- This migration originally defined PRIMARY KEY (project_id, tag_id) [composite PK]
+-- Production schema has evolved to: PRIMARY KEY (id) + UNIQUE (project_id, tag_id)
+-- The production schema is better (stable row identifier, ORM-friendly)
+-- See: docs/architecture/adr-002-project-tag-links-schema.md for full rationale
+-- See: migration 20251025080531_reconcile_project_tag_links_schema.sql for reconciliation
+-- Fresh deployments will get the production schema automatically via reconciliation migration
 CREATE TABLE IF NOT EXISTS public.project_tag_links (
     project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
     tag_id UUID NOT NULL REFERENCES public.project_tags(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (project_id, tag_id)
+    PRIMARY KEY (project_id, tag_id)  -- See NOTE above: production uses PRIMARY KEY (id)
 );
 
 CREATE INDEX IF NOT EXISTS project_tag_links_user_idx

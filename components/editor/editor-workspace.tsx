@@ -14,6 +14,7 @@ import {
   getCurrentLayoutPreset,
   LAYOUT_PRESETS,
   type WorkspaceLayoutPreset,
+  type WorkspacePreferences,
 } from '@/lib/editor/workspace-state'
 import { useLayoutShortcuts, useLayoutChangeListener } from '@/hooks/use-layout-shortcuts'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -53,14 +55,15 @@ import {
   Search,
   Sparkles,
   MoreHorizontal,
-  MoreVertical,
-  UserPlus,
   Keyboard,
   Maximize2,
   Command,
   Type,
   Loader2,
   Activity,
+  BookOpen,
+  SlidersHorizontal,
+  Info,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns/formatDistanceToNow'
@@ -111,6 +114,40 @@ type RecentDocument = {
   id: string
   title: string
   updatedAt: string
+}
+
+const PANEL_STATE_PREFIX = 'ottowrite:editor:panels:'
+const PANEL_STATE_DEFAULTS: WorkspacePreferences = {
+  showBinder: false,
+  showOutline: false,
+  showUtilitySidebar: false,
+}
+
+const readPanelStateForDocument = (documentId: string): WorkspacePreferences | null => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(`${PANEL_STATE_PREFIX}${documentId}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<WorkspacePreferences> | null
+    if (!parsed || typeof parsed !== 'object') return null
+    return {
+      showBinder: Boolean(parsed.showBinder),
+      showOutline: Boolean(parsed.showOutline),
+      showUtilitySidebar: Boolean(parsed.showUtilitySidebar),
+    }
+  } catch (error) {
+    console.warn('Failed to read panel state', error)
+    return null
+  }
+}
+
+const persistPanelStateForDocument = (documentId: string, prefs: WorkspacePreferences) => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(`${PANEL_STATE_PREFIX}${documentId}`, JSON.stringify(prefs))
+  } catch (error) {
+    console.warn('Failed to persist panel state', error)
+  }
 }
 
 // Loading fallback component
@@ -399,6 +436,8 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const [structureSidebarOpen, setStructureSidebarOpen] = useState(() =>
     getWorkspacePreference('showOutline', false)
   )
+  const [outlineDrawerOpen, setOutlineDrawerOpen] = useState(false)
+  const [metadataSheetOpen, setMetadataSheetOpen] = useState(false)
   // const [binderWidth, setBinderWidth] = useState(280) // Reserved for future resize functionality
   const [leftRailWidth, setLeftRailWidth] = useState(320)
   const [rightRailWidth, setRightRailWidth] = useState(360)
@@ -422,6 +461,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
   const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>([])
   const [recentsLoading, setRecentsLoading] = useState(false)
   const railsRestoredRef = useRef(false)
+  const panelStateLoadedRef = useRef(false)
   const previousRailsRef = useRef({ outline: true, ai: true })
   const recentsFetchedRef = useRef(false)
   const supabaseClient = useMemo(() => createClient(), [])
@@ -466,6 +506,12 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     setWorkspacePreference('showUtilitySidebar', showAI)
   }, [showAI])
 
+  useEffect(() => {
+    if (!structureSidebarOpen || focusMode) {
+      setOutlineDrawerOpen(false)
+    }
+  }, [structureSidebarOpen, focusMode])
+
   const lastSceneFocusMissRef = useRef<string | null>(null)
   const tiptapApiRef = useRef<TiptapEditorApi | null>(null)
   const screenplayApiRef = useRef<ScreenplayEditorApi | null>(null)
@@ -502,6 +548,29 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
     enabled: Boolean(document?.project_id && binderSidebarOpen),
   })
 
+  // Restore per-document panel preferences, defaulting to a blank workspace
+  useEffect(() => {
+    if (!document?.id) return
+    panelStateLoadedRef.current = false
+    const savedPanels = readPanelStateForDocument(document.id)
+    const nextState = savedPanels ?? PANEL_STATE_DEFAULTS
+    setBinderSidebarOpen(nextState.showBinder)
+    setStructureSidebarOpen(nextState.showOutline)
+    setShowAI(nextState.showUtilitySidebar)
+    panelStateLoadedRef.current = true
+  }, [document?.id])
+
+  // Persist panel preferences whenever the user toggles a rail
+  useEffect(() => {
+    if (!document?.id || !panelStateLoadedRef.current) return
+    const prefs: WorkspacePreferences = {
+      showBinder: binderSidebarOpen,
+      showOutline: structureSidebarOpen,
+      showUtilitySidebar: showAI,
+    }
+    persistPanelStateForDocument(document.id, prefs)
+  }, [document?.id, binderSidebarOpen, structureSidebarOpen, showAI])
+
   // Migrate to preset system on first mount
   useEffect(() => {
     migrateToPresetSystem()
@@ -526,13 +595,6 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
       setShowAI(false)
     }
   }, [])
-
-  // Persist binder sidebar state to localStorage
-  useEffect(() => {
-    if (document?.project_id) {
-      localStorage.setItem(`binder-sidebar-open-${document.project_id}`, String(binderSidebarOpen))
-    }
-  }, [binderSidebarOpen, document?.project_id])
 
   useEffect(() => {
     if (isWorkspaceMode) {
@@ -721,6 +783,132 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
       }
     },
     [showAI, clampWidth]
+  )
+
+  const handleToggleOutline = useCallback(() => {
+    setFocusMode(false)
+    setStructureSidebarOpen((prev) => !prev)
+  }, [])
+
+  const handleToggleBinder = useCallback(() => {
+    if (!document?.project_id) return
+    setFocusMode(false)
+    setBinderSidebarOpen((prev) => !prev)
+  }, [document?.project_id])
+
+  const handleToggleAI = useCallback(() => {
+    setFocusMode(false)
+    setShowAI((prev) => !prev)
+  }, [])
+
+  const renderWorkspaceMenuContent = () => (
+    <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuLabel>Panels</DropdownMenuLabel>
+      {document?.project_id && (
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault()
+            handleToggleBinder()
+          }}
+          className="flex items-center gap-2"
+        >
+          {binderSidebarOpen ? (
+            <>
+              <PanelLeftClose className="h-4 w-4" />
+              Hide binder
+            </>
+          ) : (
+            <>
+              <PanelLeftOpen className="h-4 w-4" />
+              Show binder
+            </>
+          )}
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuItem
+        onSelect={(event) => {
+          event.preventDefault()
+          handleToggleOutline()
+        }}
+        className="flex items-center gap-2"
+      >
+        {structureSidebarOpen ? (
+          <>
+            <PanelLeftClose className="h-4 w-4" />
+            Hide outline
+          </>
+        ) : (
+          <>
+            <PanelLeftOpen className="h-4 w-4" />
+            Show outline
+          </>
+        )}
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        onSelect={(event) => {
+          event.preventDefault()
+          handleToggleAI()
+        }}
+        className="flex items-center gap-2"
+      >
+        {showAI ? (
+          <>
+            <PanelRightClose className="h-4 w-4" />
+            Hide AI panel
+          </>
+        ) : (
+          <>
+            <Sparkles className="h-4 w-4" />
+            Show AI panel
+          </>
+        )}
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel>Layout</DropdownMenuLabel>
+      <div className="px-2 py-1.5">
+        <LayoutPresetSwitcherCompact />
+      </div>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel>Document</DropdownMenuLabel>
+      <DropdownMenuItem
+        onSelect={(event) => {
+          event.preventDefault()
+          setMetadataSheetOpen(true)
+        }}
+        className="flex items-center gap-2"
+      >
+        <Info className="h-4 w-4" />
+        Document details
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        onSelect={(event) => {
+          event.preventDefault()
+          setShowVersionHistory(true)
+        }}
+        className="flex items-center gap-2"
+      >
+        <History className="h-4 w-4" />
+        Version history
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        onSelect={(event) => {
+          event.preventDefault()
+          handleExportClick()
+        }}
+        className="flex items-center gap-2"
+      >
+        <FileDown className="h-4 w-4" />
+        Export document
+      </DropdownMenuItem>
+      {document && (
+        <DropdownMenuItem asChild>
+          <Link href={`/dashboard/editor/${document.id}/plot-analysis`} className="flex items-center gap-2">
+            <Search className="h-4 w-4" />
+            Plot analysis
+          </Link>
+        </DropdownMenuItem>
+      )}
+    </DropdownMenuContent>
   )
 
   const toggleFocusMode = useCallback(() => {
@@ -1716,22 +1904,16 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
 
               <TooltipProvider delayDuration={150} disableHoverableContent>
                 <div className={cn('hidden items-center gap-2 md:flex transition-opacity', focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100')}>
-                  {/* Command Palette - High frequency */}
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setCommandPaletteOpen(true)}
-                      >
-                        <Search className="h-4 w-4" />
-                        <span className="sr-only">Command palette</span>
+                      <Button size="sm" onClick={saveDocument} disabled={saving}>
+                        <Save className="mr-2 h-4 w-4" />
+                        {saving ? 'Saving…' : 'Save'}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Command palette ({cmdKey}+K)</TooltipContent>
+                    <TooltipContent>Save now (Ctrl+S)</TooltipContent>
                   </Tooltip>
 
-                  {/* Undo/Redo - High frequency */}
                   <UndoRedoControls
                     canUndo={undoRedoAPI.canUndo}
                     canRedo={undoRedoAPI.canRedo}
@@ -1742,108 +1924,6 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     getUndoHistory={undoRedoAPI.getUndoHistory}
                     getRedoHistory={undoRedoAPI.getRedoHistory}
                   />
-
-                  <Separator orientation="vertical" className="h-6" />
-
-                  {/* Panel Toggles - Icon buttons only */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setFocusMode(false)
-                          setStructureSidebarOpen((prev) => !prev)
-                        }}
-                      >
-                        {structureSidebarOpen ? (
-                          <PanelLeftClose className="h-4 w-4" />
-                        ) : (
-                          <PanelLeftOpen className="h-4 w-4" />
-                        )}
-                        <span className="sr-only">Toggle outline</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Toggle outline (Ctrl+Shift+O)</TooltipContent>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setFocusMode(false)
-                          setShowAI((prev) => !prev)
-                        }}
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        <span className="sr-only">Toggle AI</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Toggle AI assistant (Ctrl+Shift+A)</TooltipContent>
-                  </Tooltip>
-
-                  <Separator orientation="vertical" className="h-6" />
-
-                  {/* More Menu - Secondary actions */}
-                  <DropdownMenu>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                            <span className="sr-only">More options</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                      </TooltipTrigger>
-                      <TooltipContent>More options</TooltipContent>
-                    </Tooltip>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem
-                        onSelect={(event) => {
-                          event.preventDefault()
-                          setShowVersionHistory(true)
-                        }}
-                      >
-                        <History className="mr-2 h-4 w-4" />
-                        Version History
-                        <span className="ml-auto text-xs text-muted-foreground">Ctrl+Shift+H</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={(event) => {
-                          event.preventDefault()
-                          handleExportClick()
-                        }}
-                      >
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Export...
-                        <span className="ml-auto text-xs text-muted-foreground">Ctrl+E</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem disabled>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Share
-                        <span className="ml-auto text-xs text-muted-foreground">Coming soon</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  {/* Metadata - Inline component */}
-                  <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
-
-                  <Separator orientation="vertical" className="h-6" />
-
-                  {/* Primary Actions */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="sm" onClick={saveDocument} disabled={saving}>
-                        <Save className="mr-2 h-4 w-4" />
-                        {saving ? 'Saving…' : 'Save'}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Save now (Ctrl+S)</TooltipContent>
-                  </Tooltip>
 
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1859,6 +1939,35 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       {focusMode ? 'Exit Focus Mode (Ctrl+Shift+F)' : 'Enter Focus Mode (Ctrl+Shift+F)'}
                     </TooltipContent>
                   </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCommandPaletteOpen(true)}
+                      >
+                        <Search className="h-4 w-4" />
+                        <span className="sr-only">Command palette</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Command palette ({cmdKey}+K)</TooltipContent>
+                  </Tooltip>
+
+                  <DropdownMenu>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-2">
+                            <SlidersHorizontal className="h-4 w-4" />
+                            Workspace
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>Workspace settings</TooltipContent>
+                    </Tooltip>
+                    {renderWorkspaceMenuContent()}
+                  </DropdownMenu>
                 </div>
               </TooltipProvider>
 
@@ -1870,7 +1979,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       Actions
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align="end" className="w-64">
                     <DropdownMenuItem
                       onSelect={(event) => {
                         event.preventDefault()
@@ -1880,9 +1989,8 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       className="flex items-center gap-2"
                     >
                       <Save className="h-4 w-4" />
-                      {saving ? 'Saving...' : 'Save document'}
+                      {saving ? 'Saving…' : 'Save document'}
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onSelect={(event) => {
                         event.preventDefault()
@@ -1893,7 +2001,6 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     >
                       <History className="h-4 w-4" />
                       Undo
-                      <span className="ml-auto text-xs text-muted-foreground">Ctrl+Z</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={(event) => {
@@ -1905,35 +2012,33 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     >
                       <History className="h-4 w-4 scale-x-[-1]" />
                       Redo
-                      <span className="ml-auto text-xs text-muted-foreground">Ctrl+Y</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
+                    {document.project_id && (
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault()
+                          handleToggleBinder()
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        {binderSidebarOpen ? (
+                          <>
+                            <PanelLeftClose className="h-4 w-4" />
+                            Hide binder
+                          </>
+                        ) : (
+                          <>
+                            <PanelLeftOpen className="h-4 w-4" />
+                            Show binder
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       onSelect={(event) => {
                         event.preventDefault()
-                        setCommandPaletteOpen(true)
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      <Command className="h-4 w-4" />
-                      Command palette
-                      <span className="ml-auto text-xs text-muted-foreground">{cmdKey}+K</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={(event) => {
-                        event.preventDefault()
-                        toggleFocusMode()
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                      {focusMode ? 'Exit focus mode' : 'Focus mode'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={(event) => {
-                        event.preventDefault()
-                        setFocusMode(false)
-                        setStructureSidebarOpen((prev) => !prev)
+                        handleToggleOutline()
                       }}
                       className="flex items-center gap-2"
                     >
@@ -1952,8 +2057,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     <DropdownMenuItem
                       onSelect={(event) => {
                         event.preventDefault()
-                        setFocusMode(false)
-                        setShowAI((prev) => !prev)
+                        handleToggleAI()
                       }}
                       className="flex items-center gap-2"
                     >
@@ -1968,6 +2072,45 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                           Show AI assistant
                         </>
                       )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => event.preventDefault()}
+                      className="flex flex-col items-start gap-2"
+                    >
+                      <span className="text-xs font-semibold text-muted-foreground">Layout preset</span>
+                      <LayoutPresetSwitcherCompact />
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        toggleFocusMode()
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                      {focusMode ? 'Exit focus' : 'Focus mode'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        setCommandPaletteOpen(true)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Command className="h-4 w-4" />
+                      Command palette
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        setMetadataSheetOpen(true)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Info className="h-4 w-4" />
+                      Document details
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={(event) => {
@@ -1987,20 +2130,7 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                       className="flex items-center gap-2"
                     >
                       <FileDown className="h-4 w-4" />
-                      Export
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={(event) => event.preventDefault()} className="flex items-center gap-2" disabled>
-                      <UserPlus className="h-4 w-4" />
-                      Share (soon)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={async (event) => {
-                        event.preventDefault()
-                        await saveDocument()
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      Save now
+                      Export document
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -2469,18 +2599,15 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
             <div className="flex items-center justify-end gap-2">
               <TooltipProvider delayDuration={150} disableHoverableContent>
                 <div className={cn('hidden items-center gap-2 md:flex transition-opacity', focusMode ? 'opacity-0 pointer-events-none' : 'opacity-100')}>
-                  {/* Primary Actions - Always Visible */}
-                  {isDirty && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button size="sm" onClick={saveDocument} disabled={saving}>
-                          <Save className="mr-2 h-4 w-4" />
-                          {saving ? 'Saving…' : 'Save'}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Save now (Ctrl+S)</TooltipContent>
-                    </Tooltip>
-                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" onClick={saveDocument} disabled={saving} className="gap-2">
+                        <Save className="h-4 w-4" />
+                        {saving ? 'Saving…' : 'Save'}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Save now (Ctrl+S)</TooltipContent>
+                  </Tooltip>
 
                   <UndoRedoControls
                     canUndo={undoRedoAPI.canUndo}
@@ -2493,17 +2620,21 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                     getRedoHistory={undoRedoAPI.getRedoHistory}
                   />
 
-                  {/* Layout Preset Switcher */}
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div>
-                        <LayoutPresetSwitcherCompact />
-                      </div>
+                      <Button
+                        variant={focusMode ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={toggleFocusMode}
+                        className="gap-2"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                        {focusMode ? 'Exit focus' : 'Focus'}
+                      </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Switch workspace layout (⌘1-4)</TooltipContent>
+                    <TooltipContent>{focusMode ? 'Exit focus mode (⌘Shift+F)' : 'Enter focus mode (⌘Shift+F)'}</TooltipContent>
                   </Tooltip>
 
-                  {/* Command Palette Button */}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -2513,144 +2644,206 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
                         className="h-8 w-8 p-0"
                       >
                         <Command className="h-4 w-4" />
+                        <span className="sr-only">Open command palette</span>
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Command Palette (⌘K)</TooltipContent>
+                    <TooltipContent>Command palette ({cmdKey}+K)</TooltipContent>
                   </Tooltip>
 
-                  {/* Focus Mode Button */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant={focusMode ? 'default' : 'ghost'}
-                        size="sm"
-                        onClick={toggleFocusMode}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Maximize2 className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{focusMode ? 'Exit Focus Mode' : 'Enter Focus Mode'} (⌘Shift+F)</TooltipContent>
-                  </Tooltip>
-
-                  <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
+                  <DropdownMenu>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-2">
+                            <SlidersHorizontal className="h-4 w-4" />
+                            Workspace
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>Workspace settings</TooltipContent>
+                    </Tooltip>
+                    {renderWorkspaceMenuContent()}
+                  </DropdownMenu>
                 </div>
               </TooltipProvider>
 
               {/* Mobile Actions - Simplified Dropdown */}
               <div className={cn('flex items-center gap-2 md:hidden', focusMode ? 'hidden' : '')}>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <MoreHorizontal className="h-4 w-4" />
-                    Actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      saveDocument()
-                    }}
-                    disabled={saving}
-                    className="flex items-center gap-2"
-                  >
-                    <Save className="h-4 w-4" />
-                    {saving ? 'Saving...' : 'Save document'}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      setCommandPaletteOpen(true)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <Command className="h-4 w-4" />
-                    Command palette
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      toggleFocusMode()
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <Maximize2 className="h-4 w-4" />
-                    {focusMode ? 'Exit focus mode' : 'Focus mode'}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      setFocusMode(false)
-                      setStructureSidebarOpen((prev) => !prev)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    {structureSidebarOpen ? (
-                      <>
-                        <PanelLeftClose className="h-4 w-4" />
-                        Hide outline
-                      </>
-                    ) : (
-                      <>
-                        <PanelLeftOpen className="h-4 w-4" />
-                        Show outline
-                      </>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <MoreHorizontal className="h-4 w-4" />
+                      Actions
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        saveDocument()
+                      }}
+                      disabled={saving}
+                      className="flex items-center gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      {saving ? 'Saving…' : 'Save document'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        handleUndo()
+                      }}
+                      disabled={!undoRedoAPI.canUndo}
+                      className="flex items-center gap-2"
+                    >
+                      <History className="h-4 w-4" />
+                      Undo
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        handleRedo()
+                      }}
+                      disabled={!undoRedoAPI.canRedo}
+                      className="flex items-center gap-2"
+                    >
+                      <History className="h-4 w-4 scale-x-[-1]" />
+                      Redo
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        toggleFocusMode()
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                      {focusMode ? 'Exit focus' : 'Focus mode'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        setCommandPaletteOpen(true)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Command className="h-4 w-4" />
+                      Command palette
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {document.project_id && (
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault()
+                          handleToggleBinder()
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        {binderSidebarOpen ? (
+                          <>
+                            <PanelLeftClose className="h-4 w-4" />
+                            Hide binder
+                          </>
+                        ) : (
+                          <>
+                            <PanelLeftOpen className="h-4 w-4" />
+                            Show binder
+                          </>
+                        )}
+                      </DropdownMenuItem>
                     )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      setFocusMode(false)
-                      setShowAI((prev) => !prev)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    {showAI ? (
-                      <>
-                        <PanelRightClose className="h-4 w-4" />
-                        Hide AI panel
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        Show AI panel
-                      </>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        handleToggleOutline()
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      {structureSidebarOpen ? (
+                        <>
+                          <PanelLeftClose className="h-4 w-4" />
+                          Hide outline
+                        </>
+                      ) : (
+                        <>
+                          <PanelLeftOpen className="h-4 w-4" />
+                          Show outline
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        handleToggleAI()
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      {showAI ? (
+                        <>
+                          <PanelRightClose className="h-4 w-4" />
+                          Hide AI panel
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Show AI panel
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => event.preventDefault()}
+                      className="flex flex-col items-start gap-2"
+                    >
+                      <span className="text-xs font-semibold text-muted-foreground">Layout preset</span>
+                      <LayoutPresetSwitcherCompact />
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        setMetadataSheetOpen(true)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <Info className="h-4 w-4" />
+                      Document details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        setShowVersionHistory(true)
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <History className="h-4 w-4" />
+                      Version history
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault()
+                        handleExportClick()
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Export document
+                    </DropdownMenuItem>
+                    {document && (
+                      <DropdownMenuItem asChild>
+                        <Link href={`/dashboard/editor/${document.id}/plot-analysis`} className="flex items-center gap-2">
+                          <Search className="h-4 w-4" />
+                          Plot analysis
+                        </Link>
+                      </DropdownMenuItem>
                     )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      setShowVersionHistory(true)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <History className="h-4 w-4" />
-                    Version history
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      handleExportClick()
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <FileDown className="h-4 w-4" />
-                    Export document
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={`/dashboard/editor/${document.id}/plot-analysis`} className="flex items-center gap-2">
-                      <Search className="h-4 w-4" />
-                      Plot analysis
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button onClick={saveDocument} disabled={saving} size="sm" className="sm:hidden">
-                <Save className="mr-2 h-4 w-4" />
-                {saving ? 'Saving…' : 'Save'}
-              </Button>
-            </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button onClick={saveDocument} disabled={saving} size="sm" className="sm:hidden">
+                  <Save className="mr-2 h-4 w-4" />
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -2707,27 +2900,44 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
           </div>
         )}
         {showStructureSidebar && document && (
-          <div className="space-y-4 animate-in fade-in slide-in-from-left-5 duration-300">
+          <>
             {isScriptType(document.type) ? (
-              <ScreenplayActBoard
-                acts={screenplayStructure}
-                onChange={handleScreenplayStructureChange}
-                sceneMeta={screenplaySceneMeta}
-              />
+              <div className="space-y-4 animate-in fade-in slide-in-from-left-5 duration-300">
+                <ScreenplayActBoard
+                  acts={screenplayStructure}
+                  onChange={handleScreenplayStructureChange}
+                  sceneMeta={screenplaySceneMeta}
+                />
+              </div>
             ) : (
-              <TabbedOutlineSidebar
-                structure={structure}
-                content={content}
-                wordCount={wordCount}
-                activeSceneId={activeSceneId}
-                missingAnchors={missingAnchors}
-                onStructureChange={handleStructureChange}
-                onSelectScene={handleSceneSelect}
-                onCreateScene={handleSceneCreated}
-                onInsertAnchor={handleInsertAnchor}
-              />
+              <>
+                <div className="hidden lg:block space-y-4 animate-in fade-in slide-in-from-left-5 duration-300">
+                  <TabbedOutlineSidebar
+                    structure={structure}
+                    content={content}
+                    wordCount={wordCount}
+                    activeSceneId={activeSceneId}
+                    missingAnchors={missingAnchors}
+                    onStructureChange={handleStructureChange}
+                    onSelectScene={handleSceneSelect}
+                    onCreateScene={handleSceneCreated}
+                    onInsertAnchor={handleInsertAnchor}
+                  />
+                </div>
+                <div className="lg:hidden w-full">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-center gap-2"
+                    onClick={() => setOutlineDrawerOpen(true)}
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    Outline & tools
+                  </Button>
+                </div>
+              </>
             )}
-          </div>
+          </>
         )}
         {/* Editor - immediately visible on load */}
         <div className="overflow-hidden rounded-lg border bg-card shadow-card">
@@ -2831,6 +3041,44 @@ export function EditorWorkspace({ workspaceMode }: { workspaceMode: boolean }) {
           </div>
         )}
       </main>
+
+      {showStructureSidebar && document && !isScriptType(document.type) && (
+        <Sheet open={outlineDrawerOpen} onOpenChange={setOutlineDrawerOpen}>
+          <SheetContent side="left" className="w-full sm:max-w-md overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Outline & tools</SheetTitle>
+              <SheetDescription>
+                Switch between chapters, reading time, and characters without leaving the page.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="mt-4">
+              <TabbedOutlineSidebar
+                structure={structure}
+                content={content}
+                wordCount={wordCount}
+                activeSceneId={activeSceneId}
+                missingAnchors={missingAnchors}
+                onStructureChange={handleStructureChange}
+                onSelectScene={handleSceneSelect}
+                onCreateScene={handleSceneCreated}
+                onInsertAnchor={handleInsertAnchor}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+
+      <Sheet open={metadataSheetOpen} onOpenChange={setMetadataSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Document details</SheetTitle>
+            <SheetDescription>Update metadata, genres, and targets.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4">
+            <DocumentMetadataForm metadata={metadata} onChange={handleMetadataChange} />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Sticky Bottom Status Bar */}
       {!focusMode && (
